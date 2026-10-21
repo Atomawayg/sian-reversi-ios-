@@ -34,3 +34,22 @@ enum RawUDP {
         }
     }
 }
+
+/// Sends a whole board as a burst of Darwin notifications: one name per cell value, then a commit.
+enum DarwinBoard {
+    static let prefix = "com.atomawayg.sian.b."
+    static func names() -> [String] {
+        var n: [String] = []
+        for i in 0..<64 { for v in 0..<4 { n.append(prefix + "c\(i)v\(v)") } }
+        for v in 0..<3 { n.append(prefix + "me\(v)") }
+        n += [prefix + "turn0", prefix + "turn1", prefix + "valid0", prefix + "valid1", prefix + "commit"]
+        return n
+    }
+    static func send(_ m: BoardMessage) {
+        Signal.post(prefix + "valid\(m.valid ? 1 : 0)")
+        if m.cells.count == 64 { for (i, v) in m.cells.enumerated() { Signal.post(prefix + "c\(i)v\(v)") } }
+        Signal.post(prefix + "me\(m.me)")
+        Signal.post(prefix + "turn\(m.myTurn ? 1 : 0)")
+        Signal.post(prefix + "commit")
+    }
+}

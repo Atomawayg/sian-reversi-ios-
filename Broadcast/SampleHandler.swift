@@ -55,5 +55,6 @@ class SampleHandler: RPBroadcastSampleHandler {
         guard let data = try? JSONEncoder().encode(m) else { return }
         conn?.send(content: data, completion: .contentProcessed { _ in })
         RawUDP.send(data)
+        DarwinBoard.send(m)
     }
 }

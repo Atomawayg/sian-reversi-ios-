@@ -25,12 +25,12 @@ final class GameModel: ObservableObject {
 
     init() {
         pip.onStateChange = { [weak self] on in DispatchQueue.main.async { self?.pipOn = on } }
-        receiver.onMessage = { [weak self] m in DispatchQueue.main.async { self?.handle(m) } }
+        receiver.onMessage = { [weak self] m in DispatchQueue.main.async { self?.handle(m, viaSocket: true) } }
         receiver.onStatus = { [weak self] s in DispatchQueue.main.async { self?.netState = s; self?.refreshDebug() } }
         receiver.start()
         GameModel.shared = self
         let center = CFNotificationCenterGetDarwinNotifyCenter()
-        for name in [Signal.started, Signal.frame, Signal.stopped] {
+        for name in [Signal.started, Signal.frame, Signal.stopped] + DarwinBoard.names() {
             CFNotificationCenterAddObserver(center, nil, { _, _, name, _, _ in
                 let n = (name?.rawValue as String?) ?? ""
                 DispatchQueue.main.async { GameModel.shared?.signal(n) }
@@ -39,6 +39,8 @@ final class GameModel: ObservableObject {
         show(overlay)
         watchdog = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             guard let self else { return }
+            self.refreshDebug()
+            self.show(self.overlay)
             let alive = Date().timeIntervalSince(self.lastMsgAt) < 4
             if self.linked != alive {
                 self.linked = alive
@@ -56,26 +58,48 @@ final class GameModel: ObservableObject {
 
     static weak var shared: GameModel?
 
+    private var dCells = [Int](repeating: 0, count: 64), dMe = 0, dTurn = false, dValid = false
+    private var lastDarwinCommit = Date.distantPast, lastSocketMsg = Date.distantPast
+    private var darwinMsgs = 0
+
     fileprivate func signal(_ n: String) {
+        if n.hasPrefix(DarwinBoard.prefix) {
+            let k = String(n.dropFirst(DarwinBoard.prefix.count))
+            if k == "commit" {
+                darwinMsgs += 1
+                lastDarwinCommit = Date()
+                // sockets win when they work; Darwin burst is the fallback
+                if Date().timeIntervalSince(lastSocketMsg) > 3 {
+                    handle(BoardMessage(valid: dValid, cells: dValid ? dCells : [], me: dMe, myTurn: dTurn), viaSocket: false)
+                }
+            } else if k.hasPrefix("c"), let vi = k.firstIndex(of: "v"),
+                      let i = Int(k[k.index(after: k.startIndex)..<vi]), let v = Int(k[k.index(after: vi)...]), i < 64 {
+                dCells[i] = v
+            } else if k.hasPrefix("me"), let v = Int(k.dropFirst(2)) { dMe = v }
+            else if k.hasPrefix("turn") { dTurn = k == "turn1" }
+            else if k.hasPrefix("valid") { dValid = k == "valid1" }
+            return
+        }
         if n == Signal.started { started = true; frames = 0 }
         if n == Signal.stopped { started = false }
         if n == Signal.frame { frames += 1; started = true }
         refreshDebug()
     }
     private func refreshDebug() {
-        debug = "อ่านจอ: \(started ? "ทำงาน" : "ไม่ทำงาน") · ภาพ \(frames) · ข้อมูล \(msgs) · net \(netState)"
+        debug = "อ่านจอ: \(started ? "ทำงาน" : "ไม่ทำงาน") · ภาพ \(frames) · udp \(msgs) · darwin \(darwinMsgs) · net \(netState)"
     }
 
-    private func show(_ o: Overlay) { overlay = o; pip.show(o) }
+    private func show(_ o: Overlay) { var x = o; x.footer = debug; overlay = x; pip.show(x) }
 
     private static func name(_ i: Int) -> String {
         let letters = Array("ABCDEFGH")
         return "\(letters[i % 8])\(i / 8 + 1)"
     }
 
-    private func handle(_ m: BoardMessage) {
+    private func handle(_ m: BoardMessage, viaSocket: Bool) {
         lastMsgAt = Date()
-        msgs += 1; refreshDebug()
+        if viaSocket { lastSocketMsg = Date(); msgs += 1 }
+        refreshDebug()
         if !linked { linked = true }
         guard m.valid, m.cells.count == 64 else {
             computedFor = []

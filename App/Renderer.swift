@@ -8,6 +8,7 @@ struct Overlay: Equatable {
     var title: String        // big text, e.g. "G8"
     var line: String         // small text under it
     var mine: Bool = false   // gold accent when it's your move
+    var footer: String = ""  // tiny diagnostics line
 }
 
 enum Renderer {
@@ -83,6 +84,10 @@ enum Renderer {
         (o.title as NSString).draw(with: CGRect(x: textX, y: y, width: tw, height: tSize.height), options: .usesLineFragmentOrigin, attributes: tAttr, context: nil)
         y += tSize.height + 8
         (o.line as NSString).draw(with: CGRect(x: textX, y: y, width: tw, height: lSize.height), options: .usesLineFragmentOrigin, attributes: lAttr, context: nil)
+        if !o.footer.isEmpty {
+            let fAttr: [NSAttributedString.Key: Any] = [.font: UIFont.monospacedSystemFont(ofSize: 13, weight: .regular), .foregroundColor: muted.withAlphaComponent(0.8)]
+            (o.footer as NSString).draw(with: CGRect(x: 8, y: rect.height - 20, width: rect.width - 16, height: 18), options: .usesLineFragmentOrigin, attributes: fAttr, context: nil)
+        }
     }
 
     static func image(_ o: Overlay) -> UIImage {
