@@ -18,7 +18,7 @@ struct BoardMessage: Codable, Equatable {
     var valid: Bool
     var game: GameKind = .reversi
     /// w*h values, row-major from the top-left.
-    /// reversi: 0 empty, 1 black, 2 white, 3 hole · checkers: 0 empty, 1 red, 2 purple · connect: 0 empty, 1 red, 2 yellow
+    /// reversi: 0 empty, 1 black, 2 white, 3 hole · checkers: 0 empty, 1 red, 2 purple, 3 red king, 4 purple king · connect: 0 empty, 1 red, 2 yellow
     var cells: [Int]
     /// your colour (same codes as cells), 0 unknown
     var me: Int

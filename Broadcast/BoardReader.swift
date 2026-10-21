@@ -113,13 +113,43 @@ enum BoardReader {
         var cells = [Int](repeating: 0, count: 64)
         var pieces = 0, lightOK = 0
         for r in 0..<8 { for c in 0..<8 {
-            let cx = (52 + 135 * (Double(c) + 0.5)) * sx, cy = (773 + 134.5 * (Double(r) + 0.5) - 5) * sy
-            let p = s.avg(cx, cy, 20 * sx)
-            let L = (p.0 + p.1 + p.2) / 3
-            if (r + c) & 1 == 0 { if L > 170 { lightOK += 1 }; continue }
+            let x0 = 52 + 135 * Double(c), y0 = 773 + 134.5 * Double(r)
+            if (r + c) & 1 == 0 {
+                let p = s.avg((x0 + 67) * sx, (y0 + 62) * sy, 20 * sx)
+                if (p.0 + p.1 + p.2) / 3 > 170 { lightOK += 1 }
+                continue
+            }
+            // piece colour from the lower part of the square (a king's crown covers the top)
+            var red = 0, pur = 0, gold = 0
+            var dy = 80.0
+            while dy <= 120 {
+                var dx = 30.0
+                while dx <= 105 {
+                    let q = s.get(Int((x0 + dx) * sx), Int((y0 + dy) * sy))
+                    let L = (q.0 + q.1 + q.2) / 3
+                    if q.2 > q.0 + 5 && L < 170 { pur += 1 }
+                    else if q.0 - q.1 > 60 && q.0 < 240 && q.1 < 150 { red += 1 }
+                    dx += 6
+                }
+                dy += 6
+            }
+            // crown: gold pixels in the upper part of the square
+            dy = -35
+            while dy <= 50 {
+                var dx = 25.0
+                while dx <= 110 {
+                    let y = Int((y0 + dy) * sy), x = Int((x0 + dx) * sx)
+                    if y >= 0 && y < s.h {
+                        let q = s.get(x, y)
+                        if q.0 > 180 && q.1 > 140 && q.2 < 110 { gold += 1 }
+                    }
+                    dx += 6
+                }
+                dy += 6
+            }
             var v = 0
-            if p.2 > p.0 + 5 && L < 170 { v = 2 }                                  // purple
-            else if p.0 - p.1 > 60 && p.0 < 235 && p.1 < 150 { v = 1 }              // red
+            if red >= 12 && red > pur { v = 1 } else if pur >= 12 { v = 2 }
+            if v != 0 && gold >= 6 { v += 2 }   // 3 red king, 4 purple king
             if v != 0 { pieces += 1 }
             cells[r * 8 + c] = v
         } }
@@ -130,7 +160,7 @@ enum BoardReader {
         // your turn: the yellow countdown ring around your avatar
         var yellow = 0
         for k in 0..<24 {
-            let ang = Double(k) * .pi / 12
+            let ang = Double(k) * Double.pi / 12
             let q = s.avg((188 + 97 * cos(ang)) * sx, (530 + 97 * sin(ang)) * sy, 2 * sx)
             if (q.0 + q.1) / 2 - q.2 > 60 { yellow += 1 }
         }

@@ -172,13 +172,15 @@ final class GameModel: ObservableObject {
         var meC = m.me
         if meC == 0 { // fallback: whoever has more pieces in the bottom half is you
             var lower = [0, 0, 0]
-            for i in 32..<64 where m.cells[i] != 0 { lower[m.cells[i]] += 1 }
+            for i in 32..<64 where m.cells[i] != 0 { lower[(m.cells[i] - 1) % 2 + 1] += 1 }
             meC = lower[1] >= lower[2] ? 1 : 2
         }
         var nb = [Int](repeating: 0, count: 64)
         for i in 0..<64 where m.cells[i] != 0 {
-            let mine = m.cells[i] == meC
+            let colour = (m.cells[i] - 1) % 2 + 1, crowned = m.cells[i] >= 3
+            let mine = colour == meC
             var x = mine ? 1 : -1
+            if crowned { x *= 2 }
             if mine && i / 8 == 0 { x = 2 }
             if !mine && i / 8 == 7 { x = -2 }
             nb[i] = x

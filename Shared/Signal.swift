@@ -40,7 +40,7 @@ enum DarwinBoard {
     static let prefix = "com.atomawayg.sian.b."
     static func names() -> [String] {
         var n: [String] = []
-        for i in 0..<64 { for v in 0..<4 { n.append(prefix + "c\(i)v\(v)") } }
+        for i in 0..<64 { for v in 0..<5 { n.append(prefix + "c\(i)v\(v)") } }
         for g in 0..<4 { n.append(prefix + "g\(g)") }
         for v in 0..<3 { n.append(prefix + "me\(v)") }
         n += [prefix + "turn0", prefix + "turn1", prefix + "valid0", prefix + "valid1", prefix + "commit"]
