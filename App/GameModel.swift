@@ -6,11 +6,14 @@ final class GameModel: ObservableObject {
     @Published var pipOn = false
     @Published var linked = false
     @Published var me = 0
+    @Published var debug = "รอการอ่านจอ"
+    private var frames = 0, msgs = 0, started = false, netState = "-"
     @Published var thinkMs = UserDefaults.standard.integer(forKey: "thinkMs") == 0 ? 1000 : UserDefaults.standard.integer(forKey: "thinkMs") {
         didSet { UserDefaults.standard.set(thinkMs, forKey: "thinkMs") }
     }
 
     let pip = PiPManager()
+    private let keepAlive = KeepAlive()
     private let receiver = Receiver()
     private let engine = Engine()
     private let work = DispatchQueue(label: "sian.think", qos: .userInitiated)
@@ -23,7 +26,16 @@ final class GameModel: ObservableObject {
     init() {
         pip.onStateChange = { [weak self] on in DispatchQueue.main.async { self?.pipOn = on } }
         receiver.onMessage = { [weak self] m in DispatchQueue.main.async { self?.handle(m) } }
+        receiver.onStatus = { [weak self] s in DispatchQueue.main.async { self?.netState = s; self?.refreshDebug() } }
         receiver.start()
+        GameModel.shared = self
+        let center = CFNotificationCenterGetDarwinNotifyCenter()
+        for name in [Signal.started, Signal.frame, Signal.stopped] {
+            CFNotificationCenterAddObserver(center, nil, { _, _, name, _, _ in
+                let n = (name?.rawValue as String?) ?? ""
+                DispatchQueue.main.async { GameModel.shared?.signal(n) }
+            }, name as CFString, nil, .deliverImmediately)
+        }
         show(overlay)
         watchdog = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             guard let self else { return }
@@ -32,10 +44,26 @@ final class GameModel: ObservableObject {
                 self.linked = alive
                 if !alive {
                     self.computedFor = []
+                    if self.started {
+                        self.show(Overlay(cells: nil, rec: nil, title: "⋯", line: "อ่านจออยู่ แต่ยังไม่เห็นกระดาน"))
+                        return
+                    }
                     self.show(Overlay(cells: nil, rec: nil, title: "หยุดอ่าน", line: "การอ่านหน้าจอหยุดอยู่ กดปุ่ม 2 ในแอปอีกครั้ง"))
                 }
             }
         }
+    }
+
+    static weak var shared: GameModel?
+
+    fileprivate func signal(_ n: String) {
+        if n == Signal.started { started = true; frames = 0 }
+        if n == Signal.stopped { started = false }
+        if n == Signal.frame { frames += 1; started = true }
+        refreshDebug()
+    }
+    private func refreshDebug() {
+        debug = "อ่านจอ: \(started ? "ทำงาน" : "ไม่ทำงาน") · ภาพ \(frames) · ข้อมูล \(msgs) · net \(netState)"
     }
 
     private func show(_ o: Overlay) { overlay = o; pip.show(o) }
@@ -47,6 +75,7 @@ final class GameModel: ObservableObject {
 
     private func handle(_ m: BoardMessage) {
         lastMsgAt = Date()
+        msgs += 1; refreshDebug()
         if !linked { linked = true }
         guard m.valid, m.cells.count == 64 else {
             computedFor = []
@@ -103,5 +132,5 @@ final class GameModel: ObservableObject {
     }
 
     func setMe(_ c: Int) { me = c; manualMe = c != 0; computedFor = [] }
-    func togglePiP() { pip.start() }
+    func togglePiP() { keepAlive.start(); pip.start() }
 }

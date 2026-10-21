@@ -43,6 +43,8 @@ struct ContentView: View {
 
                 BroadcastButton(title: model.linked ? "หยุด / เริ่มอ่านจอใหม่" : "2. เริ่มอ่านหน้าจอ", gold: gold, panel: panel, active: model.linked)
 
+                Text(model.debug).font(.caption.monospaced()).foregroundColor(.secondary)
+
                 VStack(alignment: .leading, spacing: 10) {
                     Text("สีของคุณ").font(.subheadline).foregroundColor(.secondary)
                     Picker("สี", selection: Binding(get: { model.me }, set: { model.setMe($0) })) {
