@@ -57,7 +57,17 @@ enum BoardReader {
         let W = Double(s.w), H = Double(s.h)
         // Portrait only. A landscape frame is not the game screen we expect.
         if W > H { return BoardMessage(valid: false, cells: [], me: 0, myTurn: false) }
+        // Which game? The background in the top-left corner tells them apart.
+        let tl = s.avg(W * 40 / 1179, H * 400 / 2556, W * 5 / 1179)
+        let tlL = (tl.0 + tl.1 + tl.2) / 3
+        if tl.0 > 160 && tl.0 - tl.1 > 50 { return readCheckers(s) }
+        if tl.2 > tl.0 + 8 && tlL < 70 { return readConnect(s) }
+        return readReversi(s)
+    }
 
+    // MARK: WePlay Reversi
+    private static func readReversi(_ s: Sampler) -> BoardMessage {
+        let W = Double(s.w), H = Double(s.h)
         let cw = W * 107.5 / 1179
         let gx = W * 159 / 1179, gy = H * 933 / 2556
         var cells = [Int](repeating: 0, count: 64)
@@ -93,6 +103,67 @@ enum BoardReader {
         var me = 0
         if abs(tr - tl) > 60 { me = tr > tl ? 2 : 1 }
 
-        return BoardMessage(valid: valid, cells: cells, me: me, myTurn: valid && glow > 0)
+        return BoardMessage(valid: valid, game: .reversi, cells: cells, me: me, myTurn: valid && glow > 0)
+    }
+
+    // MARK: WePlay หมากฮอส — board x 52…1132, y 773…1849 on a 1179×2556 screen; you are always at the bottom
+    private static func readCheckers(_ s: Sampler) -> BoardMessage {
+        let W = Double(s.w), H = Double(s.h)
+        let sx = W / 1179, sy = H / 2556
+        var cells = [Int](repeating: 0, count: 64)
+        var pieces = 0, lightOK = 0
+        for r in 0..<8 { for c in 0..<8 {
+            let cx = (52 + 135 * (Double(c) + 0.5)) * sx, cy = (773 + 134.5 * (Double(r) + 0.5) - 5) * sy
+            let p = s.avg(cx, cy, 20 * sx)
+            let L = (p.0 + p.1 + p.2) / 3
+            if (r + c) & 1 == 0 { if L > 170 { lightOK += 1 }; continue }
+            var v = 0
+            if p.2 > p.0 + 5 && L < 170 { v = 2 }                                  // purple
+            else if p.0 - p.1 > 60 && p.0 < 235 && p.1 < 150 { v = 1 }              // red
+            if v != 0 { pieces += 1 }
+            cells[r * 8 + c] = v
+        } }
+        let valid = pieces >= 2 && lightOK >= 24
+        // your colour: the small disc badge on your avatar (top-left)
+        let bd = s.avg(262 * sx, 609 * sy, 5 * sx)
+        let me = bd.0 - bd.1 > 60 ? 1 : (bd.2 > bd.0 ? 2 : 0)
+        // your turn: the yellow countdown ring around your avatar
+        var yellow = 0
+        for k in 0..<24 {
+            let ang = Double(k) * .pi / 12
+            let q = s.avg((188 + 97 * cos(ang)) * sx, (530 + 97 * sin(ang)) * sy, 2 * sx)
+            if (q.0 + q.1) / 2 - q.2 > 60 { yellow += 1 }
+        }
+        return BoardMessage(valid: valid, game: .checkers, cells: cells, me: me, myTurn: valid && yellow >= 2)
+    }
+
+    // MARK: Plato 4 / 5 in a Row — board panel spans x 25…1150; 7×6 starts at y 836, 9×7 at y 881
+    private static func readConnect(_ s: Sampler) -> BoardMessage {
+        let W = Double(s.w), H = Double(s.h)
+        let sx = W / 1179, sy = H / 2556
+        func lum(_ x: Double, _ y: Double) -> Double { let p = s.avg(x * sx, y * sy, 3 * sx); return (p.0 + p.1 + p.2) / 3 }
+        var kind: GameKind
+        var pitch: Double, top: Double
+        if lum(30, 850) > 52 { kind = .connect4; pitch = 160.6; top = 836 }
+        else if lum(30, 900) > 52 { kind = .connect5; pitch = 124.9; top = 881 }
+        else { return BoardMessage(valid: false, cells: [], me: 0, myTurn: false) }
+        let (cols, rows) = kind.size
+        var cells = [Int](repeating: 0, count: cols * rows)
+        for r in 0..<rows { for c in 0..<cols {
+            let p = s.avg((25.5 + pitch * (Double(c) + 0.5)) * sx, (top + pitch * (Double(r) + 0.5)) * sy, pitch * 0.15 * sx)
+            let L = (p.0 + p.1 + p.2) / 3
+            var v = 0
+            if L > 70 {
+                if p.0 - p.1 > 100 { v = 1 }                    // red
+                else if p.1 > 120 && p.0 > 170 { v = 2 }        // yellow
+            }
+            cells[r * cols + c] = v
+        } }
+        // your colour: the coin next to your avatar (top-right); your turn: the blue "Your Turn" pill
+        let coin = s.avg(863 * sx, 312 * sy, 6 * sx)
+        let me = coin.0 - coin.1 > 100 ? 1 : ((coin.1 > 120 && coin.0 > 170) ? 2 : 0)
+        let pill = s.avg(730 * sx, 398 * sy, 6 * sx)
+        let myTurn = pill.2 > 200 && pill.2 - pill.0 > 120
+        return BoardMessage(valid: true, game: kind, cells: cells, me: me, myTurn: myTurn)
     }
 }

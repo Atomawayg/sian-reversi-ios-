@@ -46,7 +46,7 @@ struct ContentView: View {
                 Text(model.debug).font(.caption.monospaced()).foregroundColor(.secondary)
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("สีของคุณ").font(.subheadline).foregroundColor(.secondary)
+                    Text("สีของคุณใน Reversi (เกมอื่นอ่านเอง)").font(.subheadline).foregroundColor(.secondary)
                     Picker("สี", selection: Binding(get: { model.me }, set: { model.setMe($0) })) {
                         Text("อ่านอัตโนมัติ").tag(0); Text("ดำ ⚫").tag(1); Text("ขาว ⚪").tag(2)
                     }.pickerStyle(.segmented)
@@ -61,8 +61,8 @@ struct ContentView: View {
                     Text("วิธีใช้").font(.headline)
                     Text("1. กด เปิดหน้าต่างลอย (ถ้าไม่ขึ้น ปัดกลับหน้าโฮม หน้าต่างจะลอยเอง)")
                     Text("2. กด เริ่มอ่านหน้าจอ แล้วเลือก เซียน Reversi → เริ่มการถ่ายทอด")
-                    Text("3. เปิด WePlay เข้าเกม หน้าต่างลอยจะบอกช่องที่ควรลงทุกตา")
-                    Text("ช่วงท้ายเกม (ช่องว่าง ≤ 16) AI คำนวณจนจบเกมแบบแม่นยำ").foregroundColor(.secondary)
+                    Text("3. เข้าเกม Reversi / หมากฮอส (WePlay) หรือ เรียง 4 / เรียง 5 (Plato) แอปรู้เองว่าเล่นเกมไหน หน้าต่างลอยจะบอกตาที่ควรเดิน")
+                    Text("ฮอส: ลูกศรเขียวคือทางเดิน กากบาทคือตัวที่กิน · เรียง 4/5: ลูกศรทองชี้ช่องที่หยอด").foregroundColor(.secondary)
                 }
                 .font(.subheadline)
                 .padding(14).background(panel).clipShape(RoundedRectangle(cornerRadius: 14))

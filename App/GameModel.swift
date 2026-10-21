@@ -16,6 +16,9 @@ final class GameModel: ObservableObject {
     private let keepAlive = KeepAlive()
     private let receiver = Receiver()
     private let engine = Engine()
+    private let checkers = CheckersEngine()
+    private var tbLoaded = false
+    private var ckPrev: [Int]? = nil
     private let work = DispatchQueue(label: "sian.think", qos: .userInitiated)
     private var gen = 0
     private var computedFor: [Int] = []
@@ -58,7 +61,7 @@ final class GameModel: ObservableObject {
 
     static weak var shared: GameModel?
 
-    private var dCells = [Int](repeating: 0, count: 64), dMe = 0, dTurn = false, dValid = false
+    private var dCells = [Int](repeating: 0, count: 64), dMe = 0, dTurn = false, dValid = false, dGame = GameKind.reversi
     private var lastDarwinCommit = Date.distantPast, lastSocketMsg = Date.distantPast
     private var darwinMsgs = 0
 
@@ -70,12 +73,14 @@ final class GameModel: ObservableObject {
                 lastDarwinCommit = Date()
                 // sockets win when they work; Darwin burst is the fallback
                 if Date().timeIntervalSince(lastSocketMsg) > 3 {
-                    handle(BoardMessage(valid: dValid, cells: dValid ? dCells : [], me: dMe, myTurn: dTurn), viaSocket: false)
+                    let n = dGame.size.w * dGame.size.h
+                    handle(BoardMessage(valid: dValid, game: dGame, cells: dValid ? Array(dCells.prefix(n)) : [], me: dMe, myTurn: dTurn), viaSocket: false)
                 }
             } else if k.hasPrefix("c"), let vi = k.firstIndex(of: "v"),
                       let i = Int(k[k.index(after: k.startIndex)..<vi]), let v = Int(k[k.index(after: vi)...]), i < 64 {
                 dCells[i] = v
             } else if k.hasPrefix("me"), let v = Int(k.dropFirst(2)) { dMe = v }
+            else if k.hasPrefix("g"), let v = Int(k.dropFirst(1)), let g = GameKind(rawValue: v) { dGame = g }
             else if k.hasPrefix("turn") { dTurn = k == "turn1" }
             else if k.hasPrefix("valid") { dValid = k == "valid1" }
             return
@@ -101,10 +106,15 @@ final class GameModel: ObservableObject {
         if viaSocket { lastSocketMsg = Date(); msgs += 1 }
         refreshDebug()
         if !linked { linked = true }
-        guard m.valid, m.cells.count == 64 else {
+        guard m.valid, m.cells.count == m.game.size.w * m.game.size.h else {
             computedFor = []
             show(Overlay(cells: nil, rec: nil, title: "⋯", line: "ยังไม่เห็นกระดาน เปิดหน้าเกมไว้"))
             return
+        }
+        switch m.game {
+        case .checkers: handleCheckers(m); return
+        case .connect4, .connect5: handleConnect(m); return
+        case .reversi: break
         }
         if m.me != 0 && !manualMe { me = m.me }
         guard me != 0 else {
@@ -153,6 +163,127 @@ final class GameModel: ObservableObject {
             line = "\(t) · ลึก \(r.depth)"
         }
         show(Overlay(cells: cells, rec: i, title: GameModel.name(i), line: line, mine: true))
+    }
+
+    // MARK: หมากฮอส
+    /// Turns the colour reading into 1/2 (your man/king) and -1/-2 (opponent), tracking kings between frames:
+    /// a piece on its far row is a king, and a king keeps its crown when it moves.
+    private func checkersBoard(_ m: BoardMessage) -> (board: [Int], meColor: Int) {
+        var meC = m.me
+        if meC == 0 { // fallback: whoever has more pieces in the bottom half is you
+            var lower = [0, 0, 0]
+            for i in 32..<64 where m.cells[i] != 0 { lower[m.cells[i]] += 1 }
+            meC = lower[1] >= lower[2] ? 1 : 2
+        }
+        var nb = [Int](repeating: 0, count: 64)
+        for i in 0..<64 where m.cells[i] != 0 {
+            let mine = m.cells[i] == meC
+            var x = mine ? 1 : -1
+            if mine && i / 8 == 0 { x = 2 }
+            if !mine && i / 8 == 7 { x = -2 }
+            nb[i] = x
+        }
+        if let p = ckPrev {
+            let before = p.filter { $0 != 0 }.count, after = nb.filter { $0 != 0 }.count
+            if after > before { ckPrev = nil } // new game
+        }
+        if let p = ckPrev {
+            for i in 0..<64 where nb[i] != 0 && p[i] == nb[i] * 2 { nb[i] *= 2 }
+            for side in [1, -1] {
+                let vac = (0..<64).filter { p[$0] * side > 0 && !(nb[$0] * side > 0) }
+                let app = (0..<64).filter { nb[$0] * side > 0 && !(p[$0] * side > 0) }
+                if vac.count == 1 && app.count == 1 && abs(p[vac[0]]) == 2 { nb[app[0]] = 2 * side }
+            }
+        }
+        ckPrev = nb
+        return (nb, meC)
+    }
+
+    private static func ckName(_ s: Int) -> String { "\(8 - s / 8)·\(s % 8 + 1)" }
+
+    private func handleCheckers(_ m: BoardMessage) {
+        let (board, meC) = checkersBoard(m)
+        let draw = board.map { $0 == 1 ? 1 : ($0 == 2 ? 2 : ($0 == -1 ? 3 : ($0 == -2 ? 4 : 0))) }
+        guard m.myTurn else {
+            computedFor = []; gen += 1
+            show(Overlay(game: .checkers, cells: draw, title: "รอ…", line: "ตาคู่แข่ง", meColor: meC))
+            return
+        }
+        let key = [100] + board
+        if key == computedFor { return }
+        computedFor = key; gen += 1
+        let g = gen, ms = thinkMs
+        show(Overlay(game: .checkers, cells: draw, title: "คิด…", line: "ตาคุณ · AI กำลังคิด", mine: true, meColor: meC))
+        work.async { [weak self] in
+            guard let self else { return }
+            if !self.tbLoaded, let url = Bundle.main.url(forResource: "hos-tb", withExtension: "bin"), let d = try? Data(contentsOf: url) {
+                self.checkers.loadTB(d)
+            }
+            self.tbLoaded = true
+            let r = self.checkers.search(board, side: 1, maxMs: ms)
+            let path = r.best.map { self.checkers.path(of: $0, board: board) } ?? []
+            let caps = r.best.map { self.checkers.capsSquares($0) } ?? []
+            DispatchQueue.main.async {
+                guard g == self.gen else { return }
+                guard let best = r.best, path.count >= 2 else {
+                    self.show(Overlay(game: .checkers, cells: draw, title: "—", line: "ไม่มีตาเดิน", mine: true, meColor: meC)); return
+                }
+                let MATE = CheckersEngine.MATE
+                var verdict: String
+                if let tb = r.tb { verdict = tb == 0 ? "เสมอแน่" : (tb < 128 ? "ชนะแน่" : "แพ้ถ้าเขาเล่นถูก") }
+                else if r.score > MATE - 1000 { verdict = "ชนะแน่" }
+                else if r.score < -MATE + 1000 { verdict = "เสียเปรียบหนัก" }
+                else { let s = r.score; verdict = s >= 250 ? "ได้เปรียบมาก" : s >= 80 ? "ได้เปรียบ" : s > -80 ? "สูสี" : s > -250 ? "เสียเปรียบ" : "เสียเปรียบมาก" }
+                let what = best.caps != 0 ? "กิน \(caps.count) ตัว" : (best.promo ? "เดิน (เข้าฮอส)" : "เดิน")
+                let title = "\(GameModel.ckName(path[0]))→\(GameModel.ckName(path[path.count - 1]))"
+                let line = "\(what) · \(verdict)" + (r.depth > 0 && r.depth < 99 ? " · ลึก \(r.depth)" : "")
+                self.show(Overlay(game: .checkers, cells: draw, path: path, caps: caps, title: title, line: line, mine: true, meColor: meC))
+            }
+        }
+    }
+
+    // MARK: เรียง 4 / เรียง 5
+    private func handleConnect(_ m: BoardMessage) {
+        let (cols, rows) = m.game.size
+        var reds = 0, yellows = 0
+        for v in m.cells { if v == 1 { reds += 1 } else if v == 2 { yellows += 1 } }
+        // red always moves first: on your turn, equal counts mean you are red
+        var meC = m.me
+        if m.myTurn { meC = reds == yellows ? 1 : 2 } else if meC == 0 { meC = reds > yellows ? 2 : 1 }
+        let draw = m.cells.map { $0 == 0 ? 0 : ($0 == meC ? 1 : 3) }
+        guard m.myTurn else {
+            computedFor = []; gen += 1
+            show(Overlay(game: m.game, cells: draw, title: "รอ…", line: "ตาคู่แข่ง", meColor: meC))
+            return
+        }
+        let key = [200 + m.game.rawValue] + m.cells
+        if key == computedFor { return }
+        computedFor = key; gen += 1
+        let g = gen
+        let ms = meC == 2 ? max(thinkMs, 3000) : thinkMs // the second player is behind, so think longer
+        show(Overlay(game: m.game, cells: draw, title: "คิด…", line: "ตาคุณ · AI กำลังคิด", mine: true, meColor: meC))
+        let K = m.game == .connect4 ? 4 : 5
+        let cells = m.cells
+        work.async { [weak self] in
+            guard let self else { return }
+            let e = ConnectEngine(W: cols, H: rows, K: K)
+            for c in 0..<cols {
+                var r = rows - 1
+                while r >= 0 { let v = cells[r * cols + c]; if v == 0 { break }; e.play(c, v == meC ? 1 : -1); r -= 1 }
+            }
+            let res = e.search(1, ms: ms)
+            DispatchQueue.main.async {
+                guard g == self.gen else { return }
+                guard res.best >= 0 else { self.show(Overlay(game: m.game, cells: draw, title: "—", line: "กระดานเต็ม", meColor: meC)); return }
+                let WIN = ConnectEngine.WIN
+                var verdict: String
+                if res.score > WIN - 1000 { verdict = "ชนะแน่" }
+                else if res.score < -(WIN - 1000) { verdict = res.trap > 0 ? "เสียเปรียบ · วางกับดัก" : "แพ้ถ้าเขาเล่นถูก" }
+                else { let s = res.score; verdict = s > 60 ? "ได้เปรียบ" : (s < -60 ? "เสียเปรียบ" : "สูสี") }
+                let line = verdict + (res.depth > 0 ? " · ลึก \(res.depth)" : "")
+                self.show(Overlay(game: m.game, cells: draw, rec: res.best, title: "ช่อง \(res.best + 1)", line: line, mine: true, meColor: meC))
+            }
+        }
     }
 
     func setMe(_ c: Int) { me = c; manualMe = c != 0; computedFor = [] }

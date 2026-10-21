@@ -39,7 +39,7 @@ class SampleHandler: RPBroadcastSampleHandler {
         Signal.post(Signal.frame)
         guard var msg = BoardReader.read(pb) else { return }
         // only trust cells that stayed the same across two frames (discs animate when flipping)
-        let stable = prev.map { $0.valid == msg.valid && $0.cells == msg.cells && $0.me == msg.me } ?? false
+        let stable = prev.map { $0.valid == msg.valid && $0.game == msg.game && $0.cells == msg.cells && $0.me == msg.me } ?? false
         // the legal-move glow pulses, so remember a glow seen in the last second on the same board
         if msg.cells != glowCells { glowCells = msg.cells; lastGlow = 0 }
         if msg.myTurn { lastGlow = t }
