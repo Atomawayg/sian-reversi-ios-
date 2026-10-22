@@ -137,7 +137,7 @@ struct ContentView: View {
                 Label("กด เริ่มใช้งาน → Start Broadcast แล้วเข้าเกม แอปรู้เองว่าเล่นเกมไหน", systemImage: "1.circle")
                 Label("บีบหน้าต่างลอยให้เล็ก แล้ววางใต้กระดาน อย่าบังกระดานหรือรูปโปรไฟล์", systemImage: "2.circle")
                 Label("ฮอส: เส้นเขียวคือทางเดิน กากบาทคือตัวที่กิน · เรียง 4/5: ลูกศรทองชี้ช่องที่หยอด", systemImage: "3.circle")
-                Label("Jackaroo: ทำตามเลข ① ไพ่ขอบทอง → ② ③ ลูกที่วงทองกะพริบ · เป้าขาวคือจุดหมาย", systemImage: "4.circle")
+                Label("Jackaroo: ลงไพ่ขอบทอง → กดลูกที่วงทองกะพริบ → ไปเป้าสีขาว · ถ่างสองนิ้วที่จอลอยเพื่อขยาย", systemImage: "4.circle")
             }
             .font(.footnote)
         }

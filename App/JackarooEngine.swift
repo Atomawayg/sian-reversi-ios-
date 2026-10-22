@@ -56,14 +56,15 @@ enum JackarooEngine {
                 continue
             }
             let pos = ((start(s) + dd) % T + T) % T
-            if isProtected(st, pos) { return nil }
+            // can't pass (or land on) your own stones, nor anyone's stone sitting on its start
+            if isProtected(st, pos) || st[s].contains(pos) { return nil }
             if step == n {
                 if let o = ownerAt(st, pos), o.0 == s { return nil }
                 return pos
             }
         }
         if overshoot { // the lane is too short for this card: keep circling the track
-            for step in 1...n { if isProtected(st, (p + step) % T) { return nil } }
+            for step in 1...n { let q = (p + step) % T; if isProtected(st, q) || st[s].contains(q) { return nil } }
             let pos = (p + n) % T
             if let o = ownerAt(st, pos), o.0 == s { return nil }
             return pos
@@ -74,7 +75,7 @@ enum JackarooEngine {
     static func backDest(_ st: [[Int]], _ s: Int, _ i: Int, _ n: Int) -> Int? {
         let p = st[s][i]
         if p < 0 || p >= 100 { return nil }
-        for step in 1...n { if isProtected(st, ((p - step) % T + T) % T) { return nil } }
+        for step in 1...n { let q = ((p - step) % T + T) % T; if isProtected(st, q) || st[s].contains(q) { return nil } }
         let pos = ((p - n) % T + T) % T
         if let o = ownerAt(st, pos), o.0 == s { return nil }
         return pos

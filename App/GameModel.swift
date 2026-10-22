@@ -383,7 +383,7 @@ final class GameModel: ObservableObject {
                     line = (discardMode ? "เกมบังคับทิ้งไพ่\n" : "ไม่มีใบที่ลงได้\n") + GameModel.discardReason(st, hand: hand, ci: mv.card)
                     o.steps = []; o.tags = []
                 }
-                else if spare >= 0 && mv.kind != .discard { o.tags.append("(ถ้าขึ้น DISCARD → ทิ้ง \(hand[spare]))") }
+                else if spare >= 0 && mv.kind != .discard && o.tags.isEmpty { o.tags.append("ถ้า DISCARD → ทิ้ง \(hand[spare])") }
                 o.title = title; o.line = line
                 self.log("A \(mv.rank) \(mv.kind) | " + (o.steps.isEmpty ? title + " | " + line.replacingOccurrences(of: "\n", with: " / ") : o.steps.joined(separator: " / ")))
                 o.arrows = mv.moves.flatMap { mvv -> [Int] in
@@ -419,51 +419,54 @@ final class GameModel: ObservableObject {
         return b == 0 ? "ยังไม่มีบันทึก" : String(format: "%.1f KB", Double(b) / 1024)
     }
 
-    /// The advice as numbered taps: card first, then each stone. marks = stone codes for steps 2, 3…
+    /// The advice as taps: step 0 is the card, then one "colour|which stone|what to do" per stone.
     static func steps(_ mv: JKMove, st: [[Int]], cells: [Int]) -> (steps: [String], tags: [String], marks: [Int]) {
         func colour(_ seat: Int) -> String { jkColourName[max(0, min(4, cells[JK.seats + seat]))] }
+        let iControl = st[3].contains(where: { $0 < 100 }) ? 3 : 1
         func which(_ seat: Int, _ from: Int) -> String {
+            let pre = seat == iControl ? "" : (seat == 1 ? "เพื่อน " : colour(seat) + " ")
             if from < 0 { return "ลูกใหม่" }
-            if from >= 100 { return "ลูก\(colour(seat))ในช่องเส้นชัย" }
+            if from >= 100 { return pre + "ในเส้นชัย" }
             let onTrack = st[seat].filter { $0 >= 0 && $0 < 100 }
-            if onTrack.count <= 1 { return "ลูก\(colour(seat))" }
+            if onTrack.count <= 1 { return pre + "ลูกนี้" }
             let d = JackarooEngine.dist(seat, from)
             let ahead = onTrack.filter { JackarooEngine.dist(seat, $0) > d }.count
-            if ahead == 0 { return "ลูก\(colour(seat)) ตัวหน้าสุด" }
-            if ahead == onTrack.count - 1 { return "ลูก\(colour(seat)) ตัวหลังสุด" }
-            return "ลูก\(colour(seat)) ตัวที่ \(ahead + 1) จากหน้า"
+            if ahead == 0 { return pre + "หน้าสุด" }
+            if ahead == onTrack.count - 1 { return pre + "หลังสุด" }
+            return pre + "ตัวที่ \(ahead + 1)"
         }
         func code(_ seat: Int, _ p: Int) -> Int { p < 0 ? 200 + seat : (p >= 100 ? 100 + 4 * seat + (p - 100) : p) }
+        func step(_ seat: Int, _ from: Int, _ act: String) -> String { "\(cells[JK.seats + seat])|\(which(seat, from))|\(act)" }
         var steps = ["กดไพ่ \(mv.rank) (ใบที่ \(mv.card + 1))"]
         var marks: [Int] = []
         var tags: [String] = []
         let f = mv.moves.first
-        let notMine = { (seat: Int) -> String in seat == 3 || (seat == 1 && !st[3].contains(where: { $0 < 100 })) ? "" : (seat == 1 ? " (ลูกเพื่อน)" : " (ไม่ใช่ลูกเรา)") }
         switch mv.kind {
-        case .place: steps.append(mv.rank == "A" ? "เลือก New stone" : "ออกลูกใหม่ที่จุดเกิด"); if let f { marks.append(code(f.seat, f.from)) }
+        case .place:
+            if let f { steps.append(step(f.seat, -1, mv.rank == "A" ? "New stone" : "ออกลูก")); marks.append(code(f.seat, f.from)) }
         case .a1, .a11:
-            if let f { steps.append("เลือก Move \(mv.kind == .a1 ? 1 : 11) · กด\(which(f.seat, f.from))"); marks.append(code(f.seat, f.from)) }
+            if let f { steps.append(step(f.seat, f.from, "Move \(mv.kind == .a1 ? 1 : 11)")); marks.append(code(f.seat, f.from)) }
         case .fwd, .back, .any5:
             if let f {
-                let n = mv.kind == .back ? "ถอย 4" : (mv.kind == .any5 ? "เดิน 5" : "เดิน \(mv.steps)")
-                steps.append("กด\(which(f.seat, f.from))\(notMine(f.seat)) → \(n)"); marks.append(code(f.seat, f.from))
+                let n = mv.kind == .back ? "ถอย 4 ช่อง" : (mv.kind == .any5 ? "เดิน 5 ช่อง" : "เดิน \(mv.steps) ช่อง")
+                steps.append(step(f.seat, f.from, n)); marks.append(code(f.seat, f.from))
             }
         case .split:
             for (k, mm) in mv.moves.prefix(2).enumerated() {
-                steps.append("กด\(which(mm.seat, mm.from)) → เดิน \(k == 0 ? mv.steps : 7 - mv.steps)"); marks.append(code(mm.seat, mm.from))
+                steps.append(step(mm.seat, mm.from, "เดิน \(k == 0 ? mv.steps : 7 - mv.steps) ช่อง")); marks.append(code(mm.seat, mm.from))
             }
         case .swap:
             if mv.moves.count >= 2 {
-                steps.append("กด\(which(mv.moves[0].seat, mv.moves[0].from))"); marks.append(code(mv.moves[0].seat, mv.moves[0].from))
-                steps.append("กด\(which(mv.moves[1].seat, mv.moves[1].from)) ⇄ สลับ"); marks.append(code(mv.moves[1].seat, mv.moves[1].from))
+                steps.append(step(mv.moves[0].seat, mv.moves[0].from, "กดลูกนี้ก่อน")); marks.append(code(mv.moves[0].seat, mv.moves[0].from))
+                steps.append(step(mv.moves[1].seat, mv.moves[1].from, "⇄ สลับกัน")); marks.append(code(mv.moves[1].seat, mv.moves[1].from))
             }
-        case .force: steps.append("เลือก ให้คนถัดไปทิ้งไพ่")
+        case .force: steps.append("0|ไพ่ 10|บังคับทิ้ง")
         case .discard: break
         }
-        if mv.moves.contains(where: { $0.to >= 100 && $0.from < 100 }) { tags.append("เข้าเส้นชัย 🏁") }
-        for s in mv.captures { tags.append(s == 1 || s == 3 ? "ตีลูก\(colour(s))(เพื่อน) กลับบ้าน" : "ตีลูก\(colour(s))กลับบ้าน 💥") }
+        for s in mv.captures { tags.append(s == 1 || s == 3 ? "ตีลูกเพื่อนกลับบ้าน" : "💥 ตี\(colour(s))กลับบ้าน") }
+        if mv.moves.contains(where: { $0.to >= 100 && $0.from < 100 }) { tags.append("🏁 เข้าเส้นชัย") }
         if mv.kind == .any5 || mv.kind == .swap, let mm = mv.moves.first(where: { $0.seat != 3 }) {
-            tags.append(mm.seat == 1 ? "ช่วยลูกเพื่อน 🤝" : "ก่อกวนลูก\(colour(mm.seat)) 😈")
+            tags.append(mm.seat == 1 ? "🤝 ช่วยเพื่อน" : "😈 ก่อกวน\(colour(mm.seat))")
         }
         return (steps, tags, marks)
     }
