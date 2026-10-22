@@ -27,12 +27,12 @@ struct Overlay: Equatable {
 enum Renderer {
     static let size = CGSize(width: 640, height: 360)
 
-    private static let bg = UIColor(red: 0.055, green: 0.078, blue: 0.067, alpha: 1)
+    private static let bg = UIColor(red: 0.055, green: 0.078, blue: 0.141, alpha: 1)
     private static let felt = UIColor(red: 0.118, green: 0.416, blue: 0.271, alpha: 1)
     private static let feltLine = UIColor(red: 0.059, green: 0.239, blue: 0.153, alpha: 1)
-    private static let gold = UIColor(red: 0.957, green: 0.776, blue: 0.310, alpha: 1)
+    private static let gold = UIColor(red: 0.949, green: 0.757, blue: 0.306, alpha: 1)
     private static let ink = UIColor(red: 0.914, green: 0.941, blue: 0.918, alpha: 1)
-    private static let muted = UIColor(red: 0.561, green: 0.635, blue: 0.596, alpha: 1)
+    private static let muted = UIColor(red: 0.588, green: 0.627, blue: 0.722, alpha: 1)
     private static let hole = UIColor(red: 0.17, green: 0.11, blue: 0.07, alpha: 1)
     private static let red = UIColor(red: 0.80, green: 0.22, blue: 0.20, alpha: 1)
     private static let purple = UIColor(red: 0.42, green: 0.38, blue: 0.52, alpha: 1)

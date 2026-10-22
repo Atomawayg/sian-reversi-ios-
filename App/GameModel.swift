@@ -2,7 +2,8 @@ import Foundation
 import SwiftUI
 
 final class GameModel: ObservableObject {
-    @Published var overlay = Overlay(cells: nil, rec: nil, title: "พร้อม", line: "กดปุ่ม 1 และ 2 ด้านล่าง แล้วเปิดเกม")
+    @Published var overlay = Overlay(cells: nil, rec: nil, title: "พร้อม", line: "กด เริ่มใช้งาน แล้วเข้าเกม")
+    @Published var activeGame: GameKind? = nil
     @Published var pipOn = false
     @Published var linked = false
     @Published var me = 0
@@ -14,7 +15,6 @@ final class GameModel: ObservableObject {
 
     let pip = PiPManager()
     private let keepAlive = KeepAlive()
-    private let receiver = Receiver()
     private let engine = Engine()
     private let checkers = CheckersEngine()
     private var tbLoaded = false
@@ -28,9 +28,6 @@ final class GameModel: ObservableObject {
 
     init() {
         pip.onStateChange = { [weak self] on in DispatchQueue.main.async { self?.pipOn = on } }
-        receiver.onMessage = { [weak self] m in DispatchQueue.main.async { self?.handle(m, viaSocket: true) } }
-        receiver.onStatus = { [weak self] s in DispatchQueue.main.async { self?.netState = s; self?.refreshDebug() } }
-        receiver.start()
         GameModel.shared = self
         let center = CFNotificationCenterGetDarwinNotifyCenter()
         for name in [Signal.started, Signal.frame, Signal.stopped] + DarwinBoard.names() {
@@ -50,10 +47,12 @@ final class GameModel: ObservableObject {
                 if !alive {
                     self.computedFor = []
                     if self.started {
+                        self.activeGame = nil
                         self.show(Overlay(cells: nil, rec: nil, title: "⋯", line: "อ่านจออยู่ แต่ยังไม่เห็นกระดาน"))
                         return
                     }
-                    self.show(Overlay(cells: nil, rec: nil, title: "หยุดอ่าน", line: "การอ่านหน้าจอหยุดอยู่ กดปุ่ม 2 ในแอปอีกครั้ง"))
+                    self.activeGame = nil
+                    self.show(Overlay(cells: nil, rec: nil, title: "หยุดอ่าน", line: "เปิดแอป เซียน แล้วกด เริ่มใช้งาน"))
                 }
             }
         }
@@ -71,11 +70,8 @@ final class GameModel: ObservableObject {
             if k == "commit" {
                 darwinMsgs += 1
                 lastDarwinCommit = Date()
-                // sockets win when they work; Darwin burst is the fallback
-                if Date().timeIntervalSince(lastSocketMsg) > 3 {
-                    let n = dGame.size.w * dGame.size.h
-                    handle(BoardMessage(valid: dValid, game: dGame, cells: dValid ? Array(dCells.prefix(n)) : [], me: dMe, myTurn: dTurn), viaSocket: false)
-                }
+                let n = dGame.size.w * dGame.size.h
+                handle(BoardMessage(valid: dValid, game: dGame, cells: dValid ? Array(dCells.prefix(n)) : [], me: dMe, myTurn: dTurn), viaSocket: false)
             } else if k.hasPrefix("c"), let vi = k.firstIndex(of: "v"),
                       let i = Int(k[k.index(after: k.startIndex)..<vi]), let v = Int(k[k.index(after: vi)...]), i < 64 {
                 dCells[i] = v
@@ -91,7 +87,7 @@ final class GameModel: ObservableObject {
         refreshDebug()
     }
     private func refreshDebug() {
-        debug = "อ่านจอ: \(started ? "ทำงาน" : "ไม่ทำงาน") · ภาพ \(frames) · udp \(msgs) · darwin \(darwinMsgs) · net \(netState)"
+        debug = "อ่านจอ: \(started ? "ทำงาน" : "ไม่ทำงาน") · ภาพ \(frames) · ข้อมูล \(darwinMsgs)"
     }
 
     private func show(_ o: Overlay) { var x = o; x.footer = debug; overlay = x; pip.show(x) }
@@ -108,9 +104,11 @@ final class GameModel: ObservableObject {
         if !linked { linked = true }
         guard m.valid, m.cells.count == m.game.size.w * m.game.size.h else {
             computedFor = []
+            activeGame = nil
             show(Overlay(cells: nil, rec: nil, title: "⋯", line: "ยังไม่เห็นกระดาน เปิดหน้าเกมไว้"))
             return
         }
+        if activeGame != m.game { activeGame = m.game }
         switch m.game {
         case .checkers: handleCheckers(m); return
         case .connect4, .connect5: handleConnect(m); return
