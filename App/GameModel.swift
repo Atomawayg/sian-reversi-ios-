@@ -347,7 +347,7 @@ final class GameModel: ObservableObject {
                 best = JKMove(card: ci, rank: hand[ci], kind: .discard)
             } else {
                 best = JackarooEngine.bestDeep(st, hand: hand, playable: playable, me: 3)
-                if hand.count > 1 { spare = JackarooEngine.bestDiscard(st, hand: hand, me: 3, samples: 24, plies: 7) }
+                if hand.count > 1 { spare = JackarooEngine.bestDiscard(st, hand: hand, me: 3, samples: 64, plies: 11) }
             }
             DispatchQueue.main.async {
                 guard g == self.gen, let mv = best else { return }

@@ -48,6 +48,10 @@ extension BoardReader {
             votes[0] = 0
             if let m = (1...4).max(by: { votes[$0] < votes[$1] }), votes[m] >= 40 { seatCol[seat] = m }
         }
+        // a new game starts with every stone at home: forget last game's colours
+        var atHome = 0
+        for seat in 0..<4 { for k in 0..<4 where cells[JK.homes + 4 * seat + k] != 0 { atHome += 1 } }
+        if atHome == 16 { lockedSeats = nil }
         if Set(seatCol).count == 4 && !seatCol.contains(0) { lockedSeats = seatCol }
         else if let l = lockedSeats { seatCol = l }
         else {

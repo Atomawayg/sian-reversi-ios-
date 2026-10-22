@@ -122,6 +122,9 @@ enum JackarooEngine {
                 }
             case "5":
                 for s in 0..<4 { for i in 0..<4 where st[s][i] >= 0 {
+                    let p = st[s][i]
+                    // someone else's stone that is safe on its own start, or already in its finish lane, can't be pushed
+                    if s != ctrl && (p == start(s) || p >= 100) { continue }
                     guard let d = fwdDest(st, s, i, 5) else { continue }
                     let (a, cap) = apply(st, s, i, d)
                     out.append(JKMove(card: ci, rank: c, kind: .any5, steps: 5, moves: [(s, i, st[s][i], d)], after: a, captures: cap.map { [$0] } ?? []))
@@ -279,11 +282,29 @@ enum JackarooEngine {
         for (ci, c) in hand.enumerated() {
             for var m in generate(st, hand: [c], me: q) where m.kind != .force {
                 m.card = ci
-                let v = material(m.after, me: q) - 0.3 * (cardCost[c] ?? 0)
+                let v = material(m.after, me: q) - quickDanger(m.after, me: q) - 0.3 * (cardCost[c] ?? 0)
                 if v > bv { bv = v; best = m }
             }
         }
         return best
+    }
+
+    /// Cheap version of "how much of my team could be hit next": stones 1–12 holes in front of an enemy stone.
+    static func quickDanger(_ st: [[Int]], me: Int) -> Double {
+        let team: Set<Int> = [me, (me + 2) % 4]
+        var d = 0.0
+        for s in team { for p in st[s] where p >= 0 && p < T && p != start(s) {
+            var hit = false
+            for q in 0..<4 where !team.contains(q) {
+                for qp in st[q] where qp >= 0 && qp < T {
+                    let gap = ((p - qp) % T + T) % T
+                    if gap >= 1 && gap <= 12 { hit = true; break }
+                }
+                if hit { break }
+            }
+            if hit { d += 0.35 * stoneValue(s, p) }
+        } }
+        return d
     }
 
     struct Deal { var hands: [Int: [String]]; var reserve: [String] }
@@ -340,7 +361,7 @@ enum JackarooEngine {
     }
 
     /// Which card to throw away when the game makes you discard: keep the hand that plays out best.
-    static func bestDiscard(_ st: [[Int]], hand: [String], me: Int = 3, samples: Int = 48, plies: Int = 11) -> Int {
+    static func bestDiscard(_ st: [[Int]], hand: [String], me: Int = 3, samples: Int = 160, plies: Int = 15) -> Int {
         if hand.count <= 1 { return 0 }
         let ds = deals(st, hand: hand, me: me, samples: samples)
         var best = 0
@@ -357,7 +378,7 @@ enum JackarooEngine {
 
     /// Best move found by playing every candidate out against many sampled deals (the same deals for every
     /// candidate, seeded by the position, so one position always gives one answer).
-    static func bestDeep(_ st: [[Int]], hand: [String], playable: [Bool]?, me: Int = 3, samples: Int = 96, plies: Int = 11) -> JKMove? {
+    static func bestDeep(_ st: [[Int]], hand: [String], playable: [Bool]?, me: Int = 3, samples: Int = 600, plies: Int = 15, timeBudget: Double = 3.5) -> JKMove? {
         if hand.isEmpty { return nil }
         let ok = playable ?? Array(repeating: true, count: hand.count)
         var cands: [JKMove] = []
@@ -375,16 +396,35 @@ enum JackarooEngine {
             let k = m.after.map { $0.sorted().map(String.init).joined(separator: ",") }.joined(separator: "|") + ":" + m.rank
             return seen.insert(k).inserted
         }
-        // quick look first, then spend the time on the most promising moves
+        // quick look first, then spend the thinking time on the moves that keep looking good
         for k in 0..<cands.count { cands[k].score = position(cands[k].after, me: me) - (cardCost[cands[k].rank] ?? 0) }
         cands.sort { $0.score > $1.score }
-        if cands.count > 14 { cands = Array(cands.prefix(14)) }
+        if cands.count > 24 { cands = Array(cands.prefix(24)) }
+        let started = DispatchTime.now().uptimeNanoseconds
+        let budget = UInt64(timeBudget * 1e9)
         let ds = deals(st, hand: hand, me: me, samples: samples)
-        for k in 0..<cands.count {
-            var rest = hand; rest.remove(at: cands[k].card)
-            var total = 0.0
-            for d in ds { total += rollout(cands[k].after, mine: rest, deal: d, me: me, plies: plies) }
-            cands[k].score = total / Double(samples) - 0.3 * (cardCost[cands[k].rank] ?? 0)
+        var alive = Array(cands.indices)
+        var sum = [Double](repeating: 0, count: cands.count)
+        var cnt = [Int](repeating: 0, count: cands.count)
+        var used = 0
+        let batch = 16
+        while used < ds.count {
+            let upto = min(ds.count, used + batch)
+            for k in alive {
+                var rest = hand; rest.remove(at: cands[k].card)
+                for j in used..<upto { sum[k] += rollout(cands[k].after, mine: rest, deal: ds[j], me: me, plies: plies) }
+                cnt[k] = upto
+            }
+            used = upto
+            // successive halving: drop the clearly worse half once everyone has 32+ playouts
+            if used >= 32 && alive.count > 3 {
+                alive.sort { sum[$0] / Double(cnt[$0]) > sum[$1] / Double(cnt[$1]) }
+                alive = Array(alive.prefix(max(3, (alive.count + 1) / 2)))
+            }
+            if DispatchTime.now().uptimeNanoseconds - started > budget && used >= 32 { break }
+        }
+        for k in cands.indices {
+            cands[k].score = cnt[k] > 0 && alive.contains(k) ? sum[k] / Double(cnt[k]) - 0.3 * (cardCost[cands[k].rank] ?? 0) : -1e18
         }
         var bestIdx = 0
         for k in 1..<cands.count where cands[k].score > cands[bestIdx].score + 1e-9 { bestIdx = k }
