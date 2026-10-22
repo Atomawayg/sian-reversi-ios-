@@ -314,9 +314,27 @@ final class GameModel: ObservableObject {
             // not your turn: keep a ready answer in case the game makes you discard
             if jkLock != nil && jkLock!.board != board { jkLock = nil }
             if hand.count > 0, jkLock == nil {
-                let ci = hand.indices.min { (JackarooEngine.keepValue(st, hand[$0]), $0) < (JackarooEngine.keepValue(st, hand[$1]), $1) }!
-                base.pick = ci
-                base.line = "ถ้าขึ้น DISCARD ให้คุณทิ้ง → ทิ้งใบนี้"
+                // think about the discard properly (same way as on your turn), once per board + hand
+                let pkey = [400] + board + hand.map { JK.rankNames.firstIndex(of: $0) ?? 0 }
+                if pkey == jkPassiveKey, let o = jkPassive { if o != overlay { show(o) }; return }
+                jkPassiveKey = pkey; jkPassive = nil
+                computedFor = []; gen += 1
+                let g = gen
+                show(base)
+                let snap = base
+                work.async { [weak self] in
+                    guard let self else { return }
+                    let ci = JackarooEngine.bestDiscard(st, hand: hand, me: 3, samples: 96, plies: 15)
+                    DispatchQueue.main.async {
+                        guard g == self.gen else { return }
+                        var o = snap
+                        o.pick = ci
+                        o.line = "ถ้าขึ้น DISCARD → ทิ้ง \(hand[ci])\n" + GameModel.discardReason(st, hand: hand, ci: ci)
+                        self.jkPassive = o
+                        self.show(o)
+                    }
+                }
+                return
             }
             computedFor = []; gen += 1
             show(base); return
@@ -354,7 +372,7 @@ final class GameModel: ObservableObject {
                 var o = snap
                 o.pick = mv.card
                 var (title, line) = GameModel.describe(mv, st: st, cells: cells)
-                if discardMode { line = "เกมบังคับทิ้งไพ่ · ใบนี้เสียน้อยที่สุด" }
+                if discardMode || mv.kind == .discard { line = (discardMode ? "เกมบังคับทิ้งไพ่\n" : "ไม่มีใบที่ลงได้\n") + GameModel.discardReason(st, hand: hand, ci: mv.card) }
                 else if spare >= 0 && mv.kind != .discard { line += "\n(ถ้าขึ้น DISCARD → ทิ้ง \(hand[spare]))" }
                 o.title = title; o.line = line
                 o.arrows = mv.moves.flatMap { mvv -> [Int] in
@@ -369,6 +387,30 @@ final class GameModel: ObservableObject {
 
     private struct JKLock { let board: [Int]; let hand: [String]; let rank: String; let discard: Bool; let overlay: Overlay }
     private var jkLock: JKLock? = nil
+    private var jkPassiveKey: [Int] = []
+    private var jkPassive: Overlay? = nil
+
+    /// Why this card goes: what the cards you keep can do on this board.
+    static func discardReason(_ st: [[Int]], hand: [String], ci: Int) -> String {
+        let me = 3
+        let ctrl = st[me].contains(where: { $0 < 100 }) ? me : 1
+        let atHome = st[ctrl].contains(-1)
+        func use(_ c: String) -> String? {
+            let ms = JackarooEngine.generate(st, hand: [c], me: me).filter { $0.kind != .force }
+            if ms.contains(where: { m in m.moves.contains { $0.to >= 100 && $0.from < 100 } }) { return "\(c) พาเข้าเส้นชัย" }
+            if ms.contains(where: { !$0.captures.isEmpty && !$0.captures.contains(1) && !$0.captures.contains(3) }) { return "\(c) ตีลูกศัตรู" }
+            if (c == "K" || c == "A") && atHome { return "\(c) ไว้ออกลูกใหม่" }
+            if c == "J" && ms.contains(where: { $0.kind == .swap }) { return "J ไว้สลับลูก" }
+            if c == "4" && !ms.isEmpty { return "4 ถอยลัดเข้าบ้าน" }
+            if c == "7" && !ms.isEmpty { return "7 แบ่งเดินได้" }
+            return nil
+        }
+        var keeps: [String] = []
+        var seen = Set<String>()
+        for (i, c) in hand.enumerated() where i != ci && seen.insert(c).inserted { if let u = use(c) { keeps.append(u) } }
+        let why = use(hand[ci]) == nil ? "\(hand[ci]) ใช้ประโยชน์น้อยสุดตอนนี้" : "\(hand[ci]) เสียน้อยสุด"
+        return keeps.isEmpty ? why : why + " · เก็บ " + keeps.prefix(2).joined(separator: ", ")
+    }
     private var jkTurnAt = Date.distantPast
 
     private static func handNames(_ cells: [Int]) -> [String] {
