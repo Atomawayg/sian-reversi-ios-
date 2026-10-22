@@ -177,6 +177,7 @@ enum BoardReader {
     // at the top (left = opponent, right = you) instead of fixed colours. cells: 1 = yours, 2 = opponent's.
     private static var cLastPieces = 0
     private static var cDropSince = 0.0
+    private static var cLastKind: GameKind? = nil
 
     private static func readConnect(_ s: Sampler) -> BoardMessage {
         let W = Double(s.w), H = Double(s.h)
@@ -189,8 +190,8 @@ enum BoardReader {
         guard n > 400 else { return bad }
         let L5 = Int((124.9 * sx).rounded()), L4 = Int((160.6 * sx).rounded())
         var c5 = 0.0, c4 = 0.0, rowsUsed = 0
-        var y = 1150.0
-        while y < 1500 {
+        var y = 900.0
+        while y < 1750 {
             let yy = Int(y * sy)
             var prof = [Double](repeating: 0, count: n)
             for i in 0..<n { prof[i] = gray(x0 + i, yy) }
@@ -213,8 +214,11 @@ enum BoardReader {
             y += 35
         }
         c5 /= Double(max(1, rowsUsed)); c4 /= Double(max(1, rowsUsed))
-        guard max(c5, c4) > 0.3 else { return bad }
-        let kind: GameKind = c5 >= c4 ? .connect5 : .connect4
+        // pieces make the pattern less regular, so only ask for a clear winner (and remember the last answer)
+        var kind: GameKind
+        if max(c5, c4) > 0.15 && abs(c5 - c4) > 0.12 { kind = c5 > c4 ? .connect5 : .connect4; cLastKind = kind }
+        else if let k = cLastKind { kind = k }
+        else { return bad }
         let pitch = kind == .connect5 ? 124.9 : 160.6, top = kind == .connect5 ? 881.0 : 836.0
         let (cols, rows) = kind.size
 
