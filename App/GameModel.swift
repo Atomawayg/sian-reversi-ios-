@@ -246,23 +246,25 @@ final class GameModel: ObservableObject {
     // MARK: เรียง 4 / เรียง 5
     private func handleConnect(_ m: BoardMessage) {
         let (cols, rows) = m.game.size
-        var reds = 0, yellows = 0
-        for v in m.cells { if v == 1 { reds += 1 } else if v == 2 { yellows += 1 } }
-        // red always moves first: on your turn, equal counts mean you are red
-        var meC = m.me
-        if m.myTurn { meC = reds == yellows ? 1 : 2 } else if meC == 0 { meC = reds > yellows ? 2 : 1 }
+        // the reader marks your pieces 1 and the opponent's 2 (matched against the player badges)
+        var mineN = 0, oppN = 0
+        for v in m.cells { if v == 1 { mineN += 1 } else if v == 2 { oppN += 1 } }
+        // whoever moved first is drawn red: on your turn equal counts mean that was you
+        let first = m.myTurn ? mineN == oppN : mineN > oppN
+        let meC = 1
+        let colourForPiP = first ? 1 : 2
         let draw = m.cells.map { $0 == 0 ? 0 : ($0 == meC ? 1 : 3) }
         guard m.myTurn else {
             computedFor = []; gen += 1
-            show(Overlay(game: m.game, cells: draw, title: "รอ…", line: "ตาคู่แข่ง", meColor: meC))
+            show(Overlay(game: m.game, cells: draw, title: "รอ…", line: "ตาคู่แข่ง", meColor: colourForPiP))
             return
         }
         let key = [200 + m.game.rawValue] + m.cells
         if key == computedFor { return }
         computedFor = key; gen += 1
         let g = gen
-        let ms = meC == 2 ? max(thinkMs, 3000) : thinkMs // the second player is behind, so think longer
-        show(Overlay(game: m.game, cells: draw, title: "คิด…", line: "ตาคุณ · AI กำลังคิด", mine: true, meColor: meC))
+        let ms = first ? thinkMs : max(thinkMs, 3000) // the second player is behind, so think longer
+        show(Overlay(game: m.game, cells: draw, title: "คิด…", line: "ตาคุณ · AI กำลังคิด", mine: true, meColor: colourForPiP))
         let K = m.game == .connect4 ? 4 : 5
         let cells = m.cells
         work.async { [weak self] in
@@ -275,14 +277,14 @@ final class GameModel: ObservableObject {
             let res = e.search(1, ms: ms)
             DispatchQueue.main.async {
                 guard g == self.gen else { return }
-                guard res.best >= 0 else { self.show(Overlay(game: m.game, cells: draw, title: "—", line: "กระดานเต็ม", meColor: meC)); return }
+                guard res.best >= 0 else { self.show(Overlay(game: m.game, cells: draw, title: "—", line: "กระดานเต็ม", meColor: colourForPiP)); return }
                 let WIN = ConnectEngine.WIN
                 var verdict: String
                 if res.score > WIN - 1000 { verdict = "ชนะแน่" }
                 else if res.score < -(WIN - 1000) { verdict = res.trap > 0 ? "เสียเปรียบ · วางกับดัก" : "แพ้ถ้าเขาเล่นถูก" }
                 else { let s = res.score; verdict = s > 60 ? "ได้เปรียบ" : (s < -60 ? "เสียเปรียบ" : "สูสี") }
                 let line = verdict + (res.depth > 0 ? " · ลึก \(res.depth)" : "")
-                self.show(Overlay(game: m.game, cells: draw, rec: res.best, title: "ช่อง \(res.best + 1)", line: line, mine: true, meColor: meC))
+                self.show(Overlay(game: m.game, cells: draw, rec: res.best, title: "ช่อง \(res.best + 1)", line: line, mine: true, meColor: colourForPiP))
             }
         }
     }

@@ -63,7 +63,10 @@ enum BoardReader {
         let tl = s.avg(W * 40 / 1179, H * 400 / 2556, W * 5 / 1179)
         let tlL = (tl.0 + tl.1 + tl.2) / 3
         if tl.0 > 160 && tl.0 - tl.1 > 50 { return readCheckers(s) }
-        if tl.2 > tl.0 + 8 && tlL < 70 { return readConnect(s) }
+        // Plato's bottom bar (yellow ITEMS star + green chat icon) looks the same in every board theme
+        let star = s.avg(W * 55 / 1179, H * 2133 / 2556, W * 4 / 1179), chat = s.avg(W * 85 / 1179, H * 2380 / 2556, W * 4 / 1179)
+        let platoUI = star.0 > 225 && star.1 > 140 && star.1 < 220 && star.2 < 70 && chat.1 > chat.0 + 25 && chat.1 > chat.2 + 60
+        if platoUI || (tl.2 > tl.0 + 8 && tlL < 70) { return readConnect(s) }
         return readReversi(s)
     }
 
@@ -169,33 +172,91 @@ enum BoardReader {
         return BoardMessage(valid: valid, game: .checkers, cells: cells, me: me, myTurn: valid && yellow >= 2)
     }
 
-    // MARK: Plato 4 / 5 in a Row — board panel spans x 25…1150; 7×6 starts at y 836, 9×7 at y 881
+    // MARK: Plato 4 / 5 in a Row — board panel spans x 25…1150; 7×6 starts at y 836, 9×7 at y 881.
+    // Themes change the board and the piece skins, so pieces are matched against the two player badges
+    // at the top (left = opponent, right = you) instead of fixed colours. cells: 1 = yours, 2 = opponent's.
+    private static var cLastPieces = 0
+    private static var cDropSince = 0.0
+
     private static func readConnect(_ s: Sampler) -> BoardMessage {
         let W = Double(s.w), H = Double(s.h)
         let sx = W / 1179, sy = H / 2556
-        func lum(_ x: Double, _ y: Double) -> Double { let p = s.avg(x * sx, y * sy, 3 * sx); return (p.0 + p.1 + p.2) / 3 }
-        var kind: GameKind
-        var pitch: Double, top: Double
-        if lum(30, 850) > 52 { kind = .connect4; pitch = 160.6; top = 836 }
-        else if lum(30, 900) > 52 { kind = .connect5; pitch = 124.9; top = 881 }
-        else { return BoardMessage(valid: false, cells: [], me: 0, myTurn: false) }
-        let (cols, rows) = kind.size
-        var cells = [Int](repeating: 0, count: cols * rows)
-        for r in 0..<rows { for c in 0..<cols {
-            let p = s.avg((25.5 + pitch * (Double(c) + 0.5)) * sx, (top + pitch * (Double(r) + 0.5)) * sy, pitch * 0.15 * sx)
-            let L = (p.0 + p.1 + p.2) / 3
-            var v = 0
-            if L > 70 {
-                if p.0 - p.1 > 100 { v = 1 }                    // red
-                else if p.1 > 120 && p.0 > 170 { v = 2 }        // yellow
+        let bad = BoardMessage(valid: false, cells: [], me: 0, myTurn: false)
+        func gray(_ x: Int, _ y: Int) -> Double { let p = s.get(x, y); return (p.0 + p.1 + p.2) / 3 }
+        // which board: the holes repeat every 125 px (5 in a row) or 161 px (4 in a row)
+        let x0 = Int(25 * sx), x1 = min(s.w - 1, Int(1150 * sx))
+        let n = x1 - x0
+        guard n > 400 else { return bad }
+        let L5 = Int((124.9 * sx).rounded()), L4 = Int((160.6 * sx).rounded())
+        var c5 = 0.0, c4 = 0.0, rowsUsed = 0
+        var y = 1150.0
+        while y < 1500 {
+            let yy = Int(y * sy)
+            var prof = [Double](repeating: 0, count: n)
+            for i in 0..<n { prof[i] = gray(x0 + i, yy) }
+            var pre = [Double](repeating: 0, count: n + 1)
+            for i in 0..<n { pre[i + 1] = pre[i] + prof[i] }
+            let h = 15
+            var g = [Double](repeating: 0, count: n)
+            for i in 0..<n { let a = max(0, i - h), b = min(n, i + h + 1); g[i] = prof[i] - (pre[b] - pre[a]) / Double(b - a) }
+            func corr(_ lag: Int) -> Double {
+                let m = n - lag
+                if m < 50 { return 0 }
+                var sa = 0.0, sb = 0.0, saa = 0.0, sbb = 0.0, sab = 0.0
+                for i in 0..<m { let a = g[i], b = g[i + lag]; sa += a; sb += b; saa += a * a; sbb += b * b; sab += a * b }
+                let mm = Double(m)
+                let cov = sab / mm - sa / mm * sb / mm
+                let va = saa / mm - (sa / mm) * (sa / mm), vb = sbb / mm - (sb / mm) * (sb / mm)
+                return va > 1e-6 && vb > 1e-6 ? cov / sqrt(va * vb) : 0
             }
+            c5 += corr(L5); c4 += corr(L4); rowsUsed += 1
+            y += 35
+        }
+        c5 /= Double(max(1, rowsUsed)); c4 /= Double(max(1, rowsUsed))
+        guard max(c5, c4) > 0.3 else { return bad }
+        let kind: GameKind = c5 >= c4 ? .connect5 : .connect4
+        let pitch = kind == .connect5 ? 124.9 : 160.6, top = kind == .connect5 ? 881.0 : 836.0
+        let (cols, rows) = kind.size
+
+        // a small picture of a disc: 9×9 points inside the circle
+        func patch(_ cx: Double, _ cy: Double, _ R: Double) -> [Double] {
+            var out: [Double] = []
+            for j in 0..<9 { for i in 0..<9 {
+                let u = Double(i - 4) / 4, v = Double(j - 4) / 4
+                if u * u + v * v > 1 { continue }
+                let p = s.avg(cx + u * R * 0.75, cy + v * R * 0.75, max(1, 1.5 * sx))
+                out += [p.0, p.1, p.2]
+            } }
+            return out
+        }
+        func dist(_ a: [Double], _ b: [Double]) -> Double {
+            var t = 0.0; for i in 0..<min(a.count, b.count) { t += abs(a[i] - b[i]) }; return t / Double(max(1, a.count))
+        }
+        let opp = patch(315 * sx, 310 * sy, 28 * sx), mine = patch(863 * sx, 310 * sy, 28 * sx)
+        guard dist(opp, mine) > 20 else { return bad }   // badges hidden (banner) or identical
+        var cells = [Int](repeating: 0, count: cols * rows)
+        var nMine = 0, nOpp = 0
+        for r in 0..<rows { for c in 0..<cols {
+            let P = patch((25.5 + pitch * (Double(c) + 0.5)) * sx, (top + pitch * (Double(r) + 0.5)) * sy, pitch * 0.36 * sx)
+            let dm = dist(P, mine), dop = dist(P, opp)
+            var v = 0
+            if dm < 32 && dm < dop * 0.6 { v = 1; nMine += 1 }
+            else if dop < 32 && dop < dm * 0.6 { v = 2; nOpp += 1 }
             cells[r * cols + c] = v
         } }
-        // your colour: the coin next to your avatar (top-right); your turn: the blue "Your Turn" pill
-        let coin = s.avg(863 * sx, 312 * sy, 6 * sx)
-        let me = coin.0 - coin.1 > 100 ? 1 : ((coin.1 > 120 && coin.0 > 170) ? 2 : 0)
+        // sanity: pieces sit on top of each other (no floating ones), counts differ by at most one
+        for c in 0..<cols { for r in 0..<(rows - 1) where cells[r * cols + c] != 0 && cells[(r + 1) * cols + c] == 0 { return bad } }
+        if abs(nMine - nOpp) > 1 { return bad }
+        // pieces never disappear mid-game: a sudden drop is a covered or fading frame, unless it lasts (new game)
+        let total = nMine + nOpp
+        let now = Date().timeIntervalSince1970
+        if total < cLastPieces && cLastPieces >= 2 {
+            if cDropSince == 0 { cDropSince = now }
+            if now - cDropSince < 3 { return bad }
+        }
+        cDropSince = 0; cLastPieces = total
         let pill = s.avg(730 * sx, 398 * sy, 6 * sx)
         let myTurn = pill.2 > 200 && pill.2 - pill.0 > 120
-        return BoardMessage(valid: true, game: kind, cells: cells, me: me, myTurn: myTurn)
+        return BoardMessage(valid: true, game: kind, cells: cells, me: 1, myTurn: myTurn)
     }
 }
