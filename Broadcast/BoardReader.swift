@@ -5,7 +5,7 @@ import Foundation
 /// Positions are fractions calibrated on 1179×2556 iPhone screenshots:
 /// grid top-left (159, 933), cell 107.5 px; score tiles at y 664–742.
 enum BoardReader {
-    private struct Sampler {
+    struct Sampler {
         let w: Int, h: Int
         let get: (Int, Int) -> (Double, Double, Double)
         func avg(_ cx: Double, _ cy: Double, _ rad: Double) -> (Double, Double, Double) {
@@ -57,7 +57,9 @@ enum BoardReader {
         let W = Double(s.w), H = Double(s.h)
         // Portrait only. A landscape frame is not the game screen we expect.
         if W > H { return BoardMessage(valid: false, cells: [], me: 0, myTurn: false) }
-        // Which game? The background in the top-left corner tells them apart.
+        // Which game? Jackaroo has a green table under the board; the others differ in the top-left corner.
+        let jg = s.avg(W * 590 / 1180, H * 1650 / 2556, W * 6 / 1180)
+        if jg.1 > jg.0 + 60 && jg.1 > jg.2 + 20 { return readJackaroo(s) }
         let tl = s.avg(W * 40 / 1179, H * 400 / 2556, W * 5 / 1179)
         let tlL = (tl.0 + tl.1 + tl.2) / 3
         if tl.0 > 160 && tl.0 - tl.1 > 50 { return readCheckers(s) }

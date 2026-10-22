@@ -40,8 +40,8 @@ enum DarwinBoard {
     static let prefix = "com.atomawayg.sian.b."
     static func names() -> [String] {
         var n: [String] = []
-        for i in 0..<64 { for v in 0..<5 { n.append(prefix + "c\(i)v\(v)") } }
-        for g in 0..<4 { n.append(prefix + "g\(g)") }
+        for i in 0..<JK.count { for v in 0..<14 { n.append(prefix + "c\(i)v\(v)") } }
+        for g in 0..<5 { n.append(prefix + "g\(g)") }
         for v in 0..<3 { n.append(prefix + "me\(v)") }
         n += [prefix + "turn0", prefix + "turn1", prefix + "valid0", prefix + "valid1", prefix + "commit"]
         return n
@@ -49,7 +49,7 @@ enum DarwinBoard {
     static func send(_ m: BoardMessage) {
         Signal.post(prefix + "valid\(m.valid ? 1 : 0)")
         Signal.post(prefix + "g\(m.game.rawValue)")
-        if m.cells.count <= 64 { for (i, v) in m.cells.enumerated() { Signal.post(prefix + "c\(i)v\(v)") } }
+        if m.cells.count <= JK.count { for (i, v) in m.cells.enumerated() { Signal.post(prefix + "c\(i)v\(v)") } }
         Signal.post(prefix + "me\(m.me)")
         Signal.post(prefix + "turn\(m.myTurn ? 1 : 0)")
         Signal.post(prefix + "commit")

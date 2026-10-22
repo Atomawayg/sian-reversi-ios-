@@ -60,7 +60,7 @@ final class GameModel: ObservableObject {
 
     static weak var shared: GameModel?
 
-    private var dCells = [Int](repeating: 0, count: 64), dMe = 0, dTurn = false, dValid = false, dGame = GameKind.reversi
+    private var dCells = [Int](repeating: 0, count: JK.count), dMe = 0, dTurn = false, dValid = false, dGame = GameKind.reversi
     private var lastDarwinCommit = Date.distantPast, lastSocketMsg = Date.distantPast
     private var darwinMsgs = 0
 
@@ -73,7 +73,7 @@ final class GameModel: ObservableObject {
                 let n = dGame.size.w * dGame.size.h
                 handle(BoardMessage(valid: dValid, game: dGame, cells: dValid ? Array(dCells.prefix(n)) : [], me: dMe, myTurn: dTurn), viaSocket: false)
             } else if k.hasPrefix("c"), let vi = k.firstIndex(of: "v"),
-                      let i = Int(k[k.index(after: k.startIndex)..<vi]), let v = Int(k[k.index(after: vi)...]), i < 64 {
+                      let i = Int(k[k.index(after: k.startIndex)..<vi]), let v = Int(k[k.index(after: vi)...]), i < JK.count {
                 dCells[i] = v
             } else if k.hasPrefix("me"), let v = Int(k.dropFirst(2)) { dMe = v }
             else if k.hasPrefix("g"), let v = Int(k.dropFirst(1)), let g = GameKind(rawValue: v) { dGame = g }
@@ -112,6 +112,7 @@ final class GameModel: ObservableObject {
         switch m.game {
         case .checkers: handleCheckers(m); return
         case .connect4, .connect5: handleConnect(m); return
+        case .jackaroo: handleJackaroo(m); return
         case .reversi: break
         }
         if m.me != 0 && !manualMe { me = m.me }
@@ -284,6 +285,92 @@ final class GameModel: ObservableObject {
                 self.show(Overlay(game: m.game, cells: draw, rec: res.best, title: "ช่อง \(res.best + 1)", line: line, mine: true, meColor: meC))
             }
         }
+    }
+
+    // MARK: Jackaroo
+    private static let jkColourName = ["", "เขียว", "แดง", "ฟ้า", "ส้ม"]
+
+    private func handleJackaroo(_ m: BoardMessage) {
+        let cells = m.cells
+        var colourSeat = [Int](repeating: -1, count: 5)
+        for s in 0..<4 { let c = cells[JK.seats + s]; if c > 0 { colourSeat[c] = s } }
+        var st = [[Int]](repeating: [], count: 4)
+        for t in 0..<76 { let c = cells[JK.track + t]; if c > 0, colourSeat[c] >= 0 { st[colourSeat[c]].append(t) } }
+        for s in 0..<4 { for k in 0..<4 { if cells[JK.lanes + 4 * s + k] > 0 { st[s].append(100 + k) } } }
+        for s in 0..<4 { st[s] = Array((st[s] + [-1, -1, -1, -1]).prefix(4)) }
+        let hand = (0..<5).compactMap { k -> String? in let r = cells[JK.hand + k]; return r > 0 && r < JK.rankNames.count ? JK.rankNames[r] : nil }
+        var base = Overlay(game: .jackaroo, cells: cells, title: "รอ…", line: "ตาคนอื่น", meColor: cells[JK.seats + 3])
+        guard m.myTurn, !hand.isEmpty else {
+            computedFor = []; gen += 1
+            show(base); return
+        }
+        let key = [300] + cells
+        if key == computedFor { return }
+        computedFor = key; gen += 1
+        let g = gen
+        base.hand = hand; base.title = "คิด…"; base.line = "ตาคุณ"; base.mine = true
+        show(base)
+        let snap = base
+        work.async { [weak self] in
+            guard let self else { return }
+            let best = JackarooEngine.best(st, hand: hand, me: 3)
+            DispatchQueue.main.async {
+                guard g == self.gen, let mv = best else { return }
+                var o = snap
+                o.pick = mv.card
+                let (title, line) = GameModel.describe(mv, st: st, cells: cells)
+                o.title = title; o.line = line
+                o.arrows = mv.moves.flatMap { mvv -> [Int] in
+                    func code(_ p: Int) -> Int { p < 0 ? 200 + mvv.seat : (p >= 100 ? 100 + 4 * mvv.seat + (p - 100) : p) }
+                    return [code(mvv.from), code(mvv.to)]
+                }
+                self.show(o)
+            }
+        }
+    }
+
+    /// Plain Thai instructions for a move.
+    private static func describe(_ mv: JKMove, st: [[Int]], cells: [Int]) -> (String, String) {
+        func colour(_ seat: Int) -> String { jkColourName[max(0, min(4, cells[JK.seats + seat]))] }
+        func which(_ seat: Int, _ from: Int) -> String {
+            if from < 0 { return "ลูกใหม่" }
+            if from >= 100 { return "ลูกในช่องเส้นชัย" }
+            let onTrack = st[seat].filter { $0 >= 0 && $0 < 100 }
+            if onTrack.count <= 1 { return "ลูก\(colour(seat))" }
+            let d = JackarooEngine.dist(seat, from)
+            let ahead = onTrack.filter { JackarooEngine.dist(seat, $0) > d }.count
+            if ahead == 0 { return "ลูก\(colour(seat))หน้าสุด" }
+            if ahead == onTrack.count - 1 { return "ลูก\(colour(seat))หลังสุด" }
+            return "ลูก\(colour(seat))ตัวที่ \(ahead + 1) นับจากหน้า"
+        }
+        var extra: [String] = []
+        if mv.moves.contains(where: { $0.to >= 100 && $0.from < 100 }) { extra.append("เข้าเส้นชัย 🏁") }
+        for s in mv.captures {
+            extra.append(s == 1 || s == 3 ? "ตีลูก\(colour(s))(เพื่อน) กลับบ้าน" : "ตีลูก\(colour(s))กลับบ้าน 💥")
+        }
+        let first = mv.moves.first
+        var title: String
+        var detail = ""
+        switch mv.kind {
+        case .place: title = mv.rank == "A" ? "กด New stone" : "ออกลูกใหม่"; detail = "วางลูกที่ช่องออกตัว"
+        case .a1: title = "กด Move 1"; detail = which(first!.seat, first!.from)
+        case .a11: title = "กด Move 11"; detail = which(first!.seat, first!.from)
+        case .fwd: title = "เดิน \(mv.steps) ช่อง"; detail = which(first!.seat, first!.from)
+        case .back: title = "ถอยหลัง 4 ช่อง"; detail = which(first!.seat, first!.from)
+        case .any5:
+            if first!.seat == 3 || (first!.seat == 1 && !st[3].contains(where: { $0 < 100 })) { title = "เดิน 5 ช่อง"; detail = which(first!.seat, first!.from) }
+            else { title = "ดันลูก\(colour(first!.seat)) 5 ช่อง"; detail = first!.seat == 1 ? "ช่วยลูกเพื่อน" : "เลือกลูกของ\(colour(first!.seat))" }
+        case .split:
+            title = "แบ่ง \(mv.steps) + \(7 - mv.steps)"
+            detail = "\(which(mv.moves[0].seat, mv.moves[0].from)) \(mv.steps) · \(which(mv.moves[1].seat, mv.moves[1].from)) \(7 - mv.steps)"
+        case .swap:
+            title = "สลับกับลูก\(colour(mv.moves[1].seat))"
+            detail = "ใช้\(which(first!.seat, first!.from))"
+        case .force: title = "ให้คนถัดไปทิ้งไพ่"; detail = "เลือกตัวเลือกบังคับทิ้งไพ่"
+        case .discard: title = "ทิ้งไพ่ใบนี้"; detail = "ไม่มีตาที่ลงได้"
+        }
+        let line = ([detail] + extra).filter { !$0.isEmpty }.joined(separator: "\n")
+        return (title, line)
     }
 
     func setMe(_ c: Int) { me = c; manualMe = c != 0; computedFor = [] }

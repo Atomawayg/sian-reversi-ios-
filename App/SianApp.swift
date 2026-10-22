@@ -43,6 +43,7 @@ struct ContentView: View {
         GameInfo(kind: .checkers, name: "หมากฮอส", place: "WePlay", icon: "crown.fill"),
         GameInfo(kind: .connect4, name: "เรียง 4", place: "Plato", icon: "circle.grid.3x3.fill"),
         GameInfo(kind: .connect5, name: "เรียง 5", place: "Plato", icon: "circle.grid.3x3.circle.fill"),
+        GameInfo(kind: .jackaroo, name: "Jackaroo", place: "WePlay", icon: "suit.club.fill"),
     ]
 
     var body: some View {
@@ -136,6 +137,7 @@ struct ContentView: View {
                 Label("กด เริ่มใช้งาน → Start Broadcast แล้วเข้าเกม แอปรู้เองว่าเล่นเกมไหน", systemImage: "1.circle")
                 Label("บีบหน้าต่างลอยให้เล็ก แล้ววางใต้กระดาน อย่าบังกระดานหรือรูปโปรไฟล์", systemImage: "2.circle")
                 Label("ฮอส: เส้นเขียวคือทางเดิน กากบาทคือตัวที่กิน · เรียง 4/5: ลูกศรทองชี้ช่องที่หยอด", systemImage: "3.circle")
+                Label("Jackaroo: ไพ่ใหญ่ขอบทองคือใบที่ต้องลง ลูกศรเขียวชี้ลูกที่เดิน วงทองคือจุดหมาย", systemImage: "4.circle")
             }
             .font(.footnote)
         }
