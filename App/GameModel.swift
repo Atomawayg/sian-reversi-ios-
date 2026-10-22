@@ -316,21 +316,22 @@ final class GameModel: ObservableObject {
             if hand.count > 0, jkLock == nil {
                 let ci = hand.indices.min { (JackarooEngine.keepValue(st, hand[$0]), $0) < (JackarooEngine.keepValue(st, hand[$1]), $1) }!
                 base.pick = ci
-                base.line = "ถ้าเกมให้ทิ้งไพ่ → ทิ้งใบนี้"
+                base.line = "ถ้าขึ้น DISCARD ให้คุณทิ้ง → ทิ้งใบนี้"
             }
             computedFor = []; gen += 1
             show(base); return
         }
+        let discardMode = cells[JK.discard] == 1
         // same board, same cards: keep the answer we already gave (no flip-flopping while you tap cards)
         let handKey = hand.sorted()
-        if let l = jkLock, l.board == board, l.hand == handKey {
+        if let l = jkLock, l.board == board, l.hand == handKey, l.discard == discardMode {
             var o = l.overlay
             if let i = hand.firstIndex(of: l.rank) { o.pick = i }
             o.hand = hand
             if o != overlay { show(o) }
             return
         }
-        let key = [300] + board + hand.map { JK.rankNames.firstIndex(of: $0) ?? 0 } + playable.map { $0 ? 1 : 0 }
+        let key = [300, discardMode ? 1 : 0] + board + hand.map { JK.rankNames.firstIndex(of: $0) ?? 0 } + playable.map { $0 ? 1 : 0 }
         if key == computedFor { return }
         computedFor = key; gen += 1
         let g = gen
@@ -339,24 +340,34 @@ final class GameModel: ObservableObject {
         let snap = base
         work.async { [weak self] in
             guard let self else { return }
-            let best = JackarooEngine.bestDeep(st, hand: hand, playable: playable, me: 3)
+            var best: JKMove?
+            var spare = -1
+            if discardMode {
+                let ci = JackarooEngine.bestDiscard(st, hand: hand, me: 3)
+                best = JKMove(card: ci, rank: hand[ci], kind: .discard)
+            } else {
+                best = JackarooEngine.bestDeep(st, hand: hand, playable: playable, me: 3)
+                if hand.count > 1 { spare = JackarooEngine.bestDiscard(st, hand: hand, me: 3, samples: 24, plies: 7) }
+            }
             DispatchQueue.main.async {
                 guard g == self.gen, let mv = best else { return }
                 var o = snap
                 o.pick = mv.card
-                let (title, line) = GameModel.describe(mv, st: st, cells: cells)
+                var (title, line) = GameModel.describe(mv, st: st, cells: cells)
+                if discardMode { line = "เกมบังคับทิ้งไพ่ · ใบนี้เสียน้อยที่สุด" }
+                else if spare >= 0 && mv.kind != .discard { line += "\n(ถ้าขึ้น DISCARD → ทิ้ง \(hand[spare]))" }
                 o.title = title; o.line = line
                 o.arrows = mv.moves.flatMap { mvv -> [Int] in
                     func code(_ p: Int) -> Int { p < 0 ? 200 + mvv.seat : (p >= 100 ? 100 + 4 * mvv.seat + (p - 100) : p) }
                     return [code(mvv.from), code(mvv.to)]
                 }
-                self.jkLock = JKLock(board: board, hand: handKey, rank: mv.rank, overlay: o)
+                self.jkLock = JKLock(board: board, hand: handKey, rank: mv.rank, discard: discardMode, overlay: o)
                 self.show(o)
             }
         }
     }
 
-    private struct JKLock { let board: [Int]; let hand: [String]; let rank: String; let overlay: Overlay }
+    private struct JKLock { let board: [Int]; let hand: [String]; let rank: String; let discard: Bool; let overlay: Overlay }
     private var jkLock: JKLock? = nil
     private var jkTurnAt = Date.distantPast
 
@@ -382,6 +393,12 @@ final class GameModel: ObservableObject {
         if mv.moves.contains(where: { $0.to >= 100 && $0.from < 100 }) { extra.append("เข้าเส้นชัย 🏁") }
         for s in mv.captures {
             extra.append(s == 1 || s == 3 ? "ตีลูก\(colour(s))(เพื่อน) กลับบ้าน" : "ตีลูก\(colour(s))กลับบ้าน 💥")
+        }
+        for mm in mv.moves where mm.seat != 3 {
+            if mv.kind == .any5 || mv.kind == .swap {
+                extra.append(mm.seat == 1 ? "ช่วยดันลูกเพื่อน 🤝" : "ก่อกวนลูก\(colour(mm.seat)) 😈")
+                break
+            }
         }
         let first = mv.moves.first
         var title: String

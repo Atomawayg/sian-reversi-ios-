@@ -268,32 +268,42 @@ enum JackarooEngine {
         return ms.max { $0.score < $1.score }
     }
 
-    // MARK: strongest search: sample the hidden hands and play the next 7 turns out
+    // MARK: strongest search: sample the hidden hands and play the future out (my next turns included)
     struct RNG { var s: UInt64; mutating func next() -> UInt64 { s &+= 0x9E3779B97F4A7C15; var z = s; z = (z ^ (z >> 30)) &* 0xBF58476D1CE4E5B9; z = (z ^ (z >> 27)) &* 0x94D049BB133111EB; return z ^ (z >> 31) }
         mutating func int(_ n: Int) -> Int { Int(next() % UInt64(max(1, n))) } }
 
-    /// What a decent player does: the move that is best for their team right now (captures included).
+    /// A sensible player: the move that is best for their own team (captures, racing home, saving stones).
     static func greedy(_ st: [[Int]], _ hand: [String], _ q: Int) -> JKMove? {
         var best: JKMove? = nil
         var bv = -Double.infinity
         for (ci, c) in hand.enumerated() {
             for var m in generate(st, hand: [c], me: q) where m.kind != .force {
                 m.card = ci
-                let v = material(m.after, me: q)
+                let v = material(m.after, me: q) - 0.3 * (cardCost[c] ?? 0)
                 if v > bv { bv = v; best = m }
             }
         }
         return best
     }
 
-    static func rollout(_ st: [[Int]], mine: [String], others: [Int: [String]], me: Int, plies: Int) -> Double {
+    struct Deal { var hands: [Int: [String]]; var reserve: [String] }
+
+    static func rollout(_ st: [[Int]], mine: [String], deal: Deal, me: Int, plies: Int) -> Double {
         let order = [(me + 3) % 4, (me + 2) % 4, (me + 1) % 4, me]
-        var hands = others
+        var hands = deal.hands
         hands[me] = mine
+        var reserve = deal.reserve
         var cur = st
         for i in 0..<plies {
             let q = order[i % 4]
-            guard var h = hands[q], !h.isEmpty else { continue }
+            var h = hands[q] ?? []
+            if h.isEmpty {
+                // everyone gets new cards when the round runs out
+                if (0..<4).allSatisfy({ (hands[$0] ?? []).isEmpty }) && reserve.count >= 16 {
+                    for s in 0..<4 { hands[s] = Array(reserve.prefix(4)); reserve.removeFirst(4) }
+                    h = hands[q] ?? []
+                } else { continue }
+            }
             if let m = greedy(cur, h, q) { h.remove(at: m.card); cur = m.after } else { h.removeFirst() }
             hands[q] = h
         }
@@ -307,9 +317,47 @@ enum JackarooEngine {
         return h
     }
 
-    /// Best move found by playing every candidate out against many sampled deals (same deals for every candidate,
-    /// seeded by the position, so the same position always gives the same answer).
-    static func bestDeep(_ st: [[Int]], hand: [String], playable: [Bool]?, me: Int = 3, samples: Int = 64, plies: Int = 7) -> JKMove? {
+    /// Sampled deals for the other three players. Players after me this round still hold as many cards as I do.
+    static func deals(_ st: [[Int]], hand: [String], me: Int, samples: Int) -> [Deal] {
+        var rng = RNG(s: stateSeed(st, hand))
+        var deck: [String] = []
+        for r in ranks { for _ in 0..<4 { deck.append(r) } }
+        for c in hand { if let i = deck.firstIndex(of: c) { deck.remove(at: i) } }
+        let sizes = [(me + 3) % 4: hand.count, (me + 2) % 4: hand.count, (me + 1) % 4: max(0, hand.count - 1)]
+        var out: [Deal] = []
+        for _ in 0..<samples {
+            var d = deck
+            for i in stride(from: d.count - 1, to: 0, by: -1) { d.swapAt(i, rng.int(i + 1)) }
+            var hands: [Int: [String]] = [:]
+            var k = 0
+            for q in [(me + 3) % 4, (me + 2) % 4, (me + 1) % 4] {
+                let n = sizes[q] ?? 0
+                hands[q] = Array(d[k..<min(d.count, k + n)]); k += n
+            }
+            out.append(Deal(hands: hands, reserve: Array(d[min(d.count, k)...])))
+        }
+        return out
+    }
+
+    /// Which card to throw away when the game makes you discard: keep the hand that plays out best.
+    static func bestDiscard(_ st: [[Int]], hand: [String], me: Int = 3, samples: Int = 48, plies: Int = 11) -> Int {
+        if hand.count <= 1 { return 0 }
+        let ds = deals(st, hand: hand, me: me, samples: samples)
+        var best = 0
+        var bv = -Double.infinity
+        var tried = Set<String>()
+        for i in hand.indices where tried.insert(hand[i]).inserted {
+            var rest = hand; rest.remove(at: i)
+            var tot = 0.0
+            for d in ds { tot += rollout(st, mine: rest, deal: d, me: me, plies: plies) }
+            if tot > bv + 1e-9 { bv = tot; best = i }
+        }
+        return best
+    }
+
+    /// Best move found by playing every candidate out against many sampled deals (the same deals for every
+    /// candidate, seeded by the position, so one position always gives one answer).
+    static func bestDeep(_ st: [[Int]], hand: [String], playable: [Bool]?, me: Int = 3, samples: Int = 96, plies: Int = 11) -> JKMove? {
         if hand.isEmpty { return nil }
         let ok = playable ?? Array(repeating: true, count: hand.count)
         var cands: [JKMove] = []
@@ -319,35 +367,25 @@ enum JackarooEngine {
         let forceIdx = hand.indices.first { $0 < ok.count && ok[$0] && hand[$0] == "10" }
         if cands.isEmpty {
             if let fi = forceIdx { return JKMove(card: fi, rank: "10", kind: .force, after: st) }
-            let ci = hand.indices.min { (keepValue(st, hand[$0], me: me), $0) < (keepValue(st, hand[$1], me: me), $1) }!
+            let ci = bestDiscard(st, hand: hand, me: me)
             return JKMove(card: ci, rank: hand[ci], kind: .discard)
         }
-        // de-duplicate identical results (e.g. two equal cards)
         var seen = Set<String>()
         cands = cands.filter { m in
-            let k = m.rank + ":" + m.after.map { $0.sorted().map(String.init).joined(separator: ",") }.joined(separator: "|")
+            let k = m.after.map { $0.sorted().map(String.init).joined(separator: ",") }.joined(separator: "|") + ":" + m.rank
             return seen.insert(k).inserted
         }
-        var rng = RNG(s: stateSeed(st, hand))
-        var deck: [String] = []
-        for r in ranks { for _ in 0..<4 { deck.append(r) } }
-        for c in hand { if let i = deck.firstIndex(of: c) { deck.remove(at: i) } }
-        let n = max(1, hand.count - 1)
-        var deals: [[Int: [String]]] = []
-        for _ in 0..<samples {
-            var d = deck
-            for i in stride(from: d.count - 1, to: 0, by: -1) { d.swapAt(i, rng.int(i + 1)) }
-            var deal: [Int: [String]] = [:]
-            for (k, q) in [(me + 3) % 4, (me + 2) % 4, (me + 1) % 4].enumerated() { deal[q] = Array(d[(k * n)..<min(d.count, (k + 1) * n)]) }
-            deals.append(deal)
-        }
+        // quick look first, then spend the time on the most promising moves
+        for k in 0..<cands.count { cands[k].score = position(cands[k].after, me: me) - (cardCost[cands[k].rank] ?? 0) }
+        cands.sort { $0.score > $1.score }
+        if cands.count > 14 { cands = Array(cands.prefix(14)) }
+        let ds = deals(st, hand: hand, me: me, samples: samples)
         for k in 0..<cands.count {
             var rest = hand; rest.remove(at: cands[k].card)
             var total = 0.0
-            for d in deals { total += rollout(cands[k].after, mine: rest, others: d, me: me, plies: plies) }
-            cands[k].score = total / Double(samples) - 0.5 * (cardCost[cands[k].rank] ?? 0)
+            for d in ds { total += rollout(cands[k].after, mine: rest, deal: d, me: me, plies: plies) }
+            cands[k].score = total / Double(samples) - 0.3 * (cardCost[cands[k].rank] ?? 0)
         }
-        // stable order: best score, then the earlier card, then the first generated
         var bestIdx = 0
         for k in 1..<cands.count where cands[k].score > cands[bestIdx].score + 1e-9 { bestIdx = k }
         return cands[bestIdx]

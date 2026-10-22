@@ -39,6 +39,7 @@ enum JK {
     static let seats = 108      // colour of each seat 0..3
     static let hand = 112       // up to 5 cards: 1 A, 2…10, 11 J, 12 Q, 13 K
     static let playable = 117   // 1 when that card is white (the game lets you play it)
-    static let count = 122
+    static let discard = 122    // 1 while the big DISCARD banner is on the board
+    static let count = 123
     static let rankNames = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
 }

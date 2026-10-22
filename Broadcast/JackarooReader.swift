@@ -81,6 +81,20 @@ extension BoardReader {
         digitBase = min(digitBase + 0.0005, frac)
         let timer = frac > max(0.03, digitBase + 0.015)
         let anyWhite = hand.contains { $0.white }
+        // the red DISCARD banner across the middle of the board: someone has to throw a card away
+        var red = 0, rtot = 0
+        var dy = 960.0
+        while dy < 1100 {
+            var dx = 330.0
+            while dx < 850 {
+                let p = s.get(Int(dx * sx), Int(dy * sy))
+                if p.0 > 150 && p.0 > p.1 * 1.8 && p.0 > p.2 * 1.8 { red += 1 }
+                rtot += 1; dx += 4
+            }
+            dy += 4
+        }
+        let banner = Double(red) / Double(max(1, rtot)) > 0.12
+        cells[JK.discard] = banner ? 1 : 0
         return BoardMessage(valid: sane, game: .jackaroo, cells: cells, me: seatCol[3], myTurn: sane && !hand.isEmpty && (timer || anyWhite))
     }
 
