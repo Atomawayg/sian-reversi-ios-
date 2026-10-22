@@ -103,9 +103,9 @@ enum JackarooEngine {
             }
             if c == "K" || c == "A", let i = st[ctrl].firstIndex(of: -1) {
                 let sp = start(ctrl)
-                if ownerAt(st, sp) == nil {   // WePlay: a new stone needs an empty start square
-                    var a = st; a[ctrl][i] = sp
-                    out.append(JKMove(card: ci, rank: c, kind: .place, moves: [(ctrl, i, -1, sp)], after: a))
+                if !st[ctrl].contains(sp) {   // your own stone on the start blocks; anyone else's there is sent home
+                    let (a, cap) = apply(st, ctrl, i, sp)
+                    out.append(JKMove(card: ci, rank: c, kind: .place, moves: [(ctrl, i, -1, sp)], after: a, captures: cap.map { [$0] } ?? []))
                 }
             }
             switch c {
