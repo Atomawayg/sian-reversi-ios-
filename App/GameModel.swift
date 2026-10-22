@@ -303,6 +303,11 @@ final class GameModel: ObservableObject {
             let r = cells[JK.hand + k]
             if r > 0 && r < JK.rankNames.count { hand.append(JK.rankNames[r]); playable.append(cells[JK.playable + k] == 1) }
         }
+        if jkLogOn {
+            let rd = cells.prefix(JK.seats).map { String($0) }.joined()
+            let line = "B \(rd) s=\(cells[JK.seats..<JK.hand].map(String.init).joined()) h=" + zip(hand, playable).map { $0 + ($1 ? "*" : "") }.joined(separator: ",") + " t=\(m.myTurn ? 1 : 0) d=\(cells[JK.discard])"
+            if line != jkLastLog { jkLastLog = line; log(line) }
+        }
         var base = Overlay(game: .jackaroo, cells: cells, title: "รอ…", line: "ตาคนอื่น", meColor: cells[JK.seats + 3])
         base.hand = hand
         let board = Array(cells[0..<JK.hand])
@@ -372,9 +377,15 @@ final class GameModel: ObservableObject {
                 var o = snap
                 o.pick = mv.card
                 var (title, line) = GameModel.describe(mv, st: st, cells: cells)
-                if discardMode || mv.kind == .discard { line = (discardMode ? "เกมบังคับทิ้งไพ่\n" : "ไม่มีใบที่ลงได้\n") + GameModel.discardReason(st, hand: hand, ci: mv.card) }
-                else if spare >= 0 && mv.kind != .discard { line += "\n(ถ้าขึ้น DISCARD → ทิ้ง \(hand[spare]))" }
+                let plan = GameModel.steps(mv, st: st, cells: cells)
+                o.steps = plan.steps; o.tags = plan.tags; o.marks = plan.marks; o.swap = mv.kind == .swap
+                if discardMode || mv.kind == .discard {
+                    line = (discardMode ? "เกมบังคับทิ้งไพ่\n" : "ไม่มีใบที่ลงได้\n") + GameModel.discardReason(st, hand: hand, ci: mv.card)
+                    o.steps = []; o.tags = []
+                }
+                else if spare >= 0 && mv.kind != .discard { o.tags.append("(ถ้าขึ้น DISCARD → ทิ้ง \(hand[spare]))") }
                 o.title = title; o.line = line
+                self.log("A \(mv.rank) \(mv.kind) | " + (o.steps.isEmpty ? title + " | " + line.replacingOccurrences(of: "\n", with: " / ") : o.steps.joined(separator: " / ")))
                 o.arrows = mv.moves.flatMap { mvv -> [Int] in
                     func code(_ p: Int) -> Int { p < 0 ? 200 + mvv.seat : (p >= 100 ? 100 + 4 * mvv.seat + (p - 100) : p) }
                     return [code(mvv.from), code(mvv.to)]
@@ -387,6 +398,76 @@ final class GameModel: ObservableObject {
 
     private struct JKLock { let board: [Int]; let hand: [String]; let rank: String; let discard: Bool; let overlay: Overlay }
     private var jkLock: JKLock? = nil
+    // MARK: game log (settings → บันทึกเกม)
+    @Published var jkLogOn = UserDefaults.standard.bool(forKey: "jkLog") { didSet { UserDefaults.standard.set(jkLogOn, forKey: "jkLog"); if jkLogOn { log("--- เริ่มบันทึก \(Date())") } } }
+    private var jkLastLog = ""
+    static var logURL: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("sian-jackaroo-log.txt") }
+    private static let logTime: DateFormatter = { let f = DateFormatter(); f.dateFormat = "HH:mm:ss.S"; return f }()
+    func log(_ text: String) {
+        guard jkLogOn else { return }
+        let line = GameModel.logTime.string(from: Date()) + " " + text + "\n"
+        let url = GameModel.logURL
+        if let h = try? FileHandle(forWritingTo: url) {
+            h.seekToEndOfFile(); h.write(line.data(using: .utf8)!); try? h.close()
+            if let sz = try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int, sz > 8_000_000,
+               let d = try? Data(contentsOf: url) { try? d.suffix(4_000_000).write(to: url) }
+        } else { try? line.data(using: .utf8)!.write(to: url) }
+    }
+    func clearLog() { try? FileManager.default.removeItem(at: GameModel.logURL); jkLastLog = ""; objectWillChange.send() }
+    var logSize: String {
+        let b = (try? FileManager.default.attributesOfItem(atPath: GameModel.logURL.path)[.size] as? Int) ?? 0
+        return b == 0 ? "ยังไม่มีบันทึก" : String(format: "%.1f KB", Double(b) / 1024)
+    }
+
+    /// The advice as numbered taps: card first, then each stone. marks = stone codes for steps 2, 3…
+    static func steps(_ mv: JKMove, st: [[Int]], cells: [Int]) -> (steps: [String], tags: [String], marks: [Int]) {
+        func colour(_ seat: Int) -> String { jkColourName[max(0, min(4, cells[JK.seats + seat]))] }
+        func which(_ seat: Int, _ from: Int) -> String {
+            if from < 0 { return "ลูกใหม่" }
+            if from >= 100 { return "ลูก\(colour(seat))ในช่องเส้นชัย" }
+            let onTrack = st[seat].filter { $0 >= 0 && $0 < 100 }
+            if onTrack.count <= 1 { return "ลูก\(colour(seat))" }
+            let d = JackarooEngine.dist(seat, from)
+            let ahead = onTrack.filter { JackarooEngine.dist(seat, $0) > d }.count
+            if ahead == 0 { return "ลูก\(colour(seat)) ตัวหน้าสุด" }
+            if ahead == onTrack.count - 1 { return "ลูก\(colour(seat)) ตัวหลังสุด" }
+            return "ลูก\(colour(seat)) ตัวที่ \(ahead + 1) จากหน้า"
+        }
+        func code(_ seat: Int, _ p: Int) -> Int { p < 0 ? 200 + seat : (p >= 100 ? 100 + 4 * seat + (p - 100) : p) }
+        var steps = ["กดไพ่ \(mv.rank) (ใบที่ \(mv.card + 1))"]
+        var marks: [Int] = []
+        var tags: [String] = []
+        let f = mv.moves.first
+        let notMine = { (seat: Int) -> String in seat == 3 || (seat == 1 && !st[3].contains(where: { $0 < 100 })) ? "" : (seat == 1 ? " (ลูกเพื่อน)" : " (ไม่ใช่ลูกเรา)") }
+        switch mv.kind {
+        case .place: steps.append(mv.rank == "A" ? "เลือก New stone" : "ออกลูกใหม่ที่จุดเกิด"); if let f { marks.append(code(f.seat, f.from)) }
+        case .a1, .a11:
+            if let f { steps.append("เลือก Move \(mv.kind == .a1 ? 1 : 11) · กด\(which(f.seat, f.from))"); marks.append(code(f.seat, f.from)) }
+        case .fwd, .back, .any5:
+            if let f {
+                let n = mv.kind == .back ? "ถอย 4" : (mv.kind == .any5 ? "เดิน 5" : "เดิน \(mv.steps)")
+                steps.append("กด\(which(f.seat, f.from))\(notMine(f.seat)) → \(n)"); marks.append(code(f.seat, f.from))
+            }
+        case .split:
+            for (k, mm) in mv.moves.prefix(2).enumerated() {
+                steps.append("กด\(which(mm.seat, mm.from)) → เดิน \(k == 0 ? mv.steps : 7 - mv.steps)"); marks.append(code(mm.seat, mm.from))
+            }
+        case .swap:
+            if mv.moves.count >= 2 {
+                steps.append("กด\(which(mv.moves[0].seat, mv.moves[0].from))"); marks.append(code(mv.moves[0].seat, mv.moves[0].from))
+                steps.append("กด\(which(mv.moves[1].seat, mv.moves[1].from)) ⇄ สลับ"); marks.append(code(mv.moves[1].seat, mv.moves[1].from))
+            }
+        case .force: steps.append("เลือก ให้คนถัดไปทิ้งไพ่")
+        case .discard: break
+        }
+        if mv.moves.contains(where: { $0.to >= 100 && $0.from < 100 }) { tags.append("เข้าเส้นชัย 🏁") }
+        for s in mv.captures { tags.append(s == 1 || s == 3 ? "ตีลูก\(colour(s))(เพื่อน) กลับบ้าน" : "ตีลูก\(colour(s))กลับบ้าน 💥") }
+        if mv.kind == .any5 || mv.kind == .swap, let mm = mv.moves.first(where: { $0.seat != 3 }) {
+            tags.append(mm.seat == 1 ? "ช่วยลูกเพื่อน 🤝" : "ก่อกวนลูก\(colour(mm.seat)) 😈")
+        }
+        return (steps, tags, marks)
+    }
+
     private var jkPassiveKey: [Int] = []
     private var jkPassive: Overlay? = nil
 

@@ -20,8 +20,9 @@ final class PiPManager: NSObject, AVPictureInPictureControllerDelegate, AVPictur
         c.canStartPictureInPictureAutomaticallyFromInline = true
         controller = c
         // keep the window fed even when nothing changes
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             guard let self, let o = self.current else { return }
+            Renderer.pulse.toggle()
             self.enqueue(o)
         }
     }

@@ -20,6 +20,10 @@ struct Overlay: Equatable {
     var hand: [String] = []      // cards in your hand
     var pick: Int = -1           // index of the card to play
     var arrows: [Int] = []       // pairs (from, to): 0…75 track, 100+4*seat+slot lane, 200+seat home
+    var steps: [String] = []     // numbered things to tap, in order (step 1 = the card)
+    var tags: [String] = []      // why: captures, finishing, reasons
+    var marks: [Int] = []        // stone to tap for step 2, 3… (same codes as arrows)
+    var swap = false             // J: the two marked stones trade places
 
     init(game: GameKind = .reversi, cells: [Int]? = nil, rec: Int? = nil, path: [Int] = [], caps: [Int] = [],
          title: String, line: String, mine: Bool = false, meColor: Int = 1) {
@@ -30,6 +34,8 @@ struct Overlay: Equatable {
 
 enum Renderer {
     static let size = CGSize(width: 640, height: 360)
+    /// flips twice a second so the stones to tap blink
+    static var pulse = false
 
     private static let bg = UIColor(red: 0.055, green: 0.078, blue: 0.141, alpha: 1)
     private static let felt = UIColor(red: 0.118, green: 0.416, blue: 0.271, alpha: 1)
@@ -244,6 +250,23 @@ enum Renderer {
         return [from, to]
     }
 
+    private static func head(from p: CGPoint, to b: CGPoint) {
+        let ang = atan2(b.y - p.y, b.x - p.x), hl: CGFloat = 14
+        let h = UIBezierPath()
+        h.move(to: b)
+        h.addLine(to: CGPoint(x: b.x - hl * cos(ang - 0.5), y: b.y - hl * sin(ang - 0.5)))
+        h.addLine(to: CGPoint(x: b.x - hl * cos(ang + 0.5), y: b.y - hl * sin(ang + 0.5)))
+        h.close(); arrow.setFill(); h.fill()
+    }
+
+    private static func badge(_ n: Int, at c: CGPoint, radius: CGFloat) {
+        gold.setFill()
+        UIBezierPath(ovalIn: CGRect(x: c.x - radius, y: c.y - radius, width: radius * 2, height: radius * 2)).fill()
+        let a: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: radius * 1.35, weight: .heavy), .foregroundColor: bg]
+        let t = "\(n)" as NSString, sz = t.size(withAttributes: a)
+        t.draw(at: CGPoint(x: c.x - sz.width / 2, y: c.y - sz.height / 2), withAttributes: a)
+    }
+
     private static func drawJackaroo(_ o: Overlay, _ cells: [Int], _ rect: CGRect) {
         let pad: CGFloat = 14
         let side = rect.height - pad * 2
@@ -275,64 +298,90 @@ enum Renderer {
             let h = JKGeo.homes[s][q]; dot(map(h.0, h.1), cells[JK.homes + 4 * s + q], false)
         } }
         // the suggested move
-        var i = 0
-        while i + 1 < o.arrows.count {
-            let a = jkPoint(o.arrows[i], map), b = jkPoint(o.arrows[i + 1], map)
-            let pts = jkRoute(o.arrows[i], o.arrows[i + 1]).map { jkPoint($0, map) }
-            let path = UIBezierPath(); path.move(to: pts.first ?? a)
-            for q in pts.dropFirst() { path.addLine(to: q) }
-            if pts.count < 2 { path.addLine(to: b) }
-            path.lineJoinStyle = .round
-            path.lineWidth = 6; path.lineCapStyle = .round
-            arrow.setStroke(); path.stroke()
-            gold.setStroke()
-            let ra = UIBezierPath(ovalIn: CGRect(x: a.x - r * 1.6, y: a.y - r * 1.6, width: r * 3.2, height: r * 3.2)); ra.lineWidth = 4; ra.stroke()
-            let rb = UIBezierPath(ovalIn: CGRect(x: b.x - r * 1.7, y: b.y - r * 1.7, width: r * 3.4, height: r * 3.4)); rb.lineWidth = 4
-            rb.setLineDash([5, 4], count: 2, phase: 0); rb.stroke()
-            // arrow head
-            let prev = pts.count >= 2 ? pts[pts.count - 2] : a
-            let ang = atan2(b.y - prev.y, b.x - prev.x), hl: CGFloat = 14
-            let head = UIBezierPath()
-            head.move(to: b)
-            head.addLine(to: CGPoint(x: b.x - hl * cos(ang - 0.5), y: b.y - hl * sin(ang - 0.5)))
-            head.addLine(to: CGPoint(x: b.x - hl * cos(ang + 0.5), y: b.y - hl * sin(ang + 0.5)))
-            head.close(); arrow.setFill(); head.fill()
-            i += 2
+        if o.swap, o.marks.count >= 2 {
+            let a = jkPoint(o.marks[0], map), b = jkPoint(o.marks[1], map)
+            let path = UIBezierPath(); path.move(to: a); path.addLine(to: b)
+            path.lineWidth = 6; path.lineCapStyle = .round; arrow.setStroke(); path.stroke()
+            head(from: b, to: a); head(from: a, to: b)
+        } else {
+            var i = 0
+            while i + 1 < o.arrows.count {
+                let a = jkPoint(o.arrows[i], map), b = jkPoint(o.arrows[i + 1], map)
+                let pts = jkRoute(o.arrows[i], o.arrows[i + 1]).map { jkPoint($0, map) }
+                let path = UIBezierPath(); path.move(to: pts.first ?? a)
+                for q in pts.dropFirst() { path.addLine(to: q) }
+                if pts.count < 2 { path.addLine(to: b) }
+                path.lineJoinStyle = .round
+                path.lineWidth = 6; path.lineCapStyle = .round
+                arrow.setStroke(); path.stroke()
+                // target: where the stone ends up
+                for (rad, w) in [(r * 2.0, CGFloat(3)), (r * 1.25, CGFloat(3))] {
+                    let t = UIBezierPath(ovalIn: CGRect(x: b.x - rad, y: b.y - rad, width: rad * 2, height: rad * 2)); t.lineWidth = w
+                    UIColor.white.setStroke(); t.stroke()
+                }
+                head(from: pts.count >= 2 ? pts[pts.count - 2] : a, to: b)
+                i += 2
+            }
+        }
+        // the stones to tap: blinking gold ring + step number
+        let fallback = o.marks.isEmpty ? stride(from: 0, to: o.arrows.count, by: 2).map { o.arrows[$0] } : o.marks
+        for (n, code) in fallback.enumerated() {
+            let a = jkPoint(code, map)
+            let rr = r * (pulse ? 2.1 : 1.7)
+            let ring = UIBezierPath(ovalIn: CGRect(x: a.x - rr, y: a.y - rr, width: rr * 2, height: rr * 2))
+            ring.lineWidth = pulse ? 6 : 4; gold.withAlphaComponent(pulse ? 1 : 0.75).setStroke(); ring.stroke()
+            let bc = CGPoint(x: a.x + r * 1.7, y: a.y - r * 1.7)
+            badge(n + 2, at: bc, radius: 11)
         }
 
-        // right side: the card to play, big, then plain instructions
-        let tx = box.maxX + 22
-        let tw = rect.width - tx - 14
+        // right side: the card to play, then numbered steps
+        let tx = box.maxX + 18
+        let tw = rect.width - tx - 12
+        var y: CGFloat = 14
         if o.pick >= 0 && o.pick < o.hand.count {
-            let cardRect = CGRect(x: tx, y: 18, width: 96, height: 132)
+            let cardRect = CGRect(x: tx, y: y, width: 64, height: 88)
             UIColor.white.setFill()
-            let cp = UIBezierPath(roundedRect: cardRect, cornerRadius: 12); cp.fill()
-            gold.setStroke(); cp.lineWidth = 6; cp.stroke()
+            let cp = UIBezierPath(roundedRect: cardRect, cornerRadius: 9); cp.fill()
+            gold.setStroke(); cp.lineWidth = pulse ? 6 : 4; cp.stroke()
             let rank = o.hand[o.pick]
-            let rAttr: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: rank.count > 1 ? 54 : 70, weight: .heavy), .foregroundColor: UIColor(white: 0.1, alpha: 1)]
-            let rs = (rank as NSString).size(withAttributes: rAttr)
-            (rank as NSString).draw(at: CGPoint(x: cardRect.midX - rs.width / 2, y: cardRect.midY - rs.height / 2), withAttributes: rAttr)
-            // which card in your hand
-            let hx = cardRect.maxX + 14
-            let small = CGSize(width: 22, height: 30)
-            let cols = max(1, Int((rect.width - hx - 10) / (small.width + 5)))
-            for (j, h) in o.hand.enumerated() where j < cols {
-                let rr = CGRect(x: hx + CGFloat(j) * (small.width + 5), y: 22, width: small.width, height: small.height)
+            let rAttr: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: rank.count > 1 ? 36 : 48, weight: .heavy), .foregroundColor: UIColor(white: 0.1, alpha: 1)]
+            let rsz = (rank as NSString).size(withAttributes: rAttr)
+            (rank as NSString).draw(at: CGPoint(x: cardRect.midX - rsz.width / 2, y: cardRect.midY - rsz.height / 2), withAttributes: rAttr)
+            badge(1, at: CGPoint(x: cardRect.minX + 4, y: cardRect.minY + 4), radius: 11)
+            // your hand, left to right, the card to play in gold
+            let hx = cardRect.maxX + 12
+            let small = CGSize(width: 24, height: 32)
+            for (j, h) in o.hand.enumerated() where hx + CGFloat(j + 1) * (small.width + 5) < rect.width {
+                let rr = CGRect(x: hx + CGFloat(j) * (small.width + 5), y: y + 4, width: small.width, height: small.height)
                 (j == o.pick ? gold : UIColor(white: 0.85, alpha: 1)).setFill()
                 UIBezierPath(roundedRect: rr, cornerRadius: 4).fill()
-                let a: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 13, weight: .bold), .foregroundColor: UIColor.black]
+                let a: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 14, weight: .bold), .foregroundColor: UIColor.black]
                 let sz = (h as NSString).size(withAttributes: a)
                 (h as NSString).draw(at: CGPoint(x: rr.midX - sz.width / 2, y: rr.midY - sz.height / 2), withAttributes: a)
             }
-            let tAttr: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 15, weight: .semibold), .foregroundColor: muted]
-            ("ใบที่ \(o.pick + 1) จากซ้าย" as NSString).draw(at: CGPoint(x: hx, y: 60), withAttributes: tAttr)
+            let tAttr: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 16, weight: .semibold), .foregroundColor: ink]
+            ("ใบที่ \(o.pick + 1) จากซ้าย" as NSString).draw(at: CGPoint(x: hx, y: y + 44), withAttributes: tAttr)
+            y = cardRect.maxY + 12
+        } else { y = 50 }
+        if o.steps.count > 1 {
+            let sAttr: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 21, weight: .bold), .foregroundColor: o.mine ? ink : muted]
+            for (n, st) in o.steps.enumerated() where n > 0 {
+                let sz = (st as NSString).boundingRect(with: CGSize(width: tw - 30, height: 80), options: .usesLineFragmentOrigin, attributes: sAttr, context: nil)
+                badge(n + 1, at: CGPoint(x: tx + 11, y: y + 13), radius: 11)
+                (st as NSString).draw(with: CGRect(x: tx + 30, y: y, width: tw - 30, height: sz.height), options: .usesLineFragmentOrigin, attributes: sAttr, context: nil)
+                y += max(28, sz.height + 6)
+            }
+            let gAttr: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 18, weight: .semibold), .foregroundColor: gold]
+            let tags = o.tags.joined(separator: "\n")
+            (tags as NSString).draw(with: CGRect(x: tx, y: y + 2, width: tw, height: rect.height - y - 20), options: .usesLineFragmentOrigin, attributes: gAttr, context: nil)
+        } else {
+            let t1: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: o.title.count > 12 ? 28 : 34, weight: .heavy), .foregroundColor: o.mine ? gold : ink]
+            let s1 = (o.title as NSString).boundingRect(with: CGSize(width: tw, height: 120), options: .usesLineFragmentOrigin, attributes: t1, context: nil)
+            (o.title as NSString).draw(with: CGRect(x: tx, y: y, width: tw, height: s1.height), options: .usesLineFragmentOrigin, attributes: t1, context: nil)
+            let t2: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 20, weight: .semibold), .foregroundColor: muted]
+            let body = ([o.line] + o.tags).filter { !$0.isEmpty }.joined(separator: "\n")
+            (body as NSString).draw(with: CGRect(x: tx, y: y + s1.height + 4, width: tw, height: rect.height - y - s1.height - 22), options: .usesLineFragmentOrigin, attributes: t2, context: nil)
         }
-        let topY: CGFloat = o.pick >= 0 ? 164 : 60
-        let t1: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: o.title.count > 12 ? 30 : 38, weight: .heavy), .foregroundColor: o.mine ? gold : ink]
-        let s1 = (o.title as NSString).boundingRect(with: CGSize(width: tw, height: 120), options: .usesLineFragmentOrigin, attributes: t1, context: nil)
-        (o.title as NSString).draw(with: CGRect(x: tx, y: topY, width: tw, height: s1.height), options: .usesLineFragmentOrigin, attributes: t1, context: nil)
-        let t2: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 22, weight: .semibold), .foregroundColor: muted]
-        (o.line as NSString).draw(with: CGRect(x: tx, y: topY + s1.height + 6, width: tw, height: rect.height - topY - s1.height - 10), options: .usesLineFragmentOrigin, attributes: t2, context: nil)
         if !o.footer.isEmpty {
             let fAttr: [NSAttributedString.Key: Any] = [.font: UIFont.monospacedSystemFont(ofSize: 11, weight: .regular), .foregroundColor: muted.withAlphaComponent(0.6)]
             (o.footer as NSString).draw(at: CGPoint(x: tx, y: rect.height - 16), withAttributes: fAttr)

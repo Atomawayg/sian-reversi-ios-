@@ -137,7 +137,7 @@ struct ContentView: View {
                 Label("กด เริ่มใช้งาน → Start Broadcast แล้วเข้าเกม แอปรู้เองว่าเล่นเกมไหน", systemImage: "1.circle")
                 Label("บีบหน้าต่างลอยให้เล็ก แล้ววางใต้กระดาน อย่าบังกระดานหรือรูปโปรไฟล์", systemImage: "2.circle")
                 Label("ฮอส: เส้นเขียวคือทางเดิน กากบาทคือตัวที่กิน · เรียง 4/5: ลูกศรทองชี้ช่องที่หยอด", systemImage: "3.circle")
-                Label("Jackaroo: ไพ่ใหญ่ขอบทองคือใบที่ต้องลง ลูกศรเขียวชี้ลูกที่เดิน วงทองคือจุดหมาย", systemImage: "4.circle")
+                Label("Jackaroo: ทำตามเลข ① ไพ่ขอบทอง → ② ③ ลูกที่วงทองกะพริบ · เป้าขาวคือจุดหมาย", systemImage: "4.circle")
             }
             .font(.footnote)
         }
@@ -166,6 +166,15 @@ struct ContentView: View {
                 Button { model.togglePiP() } label: {
                     Label(model.pipOn ? "ปิดหน้าต่างลอย" : "เปิดหน้าต่างลอย", systemImage: "pip")
                         .font(.footnote.weight(.semibold))
+                }
+                Toggle(isOn: $model.jkLogOn) {
+                    Text("บันทึกเกม Jackaroo (ไว้ส่งให้ตรวจ)").font(.footnote.weight(.semibold))
+                }.tint(Theme.gold)
+                HStack(spacing: 16) {
+                    ShareLink(item: GameModel.logURL) { Label("ส่งบันทึก", systemImage: "square.and.arrow.up").font(.footnote.weight(.semibold)) }
+                    Button(role: .destructive) { model.clearLog() } label: { Label("ล้าง", systemImage: "trash").font(.footnote) }
+                    Spacer()
+                    Text(model.logSize).font(.caption2).foregroundColor(Theme.muted)
                 }
                 Text(model.debug).font(.caption2.monospaced()).foregroundColor(Theme.muted)
             }
