@@ -224,6 +224,26 @@ enum Renderer {
         return map(hs.map { $0.0 }.reduce(0, +) / 4, hs.map { $0.1 }.reduce(0, +) / 4)
     }
 
+    /// Holes the stone passes through, so the arrow follows the track.
+    static func jkRoute(_ from: Int, _ to: Int) -> [Int] {
+        guard from >= 0 && from < 76 else { return [from, to] }
+        if to >= 0 && to < 76 {
+            let f = ((to - from) % 76 + 76) % 76
+            if f <= 13 { return (0...f).map { (from + $0) % 76 } }
+            let bk = ((from - to) % 76 + 76) % 76
+            if bk <= 4 { return (0...bk).map { ((from - $0) % 76 + 76) % 76 } }
+            return [from, to]
+        }
+        if to >= 100 && to < 116 {
+            let s = (to - 100) / 4, k = (to - 100) % 4
+            let entry = ((19 * s - 2) % 76 + 76) % 76
+            let f = ((entry - from) % 76 + 76) % 76
+            if f > 13 { return [from, to] }
+            return (0...f).map { (from + $0) % 76 } + (0...k).map { 100 + 4 * s + $0 }
+        }
+        return [from, to]
+    }
+
     private static func drawJackaroo(_ o: Overlay, _ cells: [Int], _ rect: CGRect) {
         let pad: CGFloat = 14
         let side = rect.height - pad * 2
@@ -258,7 +278,11 @@ enum Renderer {
         var i = 0
         while i + 1 < o.arrows.count {
             let a = jkPoint(o.arrows[i], map), b = jkPoint(o.arrows[i + 1], map)
-            let path = UIBezierPath(); path.move(to: a); path.addLine(to: b)
+            let pts = jkRoute(o.arrows[i], o.arrows[i + 1]).map { jkPoint($0, map) }
+            let path = UIBezierPath(); path.move(to: pts.first ?? a)
+            for q in pts.dropFirst() { path.addLine(to: q) }
+            if pts.count < 2 { path.addLine(to: b) }
+            path.lineJoinStyle = .round
             path.lineWidth = 6; path.lineCapStyle = .round
             arrow.setStroke(); path.stroke()
             gold.setStroke()
@@ -266,7 +290,8 @@ enum Renderer {
             let rb = UIBezierPath(ovalIn: CGRect(x: b.x - r * 1.7, y: b.y - r * 1.7, width: r * 3.4, height: r * 3.4)); rb.lineWidth = 4
             rb.setLineDash([5, 4], count: 2, phase: 0); rb.stroke()
             // arrow head
-            let ang = atan2(b.y - a.y, b.x - a.x), hl: CGFloat = 14
+            let prev = pts.count >= 2 ? pts[pts.count - 2] : a
+            let ang = atan2(b.y - prev.y, b.x - prev.x), hl: CGFloat = 14
             let head = UIBezierPath()
             head.move(to: b)
             head.addLine(to: CGPoint(x: b.x - hl * cos(ang - 0.5), y: b.y - hl * sin(ang - 0.5)))
