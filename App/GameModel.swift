@@ -312,6 +312,18 @@ final class GameModel: ObservableObject {
         base.hand = hand
         let board = Array(cells[0..<JK.hand])
         if m.myTurn && !hand.isEmpty { jkTurnAt = Date() }
+        // step 2: the suggested card has left your hand (you confirmed it) and the stones haven't moved yet
+        if let l = jkLock, l.board == board, !l.discard, l.overlay.stage >= 1, !l.overlay.marks.isEmpty {
+            var rest = l.hand
+            if let i = rest.firstIndex(of: l.rank) { rest.remove(at: i) }
+            if hand.sorted() == rest {
+                var o = l.overlay
+                o.stage = 2; o.pick = -1; o.hand = hand
+                jkTurnAt = Date()
+                if o != overlay { show(o) }
+                return
+            }
+        }
         if !m.myTurn, let l = jkLock, l.board == board, Date().timeIntervalSince(jkTurnAt) < 2.5 {
             return   // a flicker in the turn signal: keep showing the answer
         }
@@ -333,8 +345,8 @@ final class GameModel: ObservableObject {
                     DispatchQueue.main.async {
                         guard g == self.gen else { return }
                         var o = snap
-                        o.pick = ci
-                        o.line = "ถ้าขึ้น DISCARD → ทิ้ง \(hand[ci])\n" + GameModel.discardReason(st, hand: hand, ci: ci)
+                        o.title = "ตาคนอื่น"
+                        o.line = "ถ้าต้องทิ้ง → \(hand[ci])"
                         self.jkPassive = o
                         self.show(o)
                     }
@@ -364,13 +376,11 @@ final class GameModel: ObservableObject {
         work.async { [weak self] in
             guard let self else { return }
             var best: JKMove?
-            var spare = -1
             if discardMode {
                 let ci = JackarooEngine.bestDiscard(st, hand: hand, me: 3)
                 best = JKMove(card: ci, rank: hand[ci], kind: .discard)
             } else {
                 best = JackarooEngine.bestDeep(st, hand: hand, playable: playable, me: 3)
-                if hand.count > 1 { spare = JackarooEngine.bestDiscard(st, hand: hand, me: 3, samples: 64, plies: 11) }
             }
             DispatchQueue.main.async {
                 guard g == self.gen, let mv = best else { return }
@@ -379,11 +389,24 @@ final class GameModel: ObservableObject {
                 var (title, line) = GameModel.describe(mv, st: st, cells: cells)
                 let plan = GameModel.steps(mv, st: st, cells: cells)
                 o.steps = plan.steps; o.tags = plan.tags; o.marks = plan.marks; o.swap = mv.kind == .swap
-                if discardMode || mv.kind == .discard {
-                    line = (discardMode ? "เกมบังคับทิ้งไพ่\n" : "ไม่มีใบที่ลงได้\n") + GameModel.discardReason(st, hand: hand, ci: mv.card)
-                    o.steps = []; o.tags = []
+                o.stage = 1
+                switch mv.kind {
+                case .place: o.action = mv.rank == "A" ? "New stone" : "ออกลูก"
+                case .a1: o.action = "Move 1"
+                case .a11: o.action = "Move 11"
+                case .fwd: o.action = "เดิน \(mv.steps)"
+                case .back: o.action = "ถอย 4"
+                case .any5: o.action = mv.moves.first.map { $0.seat == 3 || ($0.seat == 1 && !st[3].contains(where: { $0 < 100 })) } == false ? "ดันลูกนี้ 5" : "เดิน 5"
+                case .split: o.action = "แบ่ง \(mv.steps)+\(7 - mv.steps)"
+                case .swap: o.action = "สลับ"
+                case .force: o.action = "บังคับทิ้ง"
+                case .discard: o.action = "ทิ้ง"
                 }
-                else if spare >= 0 && mv.kind != .discard && o.tags.isEmpty { o.tags.append("ถ้า DISCARD → ทิ้ง \(hand[spare])") }
+                if discardMode || mv.kind == .discard {
+                    title = "ทิ้งใบนี้"; line = ""
+                    o.steps = []; o.tags = []; o.marks = []; o.arrows = []
+                    o.action = "ทิ้งใบนี้"; o.stage = 0
+                }
                 o.title = title; o.line = line
                 self.log("A \(mv.rank) \(mv.kind) | " + (o.steps.isEmpty ? title + " | " + line.replacingOccurrences(of: "\n", with: " / ") : o.steps.joined(separator: " / ")))
                 o.arrows = mv.moves.flatMap { mvv -> [Int] in

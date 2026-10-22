@@ -379,7 +379,7 @@ enum JackarooEngine {
 
     /// Best move found by playing every candidate out against many sampled deals (the same deals for every
     /// candidate, seeded by the position, so one position always gives one answer).
-    static func bestDeep(_ st: [[Int]], hand: [String], playable: [Bool]?, me: Int = 3, samples: Int = 600, plies: Int = 15, timeBudget: Double = 3.5) -> JKMove? {
+    static func bestDeep(_ st: [[Int]], hand: [String], playable: [Bool]?, me: Int = 3, samples: Int = 600, plies: Int = 15, timeBudget: Double = 1.5) -> JKMove? {
         if hand.isEmpty { return nil }
         let ok = playable ?? Array(repeating: true, count: hand.count)
         var cands: [JKMove] = []
