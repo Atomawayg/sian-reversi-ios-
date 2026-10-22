@@ -162,7 +162,7 @@ enum JackarooEngine {
 
     static func stoneValue(_ s: Int, _ p: Int) -> Double {
         if p < 0 { return 0 }
-        if p >= 100 { return 100 + 4 * Double(p - 100) }
+        if p >= 100 { return 70 + 4 * Double(p - 100) }
         return 12 + Double(dist(s, p))
     }
 
@@ -302,7 +302,7 @@ enum JackarooEngine {
                 }
                 if hit { break }
             }
-            if hit { d += 0.35 * stoneValue(s, p) }
+            if hit { d += 0.5 * stoneValue(s, p) }
         } }
         return d
     }
