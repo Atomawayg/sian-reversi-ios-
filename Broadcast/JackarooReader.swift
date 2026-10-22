@@ -19,7 +19,7 @@ extension BoardReader {
         else { h = 60 * ((r - g) / (mx - mn) + 4) }
         if h < 0 { h += 360 }
         if h >= 75 && h <= 160 { return 1 }
-        if h >= 180 && h <= 260 { return 3 }
+        if h >= 166 && h <= 260 { return 3 }   // glowing blue (stone on its start) drifts toward cyan
         if h < 20 || h > 340 { return 2 }
         if h >= 22 && h <= 55 && sat > 0.7 && (loose || v > 0.8) { return 4 }
         return 0
@@ -31,6 +31,14 @@ extension BoardReader {
         var cells = [Int](repeating: 0, count: JK.count)
         func hole(_ p: (Double, Double)) -> Int { stoneColour(s.avg(p.0 * sx, p.1 * sy, 7 * sx)) }
         for t in 0..<76 { cells[JK.track + t] = hole(JKGeo.track[t]) }
+        // a stone sitting on its start square glows and pulses: read those four holes more leniently
+        for s4 in 0..<4 {
+            let t = 19 * s4
+            if cells[JK.track + t] == 0 {
+                let p = JKGeo.track[t]
+                cells[JK.track + t] = stoneColour(s.avg(p.0 * sx, p.1 * sy, 5 * sx), loose: true)
+            }
+        }
         for seat in 0..<4 { for k in 0..<4 {
             cells[JK.lanes + 4 * seat + k] = hole(JKGeo.lanes[seat][k])
             cells[JK.homes + 4 * seat + k] = hole(JKGeo.homes[seat][k])
