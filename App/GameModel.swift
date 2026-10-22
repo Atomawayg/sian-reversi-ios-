@@ -298,7 +298,11 @@ final class GameModel: ObservableObject {
         for t in 0..<76 { let c = cells[JK.track + t]; if c > 0, colourSeat[c] >= 0 { st[colourSeat[c]].append(t) } }
         for s in 0..<4 { for k in 0..<4 { if cells[JK.lanes + 4 * s + k] > 0 { st[s].append(100 + k) } } }
         for s in 0..<4 { st[s] = Array((st[s] + [-1, -1, -1, -1]).prefix(4)) }
-        let hand = (0..<5).compactMap { k -> String? in let r = cells[JK.hand + k]; return r > 0 && r < JK.rankNames.count ? JK.rankNames[r] : nil }
+        var hand: [String] = [], playable: [Bool] = []
+        for k in 0..<5 {
+            let r = cells[JK.hand + k]
+            if r > 0 && r < JK.rankNames.count { hand.append(JK.rankNames[r]); playable.append(cells[JK.playable + k] == 1) }
+        }
         var base = Overlay(game: .jackaroo, cells: cells, title: "รอ…", line: "ตาคนอื่น", meColor: cells[JK.seats + 3])
         guard m.myTurn, !hand.isEmpty else {
             computedFor = []; gen += 1
@@ -313,7 +317,7 @@ final class GameModel: ObservableObject {
         let snap = base
         work.async { [weak self] in
             guard let self else { return }
-            let best = JackarooEngine.best(st, hand: hand, me: 3)
+            let best = JackarooEngine.best(st, hand: hand, playable: playable, me: 3)
             DispatchQueue.main.async {
                 guard g == self.gen, let mv = best else { return }
                 var o = snap
@@ -327,6 +331,10 @@ final class GameModel: ObservableObject {
                 self.show(o)
             }
         }
+    }
+
+    private static func handNames(_ cells: [Int]) -> [String] {
+        (0..<5).compactMap { k in let r = cells[JK.hand + k]; return r > 0 && r < JK.rankNames.count ? JK.rankNames[r] : nil }
     }
 
     /// Plain Thai instructions for a move.
@@ -367,7 +375,10 @@ final class GameModel: ObservableObject {
             title = "สลับกับลูก\(colour(mv.moves[1].seat))"
             detail = "ใช้\(which(first!.seat, first!.from))"
         case .force: title = "ให้คนถัดไปทิ้งไพ่"; detail = "เลือกตัวเลือกบังคับทิ้งไพ่"
-        case .discard: title = "ทิ้งไพ่ใบนี้"; detail = "ไม่มีตาที่ลงได้"
+        case .discard:
+            title = "ทิ้งไพ่ใบนี้"
+            let keep = Set(["K", "A"]).intersection(Set(handNames(cells)))
+            detail = keep.isEmpty || keep.contains(mv.rank) ? "ไม่มีใบที่ลงได้ · ใบนี้มีประโยชน์น้อยสุด" : "ไม่มีใบที่ลงได้ · เก็บ \(keep.sorted().joined(separator: ", ")) ไว้"
         }
         let line = ([detail] + extra).filter { !$0.isEmpty }.joined(separator: "\n")
         return (title, line)

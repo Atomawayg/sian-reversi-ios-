@@ -189,17 +189,81 @@ enum JackarooEngine {
         return sc
     }
 
-    static func best(_ st: [[Int]], hand: [String], me: Int = 3) -> JKMove? {
+    // MARK: look one turn ahead
+    static let ranks = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
+    static let pHold = 0.28   // chance an opponent holds at least one card of a given rank
+
+    static func material(_ st: [[Int]], me: Int = 3) -> Double {
+        let team: Set<Int> = [me, (me + 2) % 4]
+        var sc = 0.0
+        for s in 0..<4 {
+            let sign: Double = team.contains(s) ? 1 : -1
+            for p in st[s] { sc += sign * stoneValue(s, p) }
+            if st[s].contains(start(s)) { sc += sign * 3 }
+        }
+        return sc
+    }
+
+    /// Expected loss to my team from opponent q's best reply, when we don't know q's cards.
+    static func threat(_ st: [[Int]], from q: Int, me: Int = 3) -> Double {
+        let base = material(st, me: me)
+        var gains: [Double] = []
+        for r in ranks {
+            var g = 0.0
+            for m in generate(st, hand: [r], me: q) where m.kind != .force {
+                g = max(g, base - material(m.after, me: me))
+            }
+            gains.append(g)
+        }
+        gains.sort(by: >)
+        var e = 0.0, miss = 1.0
+        for g in gains where g > 0 { e += g * pHold * miss; miss *= 1 - pHold }
+        return e
+    }
+
+    static func position(_ st: [[Int]], me: Int = 3) -> Double {
+        let next = (me + 3) % 4, later = (me + 1) % 4   // play goes me → next → partner → later
+        return material(st, me: me) - threat(st, from: next, me: me) - 0.6 * threat(st, from: later, me: me)
+    }
+
+    /// How much a card is worth keeping for later turns (used to choose a discard).
+    static func keepValue(_ st: [[Int]], _ c: String, me: Int = 3) -> Double {
+        let ctrl = st[me].contains(where: { $0 < 100 }) ? me : (me + 2) % 4
+        let mine = st[ctrl]
+        let home = mine.filter { $0 < 0 }.count
+        let on = mine.filter { $0 >= 0 && $0 < T }
+        switch c {
+        case "K": return home > 0 ? 10 : 1
+        case "A": return home > 0 ? 10 : 4
+        case "4": return on.contains { let d = dist(ctrl, $0); return d >= 0 && d <= 6 } ? 5 : 2
+        case "5": return 3
+        case "J": return on.isEmpty ? 2 : 4
+        case "7": return 4
+        case "10": return 3
+        default:
+            let n = c == "Q" ? 12 : (Int(c) ?? 0)
+            var v = 1 + Double(n) / 24
+            for p in on { let d = dist(ctrl, p); if d + n >= 75 && d + n <= 78 { v += 5 } }
+            return v
+        }
+    }
+
+    /// playable: which cards the game shows white (allowed). Returns the move to make, or a card to discard.
+    static func best(_ st: [[Int]], hand: [String], playable: [Bool]? = nil, me: Int = 3) -> JKMove? {
         if hand.isEmpty { return nil }
-        var ms = generate(st, hand: hand, me: me)
+        let ok = playable ?? Array(repeating: true, count: hand.count)
+        var ms: [JKMove] = []
+        for (ci, c) in hand.enumerated() where ci < ok.count && ok[ci] {
+            for var m in generate(st, hand: [c], me: me) { m.card = ci; ms.append(m) }
+        }
         if ms.isEmpty {
-            let ci = hand.indices.min { (cardCost[hand[$0]] ?? 0) < (cardCost[hand[$1]] ?? 0) }!
+            let ci = hand.indices.min { keepValue(st, hand[$0], me: me) < keepValue(st, hand[$1], me: me) }!
             return JKMove(card: ci, rank: hand[ci], kind: .discard)
         }
-        let base = evaluate(st, me: me)
+        let here = position(st, me: me)
         for k in 0..<ms.count {
-            if ms[k].kind == .force { ms[k].score = 6 - (cardCost["10"] ?? 0); continue }
-            ms[k].score = evaluate(ms[k].after, me: me) - base - (cardCost[ms[k].rank] ?? 0)
+            if ms[k].kind == .force { ms[k].score = here + 3; continue }
+            ms[k].score = position(ms[k].after, me: me) - (cardCost[ms[k].rank] ?? 0)
         }
         return ms.max { $0.score < $1.score }
     }

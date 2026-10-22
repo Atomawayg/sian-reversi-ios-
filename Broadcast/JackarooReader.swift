@@ -2,6 +2,10 @@ import Foundation
 
 /// WePlay Jackaroo: stones on every hole, seat colours, and the cards in your hand.
 extension BoardReader {
+    /// seat colours stay the same for a whole game, so remember them once all four are clear
+    static var lockedSeats: [Int]? = nil
+    static var digitBase = 1.0
+
     /// 0 none, 1 green, 2 red, 3 blue, 4 orange
     private static func stoneColour(_ p: (Double, Double, Double), loose: Bool = false) -> Int {
         let r = p.0 / 255, g = p.1 / 255, b = p.2 / 255
@@ -17,7 +21,7 @@ extension BoardReader {
         if h >= 75 && h <= 160 { return 1 }
         if h >= 180 && h <= 260 { return 3 }
         if h < 20 || h > 340 { return 2 }
-        if h >= 22 && h <= 55 && (loose || v > 0.85) { return 4 }
+        if h >= 22 && h <= 55 && sat > 0.7 && (loose || v > 0.8) { return 4 }
         return 0
     }
 
@@ -31,29 +35,26 @@ extension BoardReader {
             cells[JK.lanes + 4 * seat + k] = hole(JKGeo.lanes[seat][k])
             cells[JK.homes + 4 * seat + k] = hole(JKGeo.homes[seat][k])
         } }
-        // seat colours: vote with the start-square border, home stones and lane stones
+        // seat colours: every lane slot, home spot and start square has a ring in its seat's colour
         var seatCol = [Int](repeating: 0, count: 4)
         for seat in 0..<4 {
             var votes = [Int](repeating: 0, count: 5)
-            let c = JKGeo.track[19 * seat]
-            var ring = [Int](repeating: 0, count: 5)
-            for k in 0..<24 {
-                let a = Double(k) * Double.pi / 12
-                let q = s.get(Int((c.0 + 26 * cos(a)) * sx), Int((c.1 + 26 * sin(a)) * sy))
-                ring[stoneColour(q, loose: true)] += 1
-            }
-            if let m = (1...4).max(by: { ring[$0] < ring[$1] }), ring[m] >= 8 { votes[m] += 3 }
-            for k in 0..<4 {
-                votes[cells[JK.homes + 4 * seat + k]] += 2
-                votes[cells[JK.lanes + 4 * seat + k]] += 2
-            }
+            let pts = JKGeo.lanes[seat] + JKGeo.homes[seat] + [JKGeo.track[19 * seat]]
+            for c in pts { for rr in [21.0, 23.0, 25.0] { for k in 0..<16 {
+                let ang = Double(k) * Double.pi / 8
+                let x = Int((c.0 + rr * cos(ang)) * sx), y = Int((c.1 + rr * sin(ang)) * sy)
+                if x >= 0 && x < s.w && y >= 0 && y < s.h { votes[stoneColour(s.get(x, y), loose: true)] += 1 }
+            } } }
             votes[0] = 0
-            if let m = (1...4).max(by: { votes[$0] < votes[$1] }), votes[m] > 0 { seatCol[seat] = m }
+            if let m = (1...4).max(by: { votes[$0] < votes[$1] }), votes[m] >= 40 { seatCol[seat] = m }
         }
-        // fill a single missing seat by elimination
-        let missing = (0..<4).filter { seatCol[$0] == 0 }
-        let free = (1...4).filter { !seatCol.contains($0) }
-        if missing.count == 1 && free.count == 1 { seatCol[missing[0]] = free[0] }
+        if Set(seatCol).count == 4 && !seatCol.contains(0) { lockedSeats = seatCol }
+        else if let l = lockedSeats { seatCol = l }
+        else {
+            let missing = (0..<4).filter { seatCol[$0] == 0 }
+            let free = (1...4).filter { !seatCol.contains($0) }
+            if missing.count == 1 && free.count == 1 { seatCol[missing[0]] = free[0] }
+        }
         for seat in 0..<4 { cells[JK.seats + seat] = seatCol[seat] }
 
         // stones of every colour must add up to 4; otherwise the frame is mid-animation or covered
@@ -61,16 +62,32 @@ extension BoardReader {
         for i in 0..<JK.seats { count[cells[i]] += 1 }
         let sane = (1...4).allSatisfy { count[$0] <= 4 } && (1...4).reduce(0) { $0 + count[$1] } >= 8
 
-        // your hand: white cards in the band below the board
+        // your hand: white cards can be played, grey ones cannot (or it is not your turn)
         let hand = readHand(s)
-        for (k, r) in hand.prefix(5).enumerated() { cells[JK.hand + k] = r }
-        return BoardMessage(valid: sane, game: .jackaroo, cells: cells, me: seatCol[3], myTurn: sane && !hand.isEmpty)
+        for (k, c) in hand.prefix(5).enumerated() { cells[JK.hand + k] = c.rank; cells[JK.playable + k] = c.white ? 1 : 0 }
+        // your turn: the countdown digits over your avatar (bottom-left)
+        var dig = 0, tot = 0
+        var yy = 1520.0
+        while yy < 1640 {
+            var xx = 90.0
+            while xx < 240 {
+                let p = s.get(Int(xx * sx), Int(yy * sy))
+                if p.0 > 225 && p.1 > 140 && p.1 < 225 && p.2 < 90 { dig += 1 }
+                tot += 1; xx += 3
+            }
+            yy += 3
+        }
+        let frac = Double(dig) / Double(max(1, tot))
+        digitBase = min(digitBase + 0.0005, frac)
+        let timer = frac > max(0.03, digitBase + 0.015)
+        let anyWhite = hand.contains { $0.white }
+        return BoardMessage(valid: sane, game: .jackaroo, cells: cells, me: seatCol[3], myTurn: sane && !hand.isEmpty && (timer || anyWhite))
     }
 
     @inline(__always) private static func gray(_ p: (Double, Double, Double)) -> Double { 0.299 * p.0 + 0.587 * p.1 + 0.114 * p.2 }
 
     /// Rank codes (1 A … 13 K) of the white cards, left to right. Grey cards (not your turn) are ignored.
-    private static func readHand(_ s: Sampler) -> [Int] {
+    private static func readHand(_ s: Sampler) -> [(rank: Int, white: Bool)] {
         let W = s.w, H = s.h
         let ys = Int(Double(H) * 1900 / 2556), ye = Int(Double(H) * 2300 / 2556)
         let rowStep = 4
@@ -94,13 +111,23 @@ extension BoardReader {
                 if Double(x - st) > Double(W) * 0.12 { segs.append((st, x)) }
             }
         }
-        var ranks: [Int] = []
+        var ranks: [(rank: Int, white: Bool)] = []
+        let cardW = Double(W) * 0.178          // one card
+        let stackStep = cardW * 0.785           // grey cards overlap like this
         for (a0, b0) in segs {
-            let w = b0 - a0
-            let n = max(1, Int((Double(w) / (Double(W) * 0.178)).rounded()))
-            let cw = Double(w) / Double(n)
-            for k in 0..<n {
-                let a = a0 + Int(Double(k) * cw), b = a0 + Int(Double(k + 1) * cw)
+            let w = Double(b0 - a0)
+            var lefts: [Int] = [a0]
+            if w > cardW * 1.15 {
+                let gapped = Int((w / cardW).rounded())
+                let stacked = Int(((w - cardW) / stackStep).rounded()) + 1
+                // separate white cards sit ~cardW apart; stacked grey ones ~stackStep apart
+                let spread = abs(w - Double(gapped) * cardW) <= abs(w - (cardW + Double(stacked - 1) * stackStep)) ? cardW : stackStep
+                let n = spread == cardW ? gapped : stacked
+                lefts = (0..<max(1, n)).map { a0 + Int(Double($0) * spread) }
+            }
+            for a in lefts {
+                let b = a + Int(cardW)
+                let cw = cardW
                 // top edge of the card
                 var top = -1
                 var yy = ys
@@ -121,8 +148,9 @@ extension BoardReader {
                     by += 6
                 }
                 body.sort()
-                if body.isEmpty || body[body.count / 2] <= 230 { continue }
-                if let r = rankOf(s, a, b, top) { ranks.append(r) }
+                if body.isEmpty { continue }
+                let white = body[body.count / 2] > 230
+                if let r = rankOf(s, a, min(b, W - 1), top) { ranks.append((r, white)) }
             }
         }
         return ranks
