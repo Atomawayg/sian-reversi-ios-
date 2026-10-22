@@ -304,20 +304,42 @@ final class GameModel: ObservableObject {
             if r > 0 && r < JK.rankNames.count { hand.append(JK.rankNames[r]); playable.append(cells[JK.playable + k] == 1) }
         }
         var base = Overlay(game: .jackaroo, cells: cells, title: "รอ…", line: "ตาคนอื่น", meColor: cells[JK.seats + 3])
+        base.hand = hand
+        let board = Array(cells[0..<JK.hand])
+        if m.myTurn && !hand.isEmpty { jkTurnAt = Date() }
+        if !m.myTurn, let l = jkLock, l.board == board, Date().timeIntervalSince(jkTurnAt) < 2.5 {
+            return   // a flicker in the turn signal: keep showing the answer
+        }
         guard m.myTurn, !hand.isEmpty else {
+            // not your turn: keep a ready answer in case the game makes you discard
+            if jkLock != nil && jkLock!.board != board { jkLock = nil }
+            if hand.count > 0, jkLock == nil {
+                let ci = hand.indices.min { (JackarooEngine.keepValue(st, hand[$0]), $0) < (JackarooEngine.keepValue(st, hand[$1]), $1) }!
+                base.pick = ci
+                base.line = "ถ้าเกมให้ทิ้งไพ่ → ทิ้งใบนี้"
+            }
             computedFor = []; gen += 1
             show(base); return
         }
-        let key = [300] + cells
+        // same board, same cards: keep the answer we already gave (no flip-flopping while you tap cards)
+        let handKey = hand.sorted()
+        if let l = jkLock, l.board == board, l.hand == handKey {
+            var o = l.overlay
+            if let i = hand.firstIndex(of: l.rank) { o.pick = i }
+            o.hand = hand
+            if o != overlay { show(o) }
+            return
+        }
+        let key = [300] + board + hand.map { JK.rankNames.firstIndex(of: $0) ?? 0 } + playable.map { $0 ? 1 : 0 }
         if key == computedFor { return }
         computedFor = key; gen += 1
         let g = gen
-        base.hand = hand; base.title = "คิด…"; base.line = "ตาคุณ"; base.mine = true
+        base.title = "คิด…"; base.line = "ตาคุณ"; base.mine = true
         show(base)
         let snap = base
         work.async { [weak self] in
             guard let self else { return }
-            let best = JackarooEngine.best(st, hand: hand, playable: playable, me: 3)
+            let best = JackarooEngine.bestDeep(st, hand: hand, playable: playable, me: 3)
             DispatchQueue.main.async {
                 guard g == self.gen, let mv = best else { return }
                 var o = snap
@@ -328,10 +350,15 @@ final class GameModel: ObservableObject {
                     func code(_ p: Int) -> Int { p < 0 ? 200 + mvv.seat : (p >= 100 ? 100 + 4 * mvv.seat + (p - 100) : p) }
                     return [code(mvv.from), code(mvv.to)]
                 }
+                self.jkLock = JKLock(board: board, hand: handKey, rank: mv.rank, overlay: o)
                 self.show(o)
             }
         }
     }
+
+    private struct JKLock { let board: [Int]; let hand: [String]; let rank: String; let overlay: Overlay }
+    private var jkLock: JKLock? = nil
+    private var jkTurnAt = Date.distantPast
 
     private static func handNames(_ cells: [Int]) -> [String] {
         (0..<5).compactMap { k in let r = cells[JK.hand + k]; return r > 0 && r < JK.rankNames.count ? JK.rankNames[r] : nil }
