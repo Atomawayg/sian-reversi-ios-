@@ -35,23 +35,40 @@ enum RawUDP {
     }
 }
 
-/// Sends a whole board as a burst of Darwin notifications: one name per cell value, then a commit.
+/// Sends a whole board as a burst of Darwin notifications: begin, one name per cell value, a checksum, then a commit.
+/// iOS may drop or reorder Darwin notifications, so the app rebuilds the board from scratch after every
+/// begin and only accepts it when every cell arrived and the checksum matches (a broken burst is ignored;
+/// the extension re-sends the board at least once a second).
 enum DarwinBoard {
     static let prefix = "com.atomawayg.sian.b."
     static func names() -> [String] {
         var n: [String] = []
         for i in 0..<JK.count { for v in 0..<14 { n.append(prefix + "c\(i)v\(v)") } }
         for g in 0..<5 { n.append(prefix + "g\(g)") }
-        for v in 0..<3 { n.append(prefix + "me\(v)") }
-        n += [prefix + "turn0", prefix + "turn1", prefix + "valid0", prefix + "valid1", prefix + "commit"]
+        for v in 0..<5 { n.append(prefix + "me\(v)") }
+        for v in 0..<16 { n.append(prefix + "ha\(v)"); n.append(prefix + "hb\(v)") }
+        n += [prefix + "turn0", prefix + "turn1", prefix + "valid0", prefix + "valid1", prefix + "begin", prefix + "commit"]
         return n
     }
+    /// 8-bit checksum over everything in the message (same on both sides).
+    static func checksum(valid: Bool, game: Int, cells: [Int], me: Int, turn: Bool) -> Int {
+        var h: UInt32 = 2166136261
+        func mix(_ v: Int) { h = (h ^ UInt32(truncatingIfNeeded: v & 0xff)) &* 16777619 }
+        mix(valid ? 1 : 0); mix(game); mix(me); mix(turn ? 1 : 0); mix(cells.count)
+        for (i, v) in cells.enumerated() { mix(i); mix(v) }
+        return Int((h ^ (h >> 8) ^ (h >> 16) ^ (h >> 24)) & 0xff)
+    }
     static func send(_ m: BoardMessage) {
+        let cells = m.valid && m.cells.count <= JK.count ? m.cells : []
+        let h = checksum(valid: m.valid, game: m.game.rawValue, cells: cells, me: m.me, turn: m.myTurn)
+        Signal.post(prefix + "begin")
         Signal.post(prefix + "valid\(m.valid ? 1 : 0)")
         Signal.post(prefix + "g\(m.game.rawValue)")
-        if m.cells.count <= JK.count { for (i, v) in m.cells.enumerated() { Signal.post(prefix + "c\(i)v\(v)") } }
+        for (i, v) in cells.enumerated() { Signal.post(prefix + "c\(i)v\(v)") }
         Signal.post(prefix + "me\(m.me)")
         Signal.post(prefix + "turn\(m.myTurn ? 1 : 0)")
+        Signal.post(prefix + "ha\(h >> 4)")
+        Signal.post(prefix + "hb\(h & 15)")
         Signal.post(prefix + "commit")
     }
 }

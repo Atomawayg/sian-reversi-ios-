@@ -60,19 +60,43 @@ final class GameModel: ObservableObject {
 
     static weak var shared: GameModel?
 
-    private var dCells = [Int](repeating: 0, count: JK.count), dMe = 0, dTurn = false, dValid = false, dGame = GameKind.reversi
+    // a burst is rebuilt from scratch after "begin"; -1 marks anything that has not arrived yet
+    private var dCells = [Int](repeating: -1, count: JK.count), dMe = -1, dTurn: Bool? = nil, dValid: Bool? = nil, dGame: GameKind? = nil
+    private var dHa = -1, dHb = -1
     private var lastDarwinCommit = Date.distantPast, lastSocketMsg = Date.distantPast
-    private var darwinMsgs = 0
+    private var darwinMsgs = 0, darwinBroken = 0
+
+    private func resetBurst() {
+        for i in 0..<dCells.count { dCells[i] = -1 }
+        dMe = -1; dTurn = nil; dValid = nil; dGame = nil; dHa = -1; dHb = -1
+    }
+
+    /// The board from the last burst, or nil when something was lost or reordered on the way.
+    private func assembledBurst() -> BoardMessage? {
+        guard let valid = dValid, let game = dGame, let turn = dTurn, dMe >= 0, dHa >= 0, dHb >= 0 else { return nil }
+        var cells: [Int] = []
+        if valid {
+            cells = Array(dCells.prefix(game.size.w * game.size.h))
+            if cells.contains(-1) { return nil }
+        }
+        let h = DarwinBoard.checksum(valid: valid, game: game.rawValue, cells: cells, me: dMe, turn: turn)
+        guard h == dHa * 16 + dHb else { return nil }
+        return BoardMessage(valid: valid, game: game, cells: cells, me: dMe, myTurn: turn)
+    }
 
     fileprivate func signal(_ n: String) {
         if n.hasPrefix(DarwinBoard.prefix) {
             let k = String(n.dropFirst(DarwinBoard.prefix.count))
+            if k == "begin" { resetBurst(); return }
             if k == "commit" {
+                defer { resetBurst() }
+                guard let m = assembledBurst() else { darwinBroken += 1; refreshDebug(); return }
                 darwinMsgs += 1
                 lastDarwinCommit = Date()
-                let n = dGame.size.w * dGame.size.h
-                handle(BoardMessage(valid: dValid, game: dGame, cells: dValid ? Array(dCells.prefix(n)) : [], me: dMe, myTurn: dTurn), viaSocket: false)
-            } else if k.hasPrefix("c"), let vi = k.firstIndex(of: "v"),
+                handle(m, viaSocket: false)
+            } else if k.hasPrefix("ha"), let v = Int(k.dropFirst(2)) { dHa = v }
+            else if k.hasPrefix("hb"), let v = Int(k.dropFirst(2)) { dHb = v }
+            else if k.hasPrefix("c"), let vi = k.firstIndex(of: "v"),
                       let i = Int(k[k.index(after: k.startIndex)..<vi]), let v = Int(k[k.index(after: vi)...]), i < JK.count {
                 dCells[i] = v
             } else if k.hasPrefix("me"), let v = Int(k.dropFirst(2)) { dMe = v }
@@ -87,7 +111,7 @@ final class GameModel: ObservableObject {
         refreshDebug()
     }
     private func refreshDebug() {
-        debug = "อ่านจอ: \(started ? "ทำงาน" : "ไม่ทำงาน") · ภาพ \(frames) · ข้อมูล \(darwinMsgs)"
+        debug = "อ่านจอ: \(started ? "ทำงาน" : "ไม่ทำงาน") · ภาพ \(frames) · ข้อมูล \(darwinMsgs) · ตกหล่น \(darwinBroken)"
     }
 
     private func show(_ o: Overlay) { var x = o; x.footer = debug; overlay = x; pip.show(x) }

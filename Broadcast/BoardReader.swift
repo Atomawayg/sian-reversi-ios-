@@ -23,6 +23,14 @@ enum BoardReader {
         }
     }
 
+    /// YCbCr → RGB coefficients for the frame's colour matrix (BT.709 unless tagged 601).
+    private static func matrix(_ pb: CVPixelBuffer) -> (rv: Double, gu: Double, gv: Double, bu: Double) {
+        let bt709 = (rv: 1.5748, gu: 0.1873, gv: 0.4681, bu: 1.8556)
+        let bt601 = (rv: 1.402, gu: 0.344136, gv: 0.714136, bu: 1.772)
+        guard let m = CVBufferCopyAttachment(pb, kCVImageBufferYCbCrMatrixKey, nil) as? String else { return bt709 }
+        return m == (kCVImageBufferYCbCrMatrix_ITU_R_601_4 as String) ? bt601 : bt709
+    }
+
     static func read(_ pb: CVPixelBuffer) -> BoardMessage? {
         CVPixelBufferLockBaseAddress(pb, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(pb, .readOnly) }
@@ -44,12 +52,15 @@ enum BoardReader {
             let ybpr = CVPixelBufferGetBytesPerRowOfPlane(pb, 0), cbpr = CVPixelBufferGetBytesPerRowOfPlane(pb, 1)
             let yp = yb.assumingMemoryBound(to: UInt8.self), cp = cb.assumingMemoryBound(to: UInt8.self)
             let full = fmt == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
+            // Use the matrix the frame is tagged with. Screen recordings are BT.709; decoding them as
+            // BT.601 (the old code) shifts reds and purples enough to turn highlights into pieces.
+            let K = matrix(pb)
             sampler = Sampler(w: w, h: h) { x, y in
                 var Y = Double(yp[y * ybpr + x])
                 let ci = (y / 2) * cbpr + (x / 2) * 2
                 var U = Double(cp[ci]) - 128, V = Double(cp[ci + 1]) - 128
                 if !full { Y = (Y - 16) * 1.164; U *= 1.138; V *= 1.138 }
-                let r = Y + 1.402 * V, g = Y - 0.344136 * U - 0.714136 * V, b = Y + 1.772 * U
+                let r = Y + K.rv * V, g = Y - K.gu * U - K.gv * V, b = Y + K.bu * U
                 return (min(255, max(0, r)), min(255, max(0, g)), min(255, max(0, b)))
             }
         }
@@ -116,7 +127,7 @@ enum BoardReader {
         let W = Double(s.w), H = Double(s.h)
         let sx = W / 1179, sy = H / 2556
         var cells = [Int](repeating: 0, count: 64)
-        var pieces = 0, lightOK = 0
+        var pieces = 0, lightOK = 0, unsure = 0
         for r in 0..<8 { for c in 0..<8 {
             let x0 = 52 + 135 * Double(c), y0 = 773 + 134.5 * Double(r)
             if (r + c) & 1 == 0 {
@@ -124,19 +135,22 @@ enum BoardReader {
                 if (p.0 + p.1 + p.2) / 3 > 170 { lightOK += 1 }
                 continue
             }
-            // piece colour from the lower part of the square (a king's crown covers the top)
-            var red = 0, pur = 0, gold = 0
-            var dy = 80.0
+            // A real piece is a 3D disc: the band under its face is its dark side wall. The last-move
+            // highlight is a flat bright square and a captured piece fades out bright, so neither has one.
+            // Measured on real frames: pieces 56–113 dark samples of 128, highlights/ghosts/empties ≤ 3.
+            var red = 0, pur = 0, dark = 0, gold = 0
+            var dy = 92.0
             while dy <= 120 {
                 var dx = 30.0
                 while dx <= 105 {
                     let q = s.get(Int((x0 + dx) * sx), Int((y0 + dy) * sy))
                     let L = (q.0 + q.1 + q.2) / 3
-                    if q.2 > q.0 + 5 && L < 170 { pur += 1 }
-                    else if q.0 - q.1 > 60 && q.0 < 240 && q.1 < 150 { red += 1 }
-                    dx += 6
+                    if L < 130 { dark += 1 }
+                    if L < 150 && q.0 - q.1 > 50 { red += 1 }
+                    if L < 150 && q.2 > q.0 + 5 { pur += 1 }
+                    dx += 5
                 }
-                dy += 6
+                dy += 4
             }
             // crown: gold pixels in the upper part of the square
             dy = -35
@@ -153,12 +167,14 @@ enum BoardReader {
                 dy += 6
             }
             var v = 0
-            if red >= 12 && red > pur { v = 1 } else if pur >= 12 { v = 2 }
-            if v != 0 && gold >= 6 { v += 2 }   // 3 red king, 4 purple king
+            if dark >= 30 {
+                if red >= 25 && red > 3 * pur { v = 1 } else if pur >= 25 && pur > 3 * red { v = 2 } else { unsure += 1 }
+            }
+            if v != 0 && gold >= 20 { v += 2 }   // 3 red king, 4 purple king (crowns score ≥ 76, others 0)
             if v != 0 { pieces += 1 }
             cells[r * 8 + c] = v
         } }
-        let valid = pieces >= 2 && lightOK >= 24
+        let valid = pieces >= 2 && lightOK >= 24 && unsure == 0   // something disc-shaped we can't name: mid-animation
         // your colour: the small disc badge on your avatar (top-left)
         let bd = s.avg(262 * sx, 609 * sy, 5 * sx)
         let me = bd.0 - bd.1 > 60 ? 1 : (bd.2 > bd.0 ? 2 : 0)
