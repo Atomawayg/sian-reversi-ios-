@@ -1,0 +1,21 @@
+name: AlpacaTest
+on:
+  push:
+    branches: ['alpacatest/**']
+permissions:
+  contents: read
+jobs:
+  alpacatest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          S=Tools/AlpacaTest/Sources/AlpacaTest
+          cp Broadcast/AlpacaReader.swift App/AlpacaEngine.swift Shared/AlpacaData.swift Shared/BoardMessage.swift $S/
+          swift build -c release --package-path Tools/AlpacaTest 2>&1 | grep -vE "^\[[0-9]+/[0-9]+\]" | tail -40
+      - name: Run
+        run: |
+          B=$(swift build -c release --package-path Tools/AlpacaTest --show-bin-path)/AlpacaTest
+          for f in Tools/AlpacaTest/frames/*.ppm; do $B $f | tee -a out.txt; done
+          while read -r l; do echo "::notice title=alpaca::$l"; done < out.txt
