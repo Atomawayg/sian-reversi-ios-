@@ -1,7 +1,7 @@
 name: Build IPA
 on:
   push:
-    branches: [main]
+    branches: [main, 'dev/**']
   workflow_dispatch:
 permissions:
   contents: write
@@ -38,7 +38,7 @@ jobs:
           name: build-log
           path: build.log
       - name: Publish release
-        if: success()
+        if: success() && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
