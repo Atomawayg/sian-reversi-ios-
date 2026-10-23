@@ -302,7 +302,8 @@ final class GameModel: ObservableObject {
             var res = ConnectResult()
             // 7×6 four-in-a-row: try to solve the position exactly first (perfect play from mid-game on)
             var solved = false
-            if K == 4 && cols == 7 && rows == 6 && cells.filter({ $0 != 0 }).count >= 10, let a = self.c4.best(cells: cells, ms: ms * 6 / 10) {
+            let tried = K == 4 && cols == 7 && rows == 6 && cells.filter({ $0 != 0 }).count >= 10
+            if tried, let a = self.c4.best(cells: cells, ms: ms * 6 / 10) {
                 let WIN = ConnectEngine.WIN
                 res = ConnectResult(best: a.col, score: a.score > 0 ? WIN - 100 + a.score : (a.score < 0 ? -(WIN - 100) + a.score : 0),
                                     depth: 99, exact: true, trap: 0)
@@ -314,7 +315,7 @@ final class GameModel: ObservableObject {
                     var r = rows - 1
                     while r >= 0 { let v = cells[r * cols + c]; if v == 0 { break }; e.play(c, v == meC ? 1 : -1); r -= 1 }
                 }
-                res = e.search(1, ms: K == 4 && cols == 7 ? ms * 4 / 10 : ms)
+                res = e.search(1, ms: tried ? ms * 4 / 10 : ms)
             }
             DispatchQueue.main.async {
                 guard g == self.gen else { return }
