@@ -274,7 +274,7 @@ final class GameModel: ObservableObject {
         let meC = 1
         let colourForPiP = first ? 1 : 2
         let draw = m.cells.map { $0 == 0 ? 0 : ($0 == meC ? 1 : 3) }
-        let v = cnTrack.check(m.cells) { b, p in ConnectRules.successors(b, cols: cols, rows: rows, piece: p + 1) }
+        let v = cnTrack.checkGrowing(m.cells)
         guard v != .suspicious else {
             boardInDoubt(m.game, meColor: colourForPiP, shown: cnTrack.trusted.flatMap { $0.count == m.cells.count ? $0.map { $0 == 0 ? 0 : ($0 == meC ? 1 : 3) } : nil })
             return

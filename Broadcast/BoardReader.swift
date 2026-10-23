@@ -258,10 +258,19 @@ enum BoardReader {
         var nMine = 0, nOpp = 0
         for r in 0..<rows { for c in 0..<cols {
             let P = patch((25.5 + pitch * (Double(c) + 0.5)) * sx, (top + pitch * (Double(r) + 0.5)) * sy, pitch * 0.36 * sx)
-            let dm = dist(P, mine), dop = dist(P, opp)
+            // An empty hole is flat (brightness spread ≈ 0 on real frames); every piece skin has a picture
+            // on it (spread ≥ 24). So texture says "is there a piece", the nearer badge says whose it is.
+            // (The old fixed badge-distance limit missed pieces whose board art differs from the badge.)
+            var sum = 0.0, sq = 0.0, n = 0.0
+            var i = 0
+            while i + 2 < P.count { let L = (P[i] + P[i + 1] + P[i + 2]) / 3; sum += L; sq += L * L; n += 1; i += 3 }
+            let mean = sum / max(1, n), spread = (max(0, sq / max(1, n) - mean * mean)).squareRoot()
             var v = 0
-            if dm < 32 && dm < dop * 0.6 { v = 1; nMine += 1 }
-            else if dop < 32 && dop < dm * 0.6 { v = 2; nOpp += 1 }
+            if spread > 10 {
+                let dm = dist(P, mine), dop = dist(P, opp)
+                if min(dm, dop) > max(dm, dop) * 0.8 { return bad }   // looks like neither badge: mid-animation
+                if dm < dop { v = 1; nMine += 1 } else { v = 2; nOpp += 1 }
+            }
             cells[r * cols + c] = v
         } }
         // sanity: pieces sit on top of each other (no floating ones), counts differ by at most one

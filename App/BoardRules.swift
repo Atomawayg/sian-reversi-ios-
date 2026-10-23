@@ -147,6 +147,16 @@ final class BoardTracker {
         return settleCandidate(board, firstSighting: false)
     }
 
+    /// For games where pieces never move or disappear (4/5 in a row): any reading that still contains every
+    /// trusted piece is fine, however many moves were missed in between.
+    func checkGrowing(_ board: [Int]) -> Verdict {
+        guard let t = trusted, t.count == board.count else { return settleCandidate(board, firstSighting: trusted == nil) }
+        if board == t { candidate = nil; return .same }
+        if board.allSatisfy({ $0 == 0 }) { trusted = board; candidate = nil; return .resynced }   // new game
+        if zip(t, board).allSatisfy({ $0 == 0 || $0 == $1 }) { trusted = board; candidate = nil; return .moved }
+        return settleCandidate(board, firstSighting: false)
+    }
+
     private func settleCandidate(_ board: [Int], firstSighting: Bool) -> Verdict {
         let now = Date()
         if candidate != board { candidate = board; candidateSince = now }
