@@ -62,7 +62,7 @@ final class GameModel: ObservableObject {
     static weak var shared: GameModel?
 
     // -1 marks anything that has not arrived yet
-    private var dCells = [Int](repeating: -1, count: JK.count), dMe = -1, dTurn: Bool? = nil, dValid: Bool? = nil, dGame: GameKind? = nil
+    private var dCells = [Int](repeating: -1, count: DarwinBoard.maxCells), dMe = -1, dTurn: Bool? = nil, dValid: Bool? = nil, dGame: GameKind? = nil
     private var dHa = -1, dHb = -1
     private var lastDarwinCommit = Date.distantPast, lastSocketMsg = Date.distantPast
     private var darwinMsgs = 0, darwinBroken = 0
@@ -94,7 +94,7 @@ final class GameModel: ObservableObject {
             } else if k.hasPrefix("ha"), let v = Int(k.dropFirst(2)) { dHa = v }
             else if k.hasPrefix("hb"), let v = Int(k.dropFirst(2)) { dHb = v }
             else if k.hasPrefix("c"), let vi = k.firstIndex(of: "v"),
-                      let i = Int(k[k.index(after: k.startIndex)..<vi]), let v = Int(k[k.index(after: vi)...]), i < JK.count {
+                      let i = Int(k[k.index(after: k.startIndex)..<vi]), let v = Int(k[k.index(after: vi)...]), i < DarwinBoard.maxCells {
                 dCells[i] = v
             } else if k.hasPrefix("me"), let v = Int(k.dropFirst(2)) { dMe = v }
             else if k.hasPrefix("g"), let v = Int(k.dropFirst(1)), let g = GameKind(rawValue: v) { dGame = g }
@@ -134,6 +134,7 @@ final class GameModel: ObservableObject {
         case .checkers: handleCheckers(m); return
         case .connect4, .connect5: handleConnect(m); return
         case .jackaroo: handleJackaroo(m); return
+        case .alpaca: handleAlpaca(m); return
         case .reversi: break
         }
         let rv = rvTrack.check(m.cells) { b, p in ReversiRules.successors(b, colour: p + 1) }
@@ -323,6 +324,73 @@ final class GameModel: ObservableObject {
                 else { let s = res.score; verdict = s > 60 ? "ได้เปรียบ" : (s < -60 ? "เสียเปรียบ" : "สูสี") }
                 let line = verdict + (res.depth > 0 && res.depth < 99 ? " · ลึก \(res.depth)" : (res.depth == 99 ? " · สมบูรณ์แบบ" : "")) + (m.me == 3 ? "\nเริ่มกลางเกม อาจไม่แม่น" : "")
                 self.show(Overlay(game: m.game, cells: draw, rec: res.best, title: "ช่อง \(res.best + 1)", line: line, mine: true, meColor: colourForPiP))
+            }
+        }
+    }
+
+    // MARK: Crazy Alpaca
+    private let alpaca = AlpacaEngine()
+
+    private func handleAlpaca(_ m: BoardMessage) {
+        let c = m.cells
+        if c[AL.flags] == 2 {
+            computedFor = []; gen += 1
+            show(Overlay(game: .alpaca, title: "⋯", line: "มีหน้าต่างบังกระดาน")); return
+        }
+        var tiles: [AlpacaTile] = []
+        var view = AlpacaView()
+        for n in 0..<AL.maxTiles {
+            let at = AL.tiles + 5 * n
+            let st = c[at + 3]
+            if st == 0 { break }
+            let k = c[at] * 18 + c[at + 1], j = c[at + 2]
+            let type = st == AL.coveredUnknown ? -1 : c[at + 4]
+            tiles.append(AlpacaTile(k: k, j: j, type: type, layer: st == AL.open ? 1000 : 999 - n))
+            view.tiles.append(AlpacaView.Tile(k: k, j: j, type: type, open: st == AL.open))
+        }
+        let boardCount = tiles.count
+        for h in 0..<3 where c[AL.held + h] > 0 {
+            tiles.append(AlpacaTile(k: -100 - 10 * h, j: -100, type: c[AL.held + h] - 1, layer: 2000, held: true))
+        }
+        var rack: [Int] = []
+        for r in 0..<7 where c[AL.rack + r] > 0 { rack.append(c[AL.rack + r] - 1) }
+        view.rack = rack
+        view.held = (0..<3).compactMap { c[AL.held + $0] > 0 ? c[AL.held + $0] - 1 : nil }
+        view.danger = rack.count >= 5
+        if boardCount == 0 && view.held.isEmpty {
+            computedFor = []; gen += 1
+            var o = Overlay(game: .alpaca, title: rack.isEmpty ? "⋯" : "เคลียร์แล้ว", line: rack.isEmpty ? "ยังไม่เห็นกระดาน" : "รอกระดานถัดไป")
+            o.alpaca = view; show(o); return
+        }
+        let key = [500] + Array(c.prefix(AL.tiles + 5 * boardCount))
+        if key == computedFor { return }
+        computedFor = key; gen += 1
+        let g = gen
+        work.async { [weak self] in
+            guard let self else { return }
+            let p = self.alpaca.plan(tiles: tiles, rack: rack)
+            DispatchQueue.main.async {
+                guard g == self.gen else { return }
+                var v = view
+                v.picks = p.moves.map { i in i < boardCount ? i : -1 - (i - boardCount) }   // -1… = held row slot
+                let names = AlpacaData.names
+                func label(_ i: Int) -> String { names[tiles[i].type] + (tiles[i].held ? " (แถวพัก)" : "") }
+                var title = "—", line = ""
+                if let first = p.moves.first {
+                    title = "กด " + label(first)
+                    let rest = p.moves.dropFirst().map(label)
+                    line = rest.isEmpty ? "" : "แล้ว " + rest.joined(separator: " → ")
+                }
+                if p.jam {
+                    v.danger = true
+                    let tip = view.held.isEmpty ? "ใช้ ⬆ ดึงออก" : "ใช้ 🔀 สลับ"
+                    line = "รางจะตัน! " + tip + (line.isEmpty ? "" : "\n" + line)
+                } else if rack.count >= 5 {
+                    line = "รางเหลือ \(7 - rack.count) ช่อง" + (line.isEmpty ? "" : " · " + line)
+                }
+                var o = Overlay(game: .alpaca, title: title, line: line, mine: true)
+                o.alpaca = v
+                self.show(o)
             }
         }
     }

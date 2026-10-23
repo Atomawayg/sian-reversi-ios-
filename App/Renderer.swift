@@ -2,6 +2,16 @@ import UIKit
 import CoreVideo
 
 /// What the floating window shows.
+/// Crazy Alpaca drawing data.
+struct AlpacaView: Equatable {
+    struct Tile: Equatable { var k: Int; var j: Int; var type: Int; var open: Bool }
+    var tiles: [Tile] = []
+    var picks: [Int] = []       // indices into tiles in tap order; -1, -2… = held-row slot
+    var rack: [Int] = []
+    var held: [Int] = []
+    var danger = false
+}
+
 struct Overlay: Equatable {
     var game: GameKind = .reversi
     /// board cells (row-major from top-left) or nil.
@@ -26,6 +36,7 @@ struct Overlay: Equatable {
     var swap = false             // J: the two marked stones trade places
     var stage = 0                // 1 = tap the card, 2 = card confirmed, tap the stone
     var action = ""              // one word: เดิน 7, ออกลูก, สลับ…
+    var alpaca: AlpacaView? = nil
 
     init(game: GameKind = .reversi, cells: [Int]? = nil, rec: Int? = nil, path: [Int] = [], caps: [Int] = [],
          title: String, line: String, mine: Bool = false, meColor: Int = 1) {
@@ -87,12 +98,15 @@ enum Renderer {
             drawJackaroo(o, cells, rect)
             return
         }
-        if let cells = o.cells, !cells.isEmpty {
+        if o.game == .alpaca, let av = o.alpaca {
+            drawAlpaca(av, rect)
+            textX = rect.width * 0.47
+        } else if let cells = o.cells, !cells.isEmpty {
             switch o.game {
             case .reversi: drawReversi(o, cells, CGRect(x: pad, y: pad, width: side, height: side))
             case .checkers: drawCheckers(o, cells, CGRect(x: pad, y: pad, width: side, height: side))
             case .connect4, .connect5: drawConnect(o, cells, CGRect(x: pad, y: pad, width: side, height: side))
-            case .jackaroo: break
+            case .jackaroo, .alpaca: break
             }
             textX = pad + side + 24
         }
@@ -408,4 +422,57 @@ enum Renderer {
     static func image(_ o: Overlay) -> UIImage {
         UIGraphicsImageRenderer(size: size).image { _ in draw(o, in: CGRect(origin: .zero, size: size)) }
     }
+    // MARK: Crazy Alpaca
+    private static func drawAlpaca(_ v: AlpacaView, _ rect: CGRect) {
+        if v.danger {
+            let b = UIBezierPath(rect: rect.insetBy(dx: 3, dy: 3)); b.lineWidth = 6
+            UIColor(red: 0.95, green: 0.25, blue: 0.25, alpha: 1).setStroke(); b.stroke()
+        }
+        // board: lattice of quarter tiles (k) and half tiles (j)
+        let area = CGRect(x: 14, y: 12, width: rect.width * 0.44, height: rect.height - 74)
+        let ks = v.tiles.map { $0.k }, js = v.tiles.map { $0.j }
+        let k0 = (ks.min() ?? 0) - 2, k1 = (ks.max() ?? 30) + 2, j0 = (js.min() ?? 0) - 1, j1 = (js.max() ?? 16) + 1
+        let unit = min(area.width / CGFloat(k1 - k0 + 2), area.height / CGFloat((j1 - j0 + 1) * 2) * 0.9)
+        let ts = unit * 4 * 0.94   // a tile is 4 quarter units wide
+        func origin(_ t: AlpacaView.Tile) -> CGPoint {
+            CGPoint(x: area.minX + CGFloat(t.k - k0) * unit, y: area.minY + CGFloat(t.j - j0) * unit * 2 * 1.12)
+        }
+        let order = v.tiles.indices.sorted { (v.tiles[$0].open ? 1 : 0, -$0) < (v.tiles[$1].open ? 1 : 0, -$1) }
+        for i in order {
+            let t = v.tiles[i], p = origin(t)
+            let r = CGRect(x: p.x - ts / 2, y: p.y - ts / 2, width: ts, height: ts)
+            (t.open ? UIColor(red: 0.96, green: 0.98, blue: 0.86, alpha: 1) : UIColor(red: 0.42, green: 0.45, blue: 0.36, alpha: 1)).setFill()
+            UIBezierPath(roundedRect: r, cornerRadius: 3).fill()
+            if t.type >= 0 {
+                let e = AlpacaData.emoji[t.type] as NSString
+                e.draw(in: r.insetBy(dx: ts * 0.12, dy: ts * 0.08), withAttributes: [.font: UIFont.systemFont(ofSize: ts * 0.62)])
+                if !t.open { UIColor(white: 0, alpha: 0.45).setFill(); UIBezierPath(roundedRect: r, cornerRadius: 3).fill() }
+            }
+        }
+        // numbered picks
+        for (n, pi) in v.picks.enumerated() where pi >= 0 && pi < v.tiles.count {
+            let p = origin(v.tiles[pi])
+            let r = CGRect(x: p.x - ts / 2, y: p.y - ts / 2, width: ts, height: ts)
+            let b = UIBezierPath(roundedRect: r.insetBy(dx: -2, dy: -2), cornerRadius: 4); b.lineWidth = n == 0 ? 5 : 3
+            (n == 0 ? gold : gold.withAlphaComponent(0.6)).setStroke(); b.stroke()
+            badge(n + 1, at: CGPoint(x: r.maxX - 2, y: r.minY + 2), radius: max(9, ts * 0.24))
+        }
+        // rack + held row
+        let slot: CGFloat = 40, y = rect.height - 56
+        for s in 0..<7 {
+            let r = CGRect(x: 14 + CGFloat(s) * (slot + 4), y: y, width: slot, height: slot)
+            UIColor(red: 0.42, green: 0.25, blue: 0.14, alpha: 1).setFill(); UIBezierPath(roundedRect: r, cornerRadius: 4).fill()
+            if s < v.rack.count {
+                UIColor(red: 0.96, green: 0.98, blue: 0.86, alpha: 1).setFill(); UIBezierPath(roundedRect: r.insetBy(dx: 2, dy: 2), cornerRadius: 3).fill()
+                (AlpacaData.emoji[v.rack[s]] as NSString).draw(in: r.insetBy(dx: 6, dy: 5), withAttributes: [.font: UIFont.systemFont(ofSize: 25)])
+            }
+        }
+        for (h, t) in v.held.enumerated() {
+            let r = CGRect(x: 14 + 7 * (slot + 4) + 10 + CGFloat(h) * (slot * 0.8 + 3), y: y + 6, width: slot * 0.8, height: slot * 0.8)
+            UIColor(red: 0.96, green: 0.98, blue: 0.86, alpha: 1).setFill(); UIBezierPath(roundedRect: r, cornerRadius: 3).fill()
+            (AlpacaData.emoji[t] as NSString).draw(in: r.insetBy(dx: 4, dy: 3), withAttributes: [.font: UIFont.systemFont(ofSize: 20)])
+            if let n = v.picks.firstIndex(of: -1 - h) { badge(n + 1, at: CGPoint(x: r.maxX, y: r.minY), radius: 9) }
+        }
+    }
+
 }

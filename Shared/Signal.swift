@@ -40,10 +40,12 @@ enum RawUDP {
 /// (a broken burst is ignored; the extension re-sends the board at least once a second).
 enum DarwinBoard {
     static let prefix = "com.atomawayg.sian.b."
+    static let maxCells = max(JK.count, AL.count)
+    static let values = 18
     static func names() -> [String] {
         var n: [String] = []
-        for i in 0..<JK.count { for v in 0..<14 { n.append(prefix + "c\(i)v\(v)") } }
-        for g in 0..<5 { n.append(prefix + "g\(g)") }
+        for i in 0..<maxCells { for v in 0..<values { n.append(prefix + "c\(i)v\(v)") } }
+        for g in 0..<6 { n.append(prefix + "g\(g)") }
         for v in 0..<5 { n.append(prefix + "me\(v)") }
         for v in 0..<16 { n.append(prefix + "ha\(v)"); n.append(prefix + "hb\(v)") }
         n += [prefix + "turn0", prefix + "turn1", prefix + "valid0", prefix + "valid1", prefix + "begin", prefix + "commit"]
@@ -58,7 +60,7 @@ enum DarwinBoard {
         return Int((h ^ (h >> 8) ^ (h >> 16) ^ (h >> 24)) & 0xff)
     }
     static func send(_ m: BoardMessage) {
-        let cells = m.valid && m.cells.count <= JK.count ? m.cells : []
+        let cells = m.valid && m.cells.count <= maxCells ? m.cells.map { max(0, min(values - 1, $0)) } : []
         let h = checksum(valid: m.valid, game: m.game.rawValue, cells: cells, me: m.me, turn: m.myTurn)
         Signal.post(prefix + "begin")
         Signal.post(prefix + "valid\(m.valid ? 1 : 0)")
