@@ -15,8 +15,13 @@ jobs:
           S=Tools/PlatoTest/Sources/PlatoTest
           cp App/ChessEngine.swift App/DraughtsEngine.swift Broadcast/PlatoBoardReader.swift Broadcast/PlatoChessData.swift Shared/BoardMessage.swift $S/
           swift build -c release --package-path Tools/PlatoTest 2>&1 | grep -vE "^\[[0-9]+/[0-9]+\]" | tail -40
-      - name: Run
+      - name: Read frames
         run: |
           B=$(swift build -c release --package-path Tools/PlatoTest --show-bin-path)/PlatoTest
-          $B all | tee out.txt
-          while read -r l; do echo "::notice title=plato::$l"; done < out.txt
+          $B read | tee r.txt
+          while read -r l; do echo "::notice title=read::$l"; done < r.txt
+      - name: Search
+        run: |
+          B=$(swift build -c release --package-path Tools/PlatoTest --show-bin-path)/PlatoTest
+          $B search | tee s.txt
+          while read -r l; do echo "::notice title=search::$l"; done < s.txt
