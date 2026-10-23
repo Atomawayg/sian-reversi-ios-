@@ -27,6 +27,7 @@ targets:
         UIBackgroundModes: [audio]
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIRequiresFullScreen: true
+        NSPhotoLibraryAddUsageDescription: "เก็บภาพหน้าจอตอนที่อ่านกระดานผิด เพื่อใช้แก้บัค"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.atomawayg.sianreversi
@@ -46,6 +47,7 @@ targets:
         CFBundleDisplayName: "เซียน"
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        NSPhotoLibraryAddUsageDescription: "เก็บภาพหน้าจอตอนที่อ่านกระดานผิด เพื่อใช้แก้บัค"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.broadcast-services-upload
           NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).SampleHandler"

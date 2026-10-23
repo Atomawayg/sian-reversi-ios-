@@ -18,7 +18,8 @@ final class GameModel: ObservableObject {
     private let engine = Engine()
     private let checkers = CheckersEngine()
     private var tbLoaded = false
-    private var ckPrev: [Int]? = nil
+    private let ckTrack = BoardTracker(), rvTrack = BoardTracker(), cnTrack = BoardTracker()
+    private var suspectsPosted = 0
     private let work = DispatchQueue(label: "sian.think", qos: .userInitiated)
     private var gen = 0
     private var computedFor: [Int] = []
@@ -30,7 +31,7 @@ final class GameModel: ObservableObject {
         pip.onStateChange = { [weak self] on in DispatchQueue.main.async { self?.pipOn = on } }
         GameModel.shared = self
         let center = CFNotificationCenterGetDarwinNotifyCenter()
-        for name in [Signal.started, Signal.frame, Signal.stopped] + DarwinBoard.names() {
+        for name in [Signal.started, Signal.frame, Signal.stopped, Signal.frameSaved, Signal.frameSaveFailed] + DarwinBoard.names() {
             CFNotificationCenterAddObserver(center, nil, { _, _, name, _, _ in
                 let n = (name?.rawValue as String?) ?? ""
                 DispatchQueue.main.async { GameModel.shared?.signal(n) }
@@ -64,7 +65,7 @@ final class GameModel: ObservableObject {
     private var dCells = [Int](repeating: -1, count: JK.count), dMe = -1, dTurn: Bool? = nil, dValid: Bool? = nil, dGame: GameKind? = nil
     private var dHa = -1, dHb = -1
     private var lastDarwinCommit = Date.distantPast, lastSocketMsg = Date.distantPast
-    private var darwinMsgs = 0, darwinBroken = 0
+    private var darwinMsgs = 0, darwinBroken = 0, bugFrames = 0, bugFrameFailed = false
 
     private func resetBurst() {
         for i in 0..<dCells.count { dCells[i] = -1 }
@@ -107,11 +108,13 @@ final class GameModel: ObservableObject {
         }
         if n == Signal.started { started = true; frames = 0 }
         if n == Signal.stopped { started = false }
+        if n == Signal.frameSaved { bugFrames += 1 }
+        if n == Signal.frameSaveFailed { bugFrameFailed = true }
         if n == Signal.frame { frames += 1; started = true }
         refreshDebug()
     }
     private func refreshDebug() {
-        debug = "อ่านจอ: \(started ? "ทำงาน" : "ไม่ทำงาน") · ภาพ \(frames) · ข้อมูล \(darwinMsgs) · ตกหล่น \(darwinBroken)"
+        debug = "อ่านจอ: \(started ? "ทำงาน" : "ไม่ทำงาน") · ภาพ \(frames) · ข้อมูล \(darwinMsgs) · ตกหล่น \(darwinBroken) · ภาพบัค \(bugFrames)\(bugFrameFailed ? " (เก็บไม่ได้)" : "")"
     }
 
     private func show(_ o: Overlay) { var x = o; x.footer = debug; overlay = x; pip.show(x) }
@@ -139,6 +142,8 @@ final class GameModel: ObservableObject {
         case .jackaroo: handleJackaroo(m); return
         case .reversi: break
         }
+        let rv = rvTrack.check(m.cells) { b, p in ReversiRules.successors(b, colour: p + 1) }
+        guard rv != .suspicious else { boardInDoubt(.reversi, shown: rvTrack.trusted); return }
         if m.me != 0 && !manualMe { me = m.me }
         guard me != 0 else {
             show(Overlay(cells: m.cells, rec: nil, title: "?", line: "อ่านสีของคุณไม่ได้ เลือกสีในแอป"))
@@ -188,9 +193,19 @@ final class GameModel: ObservableObject {
         show(Overlay(cells: cells, rec: i, title: GameModel.name(i), line: line, mine: true))
     }
 
+    /// A reading that no legal move explains: keep the last trusted board on screen, don't let the AI
+    /// think on it, and ask the screen reader to keep the frame for debugging.
+    private func boardInDoubt(_ game: GameKind, meColor: Int = 1, shown: [Int]?) {
+        computedFor = []; gen += 1
+        show(Overlay(game: game, cells: shown, title: "ตรวจ…", line: "กระดานไม่ตรงกติกา รออ่านใหม่", meColor: meColor))
+        suspectsPosted += 1
+        Signal.post(Signal.suspect)
+    }
+
     // MARK: หมากฮอส
-    /// Turns the colour reading into 1/2 (your man/king) and -1/-2 (opponent), tracking kings between frames:
-    /// a piece on its far row is a king, and a king keeps its crown when it moves.
+    /// Turns the colour reading into 1/2 (your man/king) and -1/-2 (opponent); a man on its far row is a king.
+    /// (The reader sees crowns directly now, so kings are no longer remembered between frames —
+    /// that memory kept one misread "king" alive for the rest of the game.)
     private func checkersBoard(_ m: BoardMessage) -> (board: [Int], meColor: Int) {
         var meC = m.me
         if meC == 0 { // fallback: whoever has more pieces in the bottom half is you
@@ -208,19 +223,6 @@ final class GameModel: ObservableObject {
             if !mine && i / 8 == 7 { x = -2 }
             nb[i] = x
         }
-        if let p = ckPrev {
-            let before = p.filter { $0 != 0 }.count, after = nb.filter { $0 != 0 }.count
-            if after > before { ckPrev = nil } // new game
-        }
-        if let p = ckPrev {
-            for i in 0..<64 where nb[i] != 0 && p[i] == nb[i] * 2 { nb[i] *= 2 }
-            for side in [1, -1] {
-                let vac = (0..<64).filter { p[$0] * side > 0 && !(nb[$0] * side > 0) }
-                let app = (0..<64).filter { nb[$0] * side > 0 && !(p[$0] * side > 0) }
-                if vac.count == 1 && app.count == 1 && abs(p[vac[0]]) == 2 { nb[app[0]] = 2 * side }
-            }
-        }
-        ckPrev = nb
         return (nb, meC)
     }
 
@@ -229,6 +231,8 @@ final class GameModel: ObservableObject {
     private func handleCheckers(_ m: BoardMessage) {
         let (board, meC) = checkersBoard(m)
         let draw = board.map { $0 == 1 ? 1 : ($0 == 2 ? 2 : ($0 == -1 ? 3 : ($0 == -2 ? 4 : 0))) }
+        let verdict = ckTrack.check(board) { b, p in CheckersRules.successors(b, side: p == 0 ? 1 : -1) }
+        guard verdict != .suspicious else { boardInDoubt(.checkers, meColor: meC, shown: ckTrack.trusted.map { t in t.map { $0 == 1 ? 1 : ($0 == 2 ? 2 : ($0 == -1 ? 3 : ($0 == -2 ? 4 : 0))) } }); return }
         guard m.myTurn else {
             computedFor = []; gen += 1
             show(Overlay(game: .checkers, cells: draw, title: "รอ…", line: "ตาคู่แข่ง", meColor: meC))
@@ -278,6 +282,11 @@ final class GameModel: ObservableObject {
         let meC = 1
         let colourForPiP = first ? 1 : 2
         let draw = m.cells.map { $0 == 0 ? 0 : ($0 == meC ? 1 : 3) }
+        let v = cnTrack.check(m.cells) { b, p in ConnectRules.successors(b, cols: cols, rows: rows, piece: p + 1) }
+        guard v != .suspicious else {
+            boardInDoubt(m.game, meColor: colourForPiP, shown: cnTrack.trusted.flatMap { $0.count == m.cells.count ? $0.map { $0 == 0 ? 0 : ($0 == meC ? 1 : 3) } : nil })
+            return
+        }
         guard m.myTurn else {
             computedFor = []; gen += 1
             show(Overlay(game: m.game, cells: draw, title: "รอ…", line: "ตาคู่แข่ง", meColor: colourForPiP))

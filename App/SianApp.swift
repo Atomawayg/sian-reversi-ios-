@@ -1,4 +1,5 @@
 import SwiftUI
+import Photos
 import AVFoundation
 import ReplayKit
 
