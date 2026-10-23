@@ -21,8 +21,10 @@ final class ConnectEngine {
     static let WIN = 100000
     private let BIG = Int.max / 4
 
-    private struct TTE { var d: Int; var s: Int; var f: Int; var m: Int; var x: Bool }
-    private var TT: [UInt64: TTE] = [:]
+    private struct TTE { var k: UInt64 = 0; var d: Int32 = -1; var s: Int32 = 0; var f: Int8 = 0; var m: Int8 = -1; var x: Bool = false }
+    // fixed-size table (a Swift Dictionary here cost most of the search time)
+    private static let TTN = 1 << 20
+    private var TT = [TTE](repeating: TTE(), count: ConnectEngine.TTN)
     private var nodes = 0, deadline: UInt64 = 0, stop = false, cut = false
 
     init(W: Int, H: Int, K: Int) {
@@ -132,11 +134,14 @@ final class ConnectEngine {
         if beta > maxS { beta = maxS; if alpha >= beta { return beta } }
         let k = h
         var ttm = -1
-        if let e = TT[k] {
-            ttm = e.m
-            if e.d >= depth {
-                let hit = e.f == 0 || (e.f == 1 && e.s >= beta) || (e.f == 2 && e.s <= alpha)
-                if hit { if !e.x { cut = true }; return e.s }
+        let ti = Int(k & UInt64(ConnectEngine.TTN - 1))
+        if TT[ti].k == k && TT[ti].d >= 0 {
+            let e = TT[ti]
+            ttm = Int(e.m)
+            if Int(e.d) >= depth {
+                let es = Int(e.s)
+                let hit = e.f == 0 || (e.f == 1 && es >= beta) || (e.f == 2 && es <= alpha)
+                if hit { if !e.x { cut = true }; return es }
             }
         }
         let moves = forced >= 0 ? [forced] : ordered(p, ttm >= 0 ? [ttm] + order.filter { $0 != ttm } : order)
@@ -157,8 +162,7 @@ final class ConnectEngine {
         let nodeCut = cut
         cut = cutBefore || nodeCut
         if bm < 0 { return 0 }
-        if TT.count > 800_000 { TT.removeAll(keepingCapacity: true) }
-        TT[k] = TTE(d: nodeCut ? depth : 999, s: best, f: best <= a0 ? 2 : (best >= beta ? 1 : 0), m: bm, x: !nodeCut)
+        TT[ti] = TTE(k: k, d: Int32(nodeCut ? depth : 999), s: Int32(clamping: best), f: Int8(best <= a0 ? 2 : (best >= beta ? 1 : 0)), m: Int8(bm), x: !nodeCut)
         return best
     }
 
