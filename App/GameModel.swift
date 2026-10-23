@@ -283,7 +283,7 @@ final class GameModel: ObservableObject {
                 if res.score > WIN - 1000 { verdict = "ชนะแน่" }
                 else if res.score < -(WIN - 1000) { verdict = res.trap > 0 ? "เสียเปรียบ · วางกับดัก" : "แพ้ถ้าเขาเล่นถูก" }
                 else { let s = res.score; verdict = s > 60 ? "ได้เปรียบ" : (s < -60 ? "เสียเปรียบ" : "สูสี") }
-                let line = verdict + (res.depth > 0 ? " · ลึก \(res.depth)" : "")
+                let line = verdict + (res.depth > 0 ? " · ลึก \(res.depth)" : "") + (m.me == 3 ? "\nเริ่มกลางเกม อาจไม่แม่น" : "")
                 self.show(Overlay(game: m.game, cells: draw, rec: res.best, title: "ช่อง \(res.best + 1)", line: line, mine: true, meColor: colourForPiP))
             }
         }
