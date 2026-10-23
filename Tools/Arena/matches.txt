@@ -1,3 +1,2 @@
 checkers 800 100
 checkers-notrap 800 100
-connect4 200 500

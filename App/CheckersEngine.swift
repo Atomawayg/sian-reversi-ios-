@@ -437,15 +437,13 @@ final class CheckersEngine {
                 return res
             }
         }
-        // Main search gets ~80% of the time; the rest is for picking the most "tricky" of equally good moves.
-        let mainBudget = Double(maxMs) * (trapMode ? 0.85 : 0.95)
-        deadline = t0 + UInt64(mainBudget) * 1_000_000
+        // original iterative deepening (measured: my "smarter" time rules lost ~50 Elo); when trap-picking
+        // is on, the main search keeps 15% of the time back for it
+        deadline = t0 + UInt64(Double(maxMs) * (trapMode ? 0.85 : 1.0)) * 1_000_000
         var list = root
         var stable = 0
         var prevBest = ""
-        var lastIter = 0.0
         for d in 1...64 {
-            let itStart = Double(now() - t0) / 1_000_000
             var alpha = -INF
             var cur: [(m: CheckersMove, score: Int)] = []
             for j in 0..<list.count {
@@ -464,15 +462,7 @@ final class CheckersEngine {
                 cur.append((x.m, s))
                 if s > alpha { alpha = s }
             }
-            if stop {
-                // keep a partly finished iteration when a move already proved better than the old choice
-                if let top = cur.max(by: { $0.score < $1.score }), cur.count >= 1, top.score > (list.first?.score ?? -INF) || top.m.from == list[0].m.from && top.m.to == list[0].m.to {
-                    res.best = top.m; res.score = top.score; res.depth = d
-                    let done = Set(cur.map { "\($0.m.from)-\($0.m.to)-\($0.m.caps)" })
-                    list = cur.sorted { $0.score > $1.score } + list.filter { !done.contains("\($0.m.from)-\($0.m.to)-\($0.m.caps)") }
-                }
-                break
-            }
+            if stop { break }
             cur.sort { $0.score > $1.score }
             list = cur
             res.best = list[0].m; res.score = list[0].score; res.depth = d
@@ -480,18 +470,14 @@ final class CheckersEngine {
             stable = key == prevBest ? stable + 1 : 0
             prevBest = key
             let el = Double(now() - t0) / 1_000_000
-            let iterMs = el - itStart
             if abs(list[0].score) > MATE - 1000 { break }
             if d >= 6 {
                 let second = list.count > 1 ? list[1].score : -INF
                 let margin = list[0].score - second
-                if stable >= 3 && margin >= 150 && el > mainBudget * 0.15 { break }
-                if stable >= 6 && el > mainBudget * 0.4 { break }
+                if stable >= 3 && margin >= 150 && el > Double(maxMs) * 0.12 { break }
+                if stable >= 5 && el > Double(maxMs) * 0.3 { break }
             }
-            // don't start an iteration that can't finish (each one costs ~2–3× the previous)
-            let growth = lastIter > 0.5 ? min(6, max(1.5, iterMs / lastIter)) : 3
-            if el + iterMs * growth > mainBudget { break }
-            lastIter = iterMs
+            if el > Double(maxMs) * 0.5 { break }
         }
         if res.best == nil { res.best = list[0].m }
         if trapMode && abs(res.score) < MATE - 1000 && list.count > 1 && res.depth >= 4 {
