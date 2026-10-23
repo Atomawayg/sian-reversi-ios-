@@ -44,6 +44,7 @@ struct ContentView: View {
         GameInfo(kind: .connect4, name: "เรียง 4", place: "Plato", icon: "circle.grid.3x3.fill"),
         GameInfo(kind: .connect5, name: "เรียง 5", place: "Plato", icon: "circle.grid.3x3.circle.fill"),
         GameInfo(kind: .jackaroo, name: "Jackaroo", place: "WePlay", icon: "suit.club.fill"),
+        GameInfo(kind: .pool, name: "Pool", place: "WePlay", icon: "circle.circle.fill"),
     ]
 
     var body: some View {

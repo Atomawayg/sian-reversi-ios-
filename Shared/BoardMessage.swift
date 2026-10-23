@@ -7,9 +7,10 @@ enum GameKind: Int, Codable {
     case connect4 = 2     // Plato 4 in a Row (7x6)
     case connect5 = 3     // Plato 5 in a Row (9x7)
     case jackaroo = 4     // WePlay Jackaroo (see JK layout)
+    case pool = 5         // WePlay Pool / 8-ball (see PoolCodec layout)
 
     var size: (w: Int, h: Int) {
-        switch self { case .reversi, .checkers: return (8, 8); case .connect4: return (7, 6); case .connect5: return (9, 7); case .jackaroo: return (JK.count, 1) }
+        switch self { case .reversi, .checkers: return (8, 8); case .connect4: return (7, 6); case .connect5: return (9, 7); case .jackaroo: return (JK.count, 1); case .pool: return (PoolCodec.count, 1) }
     }
 }
 
@@ -42,4 +43,29 @@ enum JK {
     static let discard = 122    // 1 while the big DISCARD banner is on the board
     static let count = 123
     static let rankNames = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
+}
+
+/// Pool message layout (cells, every value 0…13 so it fits the Darwin transport).
+/// Positions are on the playing surface in half-pixels of a 1180×2556 screen, origin at the top-left
+/// cushion nose (207.5, 584); x·3200 + y packed as 6 base-14 digits.
+/// me: 0 open table, 1 you have solids, 2 stripes, 3 your group is cleared (play the 8).
+enum PoolCodec {
+    static let flags = 0          // bit0 table read cleanly, bit1 the game's aim circle is on screen
+    static let aim = 1            // 6 digits: centre of the game's aim (ghost-ball) circle
+    static let balls = 7          // + 7*id: present (0/1) + 6 digits; id 0 = cue ball, 1…15
+    static let myLeft = 119       // balls left in your group (from the bar)
+    static let oppLeft = 120
+    static let count = 121
+    static let originX = 207.5, originY = 584.0, width = 759.0, height = 1551.0
+
+    static func put(_ cells: inout [Int], _ at: Int, _ x: Double, _ y: Double) {
+        let qx = max(0, min(1599, Int(((x - originX) * 2).rounded()))), qy = max(0, min(3199, Int(((y - originY) * 2).rounded())))
+        var v = qx * 3200 + qy
+        for k in 0..<6 { cells[at + 5 - k] = v % 14; v /= 14 }
+    }
+    static func get(_ cells: [Int], _ at: Int) -> (x: Double, y: Double) {
+        var v = 0
+        for k in 0..<6 { v = v * 14 + cells[at + k] }
+        return (originX + Double(v / 3200) / 2, originY + Double(v % 3200) / 2)
+    }
 }
