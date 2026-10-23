@@ -316,7 +316,7 @@ final class GameModel: ObservableObject {
         if m.myTurn && !hand.isEmpty { jkTurnAt = Date() }
         // step 2: the suggested card has left your hand (you confirmed it) and the stones haven't moved yet
         if let l = jkLock, l.board == board, !l.discard, l.overlay.stage >= 1, !l.overlay.marks.isEmpty {
-            var rest = l.hand
+            var rest = l.ranks
             if let i = rest.firstIndex(of: l.rank) { rest.remove(at: i) }
             if hand.sorted() == rest {
                 var o = l.overlay
@@ -360,7 +360,8 @@ final class GameModel: ObservableObject {
         }
         let discardMode = cells[JK.discard] == 1
         // same board, same cards: keep the answer we already gave (no flip-flopping while you tap cards)
-        let handKey = hand.sorted()
+        // the key includes which cards are white: the game lights them up a moment after your turn starts
+        let handKey = zip(hand, playable).map { $0 + ($1 ? "*" : "") }.sorted()
         if let l = jkLock, l.board == board, l.hand == handKey, l.discard == discardMode {
             var o = l.overlay
             if let i = hand.firstIndex(of: l.rank) { o.pick = i }
@@ -384,8 +385,12 @@ final class GameModel: ObservableObject {
             } else {
                 best = JackarooEngine.bestDeep(st, hand: hand, playable: playable, me: 3)
             }
+            // every card grey but stones could still move: the game hasn't lit the cards yet, so wait
+            let notLitYet = !discardMode && best?.kind == .discard && !playable.contains(true)
+                && !JackarooEngine.generate(st, hand: hand, me: 3).filter({ $0.kind != .force }).isEmpty
             DispatchQueue.main.async {
                 guard g == self.gen, let mv = best else { return }
+                if notLitYet { var w = snap; w.title = "รอ…"; w.line = "รอเกมเปิดไพ่"; self.show(w); return }
                 var o = snap
                 o.pick = mv.card
                 var (title, line) = GameModel.describe(mv, st: st, cells: cells)
@@ -415,13 +420,13 @@ final class GameModel: ObservableObject {
                     func code(_ p: Int) -> Int { p < 0 ? 200 + mvv.seat : (p >= 100 ? 100 + 4 * mvv.seat + (p - 100) : p) }
                     return [code(mvv.from), code(mvv.to)]
                 }
-                self.jkLock = JKLock(board: board, hand: handKey, rank: mv.rank, discard: discardMode, overlay: o)
+                self.jkLock = JKLock(board: board, hand: handKey, ranks: hand.sorted(), rank: mv.rank, discard: discardMode, overlay: o)
                 self.show(o)
             }
         }
     }
 
-    private struct JKLock { let board: [Int]; let hand: [String]; let rank: String; let discard: Bool; let overlay: Overlay }
+    private struct JKLock { let board: [Int]; let hand: [String]; let ranks: [String]; let rank: String; let discard: Bool; let overlay: Overlay }
     private var jkLock: JKLock? = nil
     // MARK: game log (settings → บันทึกเกม)
     @Published var jkLogOn = UserDefaults.standard.bool(forKey: "jkLog") { didSet { UserDefaults.standard.set(jkLogOn, forKey: "jkLog"); if jkLogOn { log("--- เริ่มบันทึก \(Date())") } } }
