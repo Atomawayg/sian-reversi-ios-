@@ -99,7 +99,8 @@ final class AlpacaEngine {
             else {
                 for i in fr {
                     let (nr, cl) = add(r, tiles[i].type)
-                    let v = search(with(gone, i), nr, depth - 1, deadline) + (cl ? 25 : 0)
+                    // equal moves: finish a group already in the rack before starting a new one
+                    let v = search(with(gone, i), nr, depth - 1, deadline) + (cl ? 25 : 0) + (rc[tiles[i].type] > 0 ? 0.5 : 0)
                     if v > bv { bv = v; bi = i }
                 }
             }
