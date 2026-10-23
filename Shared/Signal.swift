@@ -41,9 +41,8 @@ enum RawUDP {
 }
 
 /// Sends a whole board as a burst of Darwin notifications: begin, one name per cell value, a checksum, then a commit.
-/// iOS may drop or reorder Darwin notifications, so the app rebuilds the board from scratch after every
-/// begin and only accepts it when every cell arrived and the checksum matches (a broken burst is ignored;
-/// the extension re-sends the board at least once a second).
+/// iOS may drop or reorder Darwin notifications, so the app only accepts a board when its checksum matches
+/// (a broken burst is ignored; the extension re-sends the board at least once a second).
 enum DarwinBoard {
     static let prefix = "com.atomawayg.sian.b."
     static func names() -> [String] {
