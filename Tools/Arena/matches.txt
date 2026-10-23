@@ -1,4 +1,3 @@
 checkers 800 100
-connect4 80 500
-connect5 80 300
-reversi 200 100
+checkers-notrap 800 100
+connect4 200 500

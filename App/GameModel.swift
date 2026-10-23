@@ -302,7 +302,7 @@ final class GameModel: ObservableObject {
             var res = ConnectResult()
             // 7×6 four-in-a-row: try to solve the position exactly first (perfect play from mid-game on)
             var solved = false
-            if K == 4 && cols == 7 && rows == 6, let a = self.c4.best(cells: cells, ms: ms * 6 / 10) {
+            if K == 4 && cols == 7 && rows == 6 && cells.filter({ $0 != 0 }).count >= 10, let a = self.c4.best(cells: cells, ms: ms * 6 / 10) {
                 let WIN = ConnectEngine.WIN
                 res = ConnectResult(best: a.col, score: a.score > 0 ? WIN - 100 + a.score : (a.score < 0 ? -(WIN - 100) + a.score : 0),
                                     depth: 99, exact: true, trap: 0)

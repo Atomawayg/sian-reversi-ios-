@@ -438,7 +438,7 @@ final class CheckersEngine {
             }
         }
         // Main search gets ~80% of the time; the rest is for picking the most "tricky" of equally good moves.
-        let mainBudget = Double(maxMs) * (trapMode ? 0.8 : 0.95)
+        let mainBudget = Double(maxMs) * (trapMode ? 0.85 : 0.95)
         deadline = t0 + UInt64(mainBudget) * 1_000_000
         var list = root
         var stable = 0
@@ -506,11 +506,12 @@ final class CheckersEngine {
     /// opponent the most replies that LOOK fine at a glance (2-ply) but actually lose material (deep).
     var trapMode = true
     private func pickTrap(_ list: [(m: CheckersMove, score: Int)], side: Int, depth: Int) -> (m: CheckersMove, traps: Int)? {
-        let best = list[0].score
-        let cands = list.prefix(4).filter { $0.score >= best - 12 }
+        // Only the first move's score is exact (the others are bounds from a null-window search), so every
+        // candidate is re-scored below at the same depth before it may be chosen.
+        let cands = Array(list.prefix(4))
         if cands.count < 2 { return nil }
         let deep = max(3, min(depth - 2, 9))
-        var counts: [(m: CheckersMove, traps: Int)] = []
+        var counts: [(m: CheckersMove, traps: Int, value: Int)] = []
         for c in cands {
             let i = findIndex(c.m); if i < 0 { continue }
             make(i, 0)
@@ -534,11 +535,14 @@ final class CheckersEngine {
             guard let gBest = glance.max(), let rBest = real.max() else { continue }
             var traps = 0
             for q in 0..<glance.count where glance[q] >= gBest - 30 && real[q] <= rBest - 120 { traps += 1 }
-            counts.append((c.m, traps))
+            counts.append((c.m, traps, -rBest))   // my value = what's left after their best reply
         }
-        guard let top = counts.max(by: { $0.traps < $1.traps }), top.traps > 0 else { return nil }
-        let base = counts.first { $0.m.from == list[0].m.from && $0.m.to == list[0].m.to && $0.m.caps == list[0].m.caps }?.traps ?? 0
-        return top.traps > base ? top : nil
+        guard let first = counts.first, first.m.from == list[0].m.from && first.m.to == list[0].m.to && first.m.caps == list[0].m.caps else { return nil }
+        let top = counts.map { $0.value }.max()!
+        // never give up value: candidates must be as good as the best at this depth (and as good as the main pick)
+        let ok = counts.filter { $0.value >= top - 8 && $0.value >= first.value - 8 }
+        guard let pick = ok.max(by: { $0.traps < $1.traps }), pick.traps > first.traps else { return nil }
+        return (pick.m, pick.traps)
     }
 
     // MARK: full path of a move (for drawing), squares in 0..63

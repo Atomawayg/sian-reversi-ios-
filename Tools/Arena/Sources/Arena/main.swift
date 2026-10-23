@@ -73,8 +73,9 @@ func ckOpening(_ rng: inout Rng, plies: Int) -> [Int] {
     return b
 }
 
-func makeCkA() -> CkPlayer {
+func makeCkA(trap: Bool = true) -> CkPlayer {
     let e = CheckersEngine()
+    e.trapMode = trap
     if let d = try? Data(contentsOf: URL(fileURLWithPath: "hos-tb.bin")) { e.loadTB(d) }
     return { b, side in
         let r = e.search(b, side: side, maxMs: ms)
@@ -126,11 +127,12 @@ let pairs = max(1, games / 2)
 var result: (a: Int, b: Int, d: Int) = (0, 0, 0)
 let t0 = Date()
 switch game {
-case "checkers":
+case "checkers", "checkers-notrap":
+    let trap = game == "checkers"
     result = runPairs(pairs) { i in
         var rng = Rng(s: 0x9E3779B97F4A7C15 &+ UInt64(i) &* 0x632BE59BD9B4E019)
         let open = ckOpening(&rng, plies: 2 + rng.int(4))
-        let a = makeCkA(), b = makeCkB()
+        let a = makeCkA(trap: trap), b = makeCkB()
         let g1 = ckGame(a, b, opening: open), g2 = ckGame(b, a, opening: open)
         return (g1 == 1 ? .a : (g1 == -1 ? .b : .draw), g2 == -1 ? .a : (g2 == 1 ? .b : .draw))
     }

@@ -26,7 +26,7 @@ extension ConnectEngineV0: ConnectEngineLike {
 func makeCnA(_ ms: Int) -> CnPlayer {
     let solver = Connect4Solver()
     return { cells, cols, rows, K in
-        if K == 4 && cols == 7 && rows == 6, let a = solver.best(cells: cells, ms: ms * 6 / 10) { return a.col }
+        if K == 4 && cols == 7 && rows == 6 && cells.filter({ $0 != 0 }).count >= 10, let a = solver.best(cells: cells, ms: ms * 6 / 10) { return a.col }
         return cnOldStyle({ ConnectEngine(W: $0, H: $1, K: $2) }, cells, cols, rows, K, K == 4 && cols == 7 ? ms * 4 / 10 : ms)
     }
 }
