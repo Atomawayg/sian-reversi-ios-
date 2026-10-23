@@ -57,7 +57,9 @@ enum PoolReader {
         let mine = barIcons(s, xs: (0..<7).map { 206 + 46.8 * Double($0) }, y: 398)
         let opp = barIcons(s, xs: (0..<7).map { 697 + 47 * Double($0) }, y: 397)
         var group = 0
-        if !mine.isEmpty { group = mine.filter { $0 }.count * 2 > mine.count ? 2 : 1 }
+        func avg(_ a: [Double]) -> Double { a.reduce(0, +) / Double(max(1, a.count)) }
+        if !mine.isEmpty && !opp.isEmpty { group = avg(mine) < avg(opp) ? 2 : 1 }   // the bar with white caps is stripes
+        else if !mine.isEmpty { group = avg(mine) < 0.63 ? 2 : 1 }
         else if !opp.isEmpty { group = 3 }   // opponent still has balls, you have none left: play the 8
         cells[PoolCodec.myLeft] = min(13, mine.count); cells[PoolCodec.oppLeft] = min(13, opp.count)
 
@@ -188,10 +190,10 @@ enum PoolReader {
         return (rw > 0.22 ? base + 8 : base, rw)
     }
 
-    /// true per icon = striped; empty slots are left out.
-    static func barIcons(_ s: BoardReader.Sampler, xs: [Double], y: Double) -> [Bool] {
+    /// Cap/band saturation ratio per icon (stripes ≈ 0.42–0.56: white caps; solids ≈ 0.70–0.84); empty slots left out.
+    static func barIcons(_ s: BoardReader.Sampler, xs: [Double], y: Double) -> [Double] {
         let sx = Double(s.w) / 1180, sy = Double(s.h) / 2556
-        var out: [Bool] = []
+        var out: [Double] = []
         let r = 19.0
         for cx in xs {
             var sumS = 0.0, sumV = 0.0, sumV2 = 0.0, n = 0.0, capS = 0.0, capN = 0.0, bandS = 0.0, bandN = 0.0
@@ -205,14 +207,14 @@ enum PoolReader {
                         if abs(dy) >= 0.6 * r { capS += c.s; capN += 1 }
                         if abs(dy) <= 0.3 * r && abs(dx) >= 0.45 * r { bandS += c.s; bandN += 1 }
                     }
-                    dx += 2
+                    dx += 1
                 }
-                dy += 2
+                dy += 1
             }
             let meanS = sumS / n, meanV = sumV / n, sdV = max(0, sumV2 / n - meanV * meanV).squareRoot()
             if meanS < 0.2 && sdV < 0.06 { continue }   // empty grey slot
             let ratio = (capS / max(1, capN)) / max(0.01, bandS / max(1, bandN))
-            out.append(ratio < 0.63)
+            out.append(ratio)
         }
         return out
     }
