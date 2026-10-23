@@ -1,0 +1,21 @@
+name: PoolTest
+on:
+  push:
+    branches: ['pooltest/**']
+permissions:
+  contents: read
+jobs:
+  pooltest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          S=Tools/PoolTest/Sources/PoolTest
+          cp Broadcast/PoolReader.swift App/PoolEngine.swift Shared/BoardMessage.swift $S/
+          swift build -c release --package-path Tools/PoolTest 2>&1 | grep -vE "^\[[0-9]+/[0-9]+\]" | tail -40
+      - name: Run
+        run: |
+          B=$(swift build -c release --package-path Tools/PoolTest --show-bin-path)/PoolTest
+          for f in Tools/PoolTest/frames/*.ppm; do $B $f | tee -a out.txt; done
+          while read -r l; do echo "::notice title=pool::$l"; done < out.txt
