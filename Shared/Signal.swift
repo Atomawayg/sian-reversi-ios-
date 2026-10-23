@@ -6,11 +6,6 @@ enum Signal {
     static let started = "com.atomawayg.sian.started"
     static let frame = "com.atomawayg.sian.frame"
     static let stopped = "com.atomawayg.sian.stopped"
-    /// app → screen reader: the last board broke the game rules, keep the recent frames
-    static let suspect = "com.atomawayg.sian.suspect"
-    /// screen reader → app: a bug frame was saved to Photos (or could not be)
-    static let frameSaved = "com.atomawayg.sian.saved"
-    static let frameSaveFailed = "com.atomawayg.sian.savefail"
 
     static func post(_ name: String) {
         CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),

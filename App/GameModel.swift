@@ -20,7 +20,6 @@ final class GameModel: ObservableObject {
     private lazy var c4 = Connect4Solver()
     private var tbLoaded = false
     private let ckTrack = BoardTracker(), rvTrack = BoardTracker(), cnTrack = BoardTracker()
-    private var suspectsPosted = 0
     private let work = DispatchQueue(label: "sian.think", qos: .userInitiated)
     private var gen = 0
     private var computedFor: [Int] = []
@@ -32,7 +31,7 @@ final class GameModel: ObservableObject {
         pip.onStateChange = { [weak self] on in DispatchQueue.main.async { self?.pipOn = on } }
         GameModel.shared = self
         let center = CFNotificationCenterGetDarwinNotifyCenter()
-        for name in [Signal.started, Signal.frame, Signal.stopped, Signal.frameSaved, Signal.frameSaveFailed] + DarwinBoard.names() {
+        for name in [Signal.started, Signal.frame, Signal.stopped] + DarwinBoard.names() {
             CFNotificationCenterAddObserver(center, nil, { _, _, name, _, _ in
                 let n = (name?.rawValue as String?) ?? ""
                 DispatchQueue.main.async { GameModel.shared?.signal(n) }
@@ -66,7 +65,7 @@ final class GameModel: ObservableObject {
     private var dCells = [Int](repeating: -1, count: JK.count), dMe = -1, dTurn: Bool? = nil, dValid: Bool? = nil, dGame: GameKind? = nil
     private var dHa = -1, dHb = -1
     private var lastDarwinCommit = Date.distantPast, lastSocketMsg = Date.distantPast
-    private var darwinMsgs = 0, darwinBroken = 0, bugFrames = 0, bugFrameFailed = false
+    private var darwinMsgs = 0, darwinBroken = 0
 
     /// The board from the last burst, or nil when something was lost or reordered on the way.
     private func assembledBurst() -> BoardMessage? {
@@ -105,13 +104,11 @@ final class GameModel: ObservableObject {
         }
         if n == Signal.started { started = true; frames = 0 }
         if n == Signal.stopped { started = false }
-        if n == Signal.frameSaved { bugFrames += 1 }
-        if n == Signal.frameSaveFailed { bugFrameFailed = true }
         if n == Signal.frame { frames += 1; started = true }
         refreshDebug()
     }
     private func refreshDebug() {
-        debug = "อ่านจอ: \(started ? "ทำงาน" : "ไม่ทำงาน") · ภาพ \(frames) · ข้อมูล \(darwinMsgs) · ตกหล่น \(darwinBroken) · ภาพบัค \(bugFrames)\(bugFrameFailed ? " (เก็บไม่ได้)" : "")"
+        debug = "อ่านจอ: \(started ? "ทำงาน" : "ไม่ทำงาน") · ภาพ \(frames) · ข้อมูล \(darwinMsgs) · ตกหล่น \(darwinBroken)"
     }
 
     private func show(_ o: Overlay) { var x = o; x.footer = debug; overlay = x; pip.show(x) }
@@ -191,12 +188,10 @@ final class GameModel: ObservableObject {
     }
 
     /// A reading that no legal move explains: keep the last trusted board on screen, don't let the AI
-    /// think on it, and ask the screen reader to keep the frame for debugging.
+    /// think on it.
     private func boardInDoubt(_ game: GameKind, meColor: Int = 1, shown: [Int]?) {
         computedFor = []; gen += 1
         show(Overlay(game: game, cells: shown, title: "ตรวจ…", line: "กระดานไม่ตรงกติกา รออ่านใหม่", meColor: meColor))
-        suspectsPosted += 1
-        Signal.post(Signal.suspect)
     }
 
     // MARK: หมากฮอส
