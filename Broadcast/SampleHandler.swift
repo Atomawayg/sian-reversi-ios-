@@ -24,7 +24,7 @@ class SampleHandler: RPBroadcastSampleHandler {
     override func processSampleBuffer(_ sampleBuffer: CMSampleBuffer, with sampleBufferType: RPSampleBufferType) {
         guard sampleBufferType == .video else { return }
         let t = CACurrentMediaTime()
-        if busy || t - lastRead < 0.25 { return }
+        if busy || t - lastRead < 0.15 { return }
         lastRead = t
         guard let pb = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         busy = true
@@ -36,7 +36,8 @@ class SampleHandler: RPBroadcastSampleHandler {
         // the legal-move glow pulses, so remember a glow seen in the last second on the same board
         if msg.cells != glowCells { glowCells = msg.cells; lastGlow = 0 }
         if msg.myTurn { lastGlow = t }
-        msg.myTurn = msg.valid && t - lastGlow < 1.2
+        // Plato shows a steady "Your Turn" pill: use it as is (holding it on would think on the opponent's turn)
+        if msg.game != .chess && msg.game != .draughts { msg.myTurn = msg.valid && t - lastGlow < 1.2 }
         prev = msg
         if !stable { return }
         if msg != sent || t - lastSent > 1.0 {

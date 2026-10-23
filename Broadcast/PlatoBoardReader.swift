@@ -24,8 +24,7 @@ enum PlatoBoardReader {
             return t / Double(3 * w * h)
         }
         // board top edge: strongest light/dark flips across the square edges
-        var bestY = 721, bestS = -1.0
-        for y0 in stride(from: 690, through: 780, by: 1) {
+        func edgeScore(_ y0: Int) -> Double {
             var sc = 0.0
             for r in 1..<8 {
                 let y = Int((Double(y0) + Double(r) * CELL).rounded())
@@ -34,8 +33,13 @@ enum PlatoBoardReader {
                     sc += abs(lum(x, y - 8, 6, 5) - lum(x, y + 3, 6, 5))
                 }
             }
-            if sc > bestS { bestS = sc; bestY = y0 }
+            return sc
         }
+        // coarse pass every 4 px, then ±3 px around the best
+        var bestY = 721, bestS = -1.0
+        for y0 in stride(from: 690, through: 780, by: 4) { let sc = edgeScore(y0); if sc > bestS { bestS = sc; bestY = y0 } }
+        let coarse = bestY
+        for y0 in (coarse - 3)...(coarse + 3) where y0 != coarse { let sc = edgeScore(y0); if sc > bestS { bestS = sc; bestY = y0 } }
         let y0 = Double(bestY)
         // turn pill
         let pill = s.avg(745 * sx, 418 * sy, 4 * sx)
@@ -121,7 +125,7 @@ enum PlatoBoardReader {
             for j in 0..<G {
                 let xa = x0 + j * w / G, xb = x0 + (j + 1) * w / G
                 var f = 0, n = 0
-                for yy in ya..<yb { for xx in xa..<xb {
+                for yy in stride(from: ya, to: yb, by: 2) { for xx in stride(from: xa, to: xb, by: 2) {
                     let p = px(xx, yy); n += 1
                     if abs(p.0 - br) + abs(p.1 - bg) + abs(p.2 - bb) > 60 { f += 1; fgSum += (p.0 + p.1 + p.2) / 3; fgN += 1 }
                 } }

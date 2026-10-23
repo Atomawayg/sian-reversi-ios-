@@ -133,10 +133,11 @@ final class DraughtsEngine {
     private var tt: [UInt64: (d: Int, v: Int, f: Int, m: Int)] = [:]
     private var nodes = 0, deadline: UInt64 = 0, stopped = false
     private var ply = 0
+    var cancel: (() -> Bool)? = nil
 
     private func search(_ depth: Int, _ alphaIn: Int, _ beta: Int) -> Int {
         nodes += 1
-        if nodes & 2047 == 0 && DispatchTime.now().uptimeNanoseconds > deadline { stopped = true }
+        if nodes & 2047 == 0 && (DispatchTime.now().uptimeNanoseconds > deadline || (cancel?() ?? false)) { stopped = true }
         if stopped { return 0 }
         var ms = gen(sideToMove)
         if ms.isEmpty { return -DraughtsEngine.WIN + ply }
@@ -171,7 +172,7 @@ final class DraughtsEngine {
 
     struct Result { var best: DraughtsMove?; var score = 0; var depth = 0 }
 
-    func think(ms: Int) -> Result {
+    func think(ms: Int, progress: ((Result) -> Void)? = nil) -> Result {
         let t0 = DispatchTime.now().uptimeNanoseconds
         deadline = t0 + UInt64(ms) * 1_000_000
         stopped = false; nodes = 0; ply = 0
@@ -181,6 +182,7 @@ final class DraughtsEngine {
         guard !root.isEmpty else { return res }
         res.best = root[0]
         if root.count == 1 { return res }
+        var sameBest = 0
         for d in 1...60 {
             var alpha = -DraughtsEngine.WIN - 1, bestV = -DraughtsEngine.WIN - 1, bestI = 0
             var scores: [(Int, Int)] = []
@@ -194,11 +196,15 @@ final class DraughtsEngine {
                 if v > alpha { alpha = v }
             }
             if stopped { break }
+            sameBest = root[bestI] == res.best ? sameBest + 1 : 0
             res.best = root[bestI]; res.score = bestV; res.depth = d
+            progress?(res)
             let order = scores.sorted { $0.1 > $1.1 }.map { root[$0.0] }
             root = order
             if abs(bestV) > DraughtsEngine.WIN - 1000 { break }
-            if Double(DispatchTime.now().uptimeNanoseconds - t0) > Double(ms) * 1_000_000 * 0.45 { break }
+            let el = Double(DispatchTime.now().uptimeNanoseconds - t0)
+            if el > Double(ms) * 1_000_000 * 0.45 { break }
+            if d >= 10 && sameBest >= 6 && el > Double(ms) * 1_000_000 * 0.2 { break }
         }
         return res
     }
