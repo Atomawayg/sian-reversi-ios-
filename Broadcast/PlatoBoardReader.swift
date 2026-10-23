@@ -49,7 +49,7 @@ enum PlatoBoardReader {
             var red = 0, cream = 0, n = 0
             for yy in stride(from: cy - 35, to: cy + 35, by: 2) { for xx in stride(from: cx - 35, to: cx + 35, by: 2) {
                 let p = px(xx, yy); n += 1
-                if p.0 > 140 && p.1 < 90 && p.2 < 90 { red += 1 }
+                if p.0 > 110 && p.1 < 60 && p.2 < 60 && abs(p.1 - p.2) < 25 { red += 1 }   // red disc (G ≈ B ≈ 28); dark wood has G ≈ 80 > B
                 if p.0 > 195 && p.0 < 245 && p.1 > 175 && p.1 < 230 && p.2 > 140 && p.2 < 200 { cream += 1 }
             } }
             var v = 0
@@ -75,7 +75,7 @@ enum PlatoBoardReader {
             if v != 0 { pieces += 1 }
             if v == 6 { wk += 1 } else if v == 12 { bk += 1 }
         } }
-        if wk == 1 && bk == 1 && reds == 0 {
+        if wk == 1 && bk == 1 && reds < 2 {
             // your colour: the knight icon next to your avatar is white or black
             var hi = 0, n = 0
             for yy in stride(from: 285, to: 335, by: 2) { for xx in stride(from: 630, to: 680, by: 2) {
