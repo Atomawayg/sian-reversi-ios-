@@ -25,7 +25,9 @@ jobs:
           cp App/Resources/hos-tb.bin .
           swift --version
       - name: Build
-        run: swift build -c release --package-path Tools/Arena 2>&1 | grep -E "error|warning: unre|Compiling|Build" | head -50
+        run: |
+          set -o pipefail
+          swift build -c release --package-path Tools/Arena 2>&1 | grep -vE "^\[[0-9]+/[0-9]+\]" | tail -60
       - name: Play
         run: |
           B=$(swift build -c release --package-path Tools/Arena --show-bin-path)/Arena
