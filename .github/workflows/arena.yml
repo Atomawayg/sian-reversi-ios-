@@ -1,0 +1,36 @@
+name: Arena
+# Engine-vs-engine matches on Linux (Swift is preinstalled on the runner).
+# Results appear as notices on the run (readable from the public checks API).
+on:
+  push:
+    branches: ['arena/**']
+permissions:
+  contents: read
+env:
+  BASE: b1e988f   # baseline engines: the app as of 2026-10-23 morning
+jobs:
+  arena:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Gather engines
+        run: |
+          S=Tools/Arena/Sources/Arena
+          cp App/CheckersEngine.swift App/Engine.swift App/ConnectEngine.swift App/BoardRules.swift $S/
+          git show $BASE:App/CheckersEngine.swift | sed -E 's/\bCheckers(Engine|Move|Result)\b/Checkers\1V0/g' > $S/CheckersEngineV0.swift
+          git show $BASE:App/Engine.swift | sed -E 's/\b(Engine|ThinkResult)\b/\1V0/g' > $S/EngineV0.swift
+          git show $BASE:App/ConnectEngine.swift | sed -E 's/\bConnect(Engine|Result)\b/Connect\1V0/g' > $S/ConnectEngineV0.swift
+          cp App/Resources/hos-tb.bin .
+          swift --version
+      - name: Build
+        run: swift build -c release --package-path Tools/Arena 2>&1 | grep -E "error|warning: unre|Compiling|Build" | head -50
+      - name: Play
+        run: |
+          B=$(swift build -c release --package-path Tools/Arena --show-bin-path)/Arena
+          while read -r g n t; do
+            [ -z "$g" ] && continue
+            $B $g $n $t | tee -a results.txt
+            echo "::notice title=arena::$(tail -1 results.txt)"
+          done < Tools/Arena/matches.txt
