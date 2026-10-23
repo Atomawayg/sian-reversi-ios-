@@ -1,0 +1,22 @@
+name: PlatoTest
+on:
+  push:
+    branches: ['platotest/**']
+permissions:
+  contents: read
+jobs:
+  platotest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          S=Tools/PlatoTest/Sources/PlatoTest
+          cp App/ChessEngine.swift App/DraughtsEngine.swift Broadcast/PlatoBoardReader.swift Broadcast/PlatoChessData.swift Shared/BoardMessage.swift $S/
+          swift build -c release --package-path Tools/PlatoTest 2>&1 | grep -vE "^\[[0-9]+/[0-9]+\]" | tail -40
+      - name: Run
+        run: |
+          B=$(swift build -c release --package-path Tools/PlatoTest --show-bin-path)/PlatoTest
+          $B all | tee out.txt
+          while read -r l; do echo "::notice title=plato::$l"; done < out.txt
