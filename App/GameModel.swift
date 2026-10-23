@@ -391,12 +391,20 @@ final class GameModel: ObservableObject {
 
     // MARK: Plato checkers (English rules)
     private let draughts = DraughtsEngine()
+    private var dMine = 0          // your colour this game: 1 red, 2 white
 
     private func handleDraughts(_ m: BoardMessage) {
-        // your colour: the one sitting lower on the screen
-        var rowSum = [0.0, 0.0, 0.0], n = [0.0, 0.0, 0.0]
-        for i in 0..<64 where m.cells[i] != 0 { let c = (m.cells[i] - 1) % 2 + 1; rowSum[c] += Double(i / 8); n[c] += 1 }
-        let mine = (n[1] > 0 ? rowSum[1] / n[1] : 0) > (n[2] > 0 ? rowSum[2] / n[2] : 0) ? 1 : 2
+        // your colour: read from the captured-pieces trays; before anything is taken, the colour that
+        // started at the bottom (only trusted while most pieces are still on the board)
+        let count = m.cells.filter { $0 != 0 }.count
+        if m.me == 1 || m.me == 2 { dMine = m.me }
+        else if count >= 20 {
+            var rowSum = [0.0, 0.0, 0.0], n = [0.0, 0.0, 0.0]
+            for i in 0..<64 where m.cells[i] != 0 { let c = (m.cells[i] - 1) % 2 + 1; rowSum[c] += Double(i / 8); n[c] += 1 }
+            dMine = (n[1] > 0 ? rowSum[1] / n[1] : 0) > (n[2] > 0 ? rowSum[2] / n[2] : 0) ? 1 : 2
+        }
+        if dMine == 0 { dMine = 2 }
+        let mine = dMine
         var board = [Int](repeating: 0, count: 64)
         for i in 0..<64 where m.cells[i] != 0 {
             let c = (m.cells[i] - 1) % 2 + 1, king = m.cells[i] >= 3

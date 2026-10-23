@@ -86,7 +86,19 @@ enum PlatoBoardReader {
             return BoardMessage(valid: true, game: .chess, cells: chess, me: meWhite ? 1 : 2, myTurn: myTurn)
         }
         if reds + creams >= 2 {
-            return BoardMessage(valid: true, game: .draughts, cells: disc, me: 0, myTurn: myTurn)
+            // your colour: the tray above the board holds YOUR pieces the opponent took, the tray below theirs
+            func trayColour(_ y: Int) -> Int {
+                var red = 0, cream = 0, n = 0
+                for yy in stride(from: y - 10, to: y + 10, by: 2) { for xx in stride(from: 22, to: 42, by: 2) {
+                    let p = px(xx, yy); n += 1
+                    if p.0 > 110 && p.1 < 60 && p.2 < 60 { red += 1 }
+                    if p.0 > 180 && p.1 > 160 && p.2 > 130 { cream += 1 }
+                } }
+                return Double(red) > 0.3 * Double(n) ? 1 : (Double(cream) > 0.3 * Double(n) ? 2 : 0)
+            }
+            var me = trayColour(665)
+            if me == 0 { let below = trayColour(1965); if below != 0 { me = 3 - below } }
+            return BoardMessage(valid: true, game: .draughts, cells: disc, me: me, myTurn: myTurn)
         }
         return nil
     }
