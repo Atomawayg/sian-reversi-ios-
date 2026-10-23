@@ -45,7 +45,7 @@ enum DarwinBoard {
     static func names() -> [String] {
         var n: [String] = []
         for i in 0..<maxCells { for v in 0..<values { n.append(prefix + "c\(i)v\(v)") } }
-        for g in 0..<5 { n.append(prefix + "g\(g)") }
+        for g in 0..<7 { n.append(prefix + "g\(g)") }
         for v in 0..<5 { n.append(prefix + "me\(v)") }
         for v in 0..<16 { n.append(prefix + "ha\(v)"); n.append(prefix + "hb\(v)") }
         n += [prefix + "turn0", prefix + "turn1", prefix + "valid0", prefix + "valid1", prefix + "begin", prefix + "commit"]

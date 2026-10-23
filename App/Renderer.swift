@@ -90,7 +90,8 @@ enum Renderer {
         if let cells = o.cells, !cells.isEmpty {
             switch o.game {
             case .reversi: drawReversi(o, cells, CGRect(x: pad, y: pad, width: side, height: side))
-            case .checkers: drawCheckers(o, cells, CGRect(x: pad, y: pad, width: side, height: side))
+            case .checkers, .draughts: drawCheckers(o, cells, CGRect(x: pad, y: pad, width: side, height: side))
+            case .chess: drawChess(o, cells, CGRect(x: pad, y: pad, width: side, height: side))
             case .connect4, .connect5: drawConnect(o, cells, CGRect(x: pad, y: pad, width: side, height: side))
             case .jackaroo: break
             }
@@ -149,7 +150,9 @@ enum Renderer {
     private static func drawCheckers(_ o: Overlay, _ cells: [Int], _ r: CGRect) {
         let (cs, cell, box) = grid(r, cols: 8, rows: 8, inset: 4, gap: 0)
         UIColor(white: 0.97, alpha: 1).setFill(); UIBezierPath(roundedRect: box, cornerRadius: 8).fill()
-        let mineCol = o.meColor == 2 ? purple : red, oppCol = o.meColor == 2 ? red : purple
+        let cream = UIColor(red: 0.93, green: 0.89, blue: 0.80, alpha: 1)
+        let mineCol = o.meColor == 3 ? cream : (o.meColor == 2 ? purple : red)
+        let oppCol = o.meColor == 3 || o.meColor == 4 ? (o.meColor == 3 ? red : cream) : (o.meColor == 2 ? red : purple)
         for row in 0..<8 { for col in 0..<8 {
             let cr = cell(row, col)
             ((row + col) & 1 == 1 ? sqDark : sqLight).setFill(); UIRectFill(cr)
@@ -408,4 +411,32 @@ enum Renderer {
     static func image(_ o: Overlay) -> UIImage {
         UIGraphicsImageRenderer(size: size).image { _ in draw(o, in: CGRect(origin: .zero, size: size)) }
     }
+    // MARK: chess
+    private static func drawChess(_ o: Overlay, _ cells: [Int], _ r: CGRect) {
+        let (cs, cell, box) = grid(r, cols: 8, rows: 8, inset: 4, gap: 0)
+        UIColor(white: 0.97, alpha: 1).setFill(); UIBezierPath(roundedRect: box, cornerRadius: 8).fill()
+        let light = UIColor(red: 0.96, green: 0.88, blue: 0.74, alpha: 1), dark = UIColor(red: 0.62, green: 0.40, blue: 0.24, alpha: 1)
+        for row in 0..<8 { for col in 0..<8 { ((row + col) & 1 == 1 ? dark : light).setFill(); UIRectFill(cell(row, col)) } }
+        if o.path.count >= 2 {
+            gold.withAlphaComponent(0.6).setFill(); UIRectFill(cell(o.path[0] / 8, o.path[0] % 8))
+            gold.withAlphaComponent(0.35).setFill(); UIRectFill(cell(o.path[1] / 8, o.path[1] % 8))
+        }
+        let solid = ["", "♟", "♞", "♝", "♜", "♛", "♚"]
+        for i in 0..<64 where cells[i] > 0 && cells[i] <= 12 {
+            let white = cells[i] <= 6, t = solid[white ? cells[i] : cells[i] - 6] as NSString
+            let a: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: cs * 0.82),
+                                                     .foregroundColor: white ? UIColor.white : UIColor(white: 0.08, alpha: 1),
+                                                     .strokeColor: white ? UIColor(white: 0.15, alpha: 1) : UIColor(white: 0.7, alpha: 1), .strokeWidth: -2.5]
+            let cr = cell(i / 8, i % 8), sz = t.size(withAttributes: a)
+            t.draw(at: CGPoint(x: cr.midX - sz.width / 2, y: cr.midY - sz.height / 2), withAttributes: a)
+        }
+        if o.path.count >= 2 {
+            let a = cell(o.path[0] / 8, o.path[0] % 8), b2 = cell(o.path[1] / 8, o.path[1] % 8)
+            let p = UIBezierPath(); p.move(to: CGPoint(x: a.midX, y: a.midY)); p.addLine(to: CGPoint(x: b2.midX, y: b2.midY))
+            p.lineWidth = 7; p.lineCapStyle = .round; arrow.withAlphaComponent(0.9).setStroke(); p.stroke()
+            arrow.setFill(); UIBezierPath(ovalIn: CGRect(x: b2.midX - cs * 0.2, y: b2.midY - cs * 0.2, width: cs * 0.4, height: cs * 0.4)).fill()
+            ring(a, cs)
+        }
+    }
+
 }

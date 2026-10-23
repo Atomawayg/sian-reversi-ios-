@@ -134,6 +134,8 @@ final class GameModel: ObservableObject {
         case .checkers: handleCheckers(m); return
         case .connect4, .connect5: handleConnect(m); return
         case .jackaroo: handleJackaroo(m); return
+        case .chess: handleChess(m); return
+        case .draughts: handleDraughts(m); return
         case .reversi: break
         }
         let rv = rvTrack.check(m.cells) { b, p in ReversiRules.successors(b, colour: p + 1) }
@@ -323,6 +325,108 @@ final class GameModel: ObservableObject {
                 else { let s = res.score; verdict = s > 60 ? "ได้เปรียบ" : (s < -60 ? "เสียเปรียบ" : "สูสี") }
                 let line = verdict + (res.depth > 0 && res.depth < 99 ? " · ลึก \(res.depth)" : (res.depth == 99 ? " · สมบูรณ์แบบ" : "")) + (m.me == 3 ? "\nเริ่มกลางเกม อาจไม่แม่น" : "")
                 self.show(Overlay(game: m.game, cells: draw, rec: res.best, title: "ช่อง \(res.best + 1)", line: line, mine: true, meColor: colourForPiP))
+            }
+        }
+    }
+
+    // MARK: Plato chess
+    private let chess = ChessEngine()
+    private var chPrev: [Int]? = nil          // last board, standard order a8…h1
+    private var chCastle = 15
+    private static let chStart = [10, 8, 9, 11, 12, 9, 8, 10] + [Int](repeating: 7, count: 8) + [Int](repeating: 0, count: 32)
+        + [Int](repeating: 1, count: 8) + [4, 2, 3, 5, 6, 3, 2, 4]
+    private static let glyph = ["", "♙", "♘", "♗", "♖", "♕", "♔", "♟", "♞", "♝", "♜", "♛", "♚"]
+
+    static func sqName(_ i: Int) -> String { "\(Array("abcdefgh")[i % 8])\(8 - i / 8)" }
+
+    private func handleChess(_ m: BoardMessage) {
+        let meWhite = m.me != 2
+        let std = meWhite ? m.cells : Array(m.cells.reversed())          // screen → a8…h1
+        // castling rights: lost for good once a king or rook leaves its home square (reset on a new game)
+        if std == GameModel.chStart { chCastle = 15 }
+        if std[60] != 6 { chCastle &= ~3 }; if std[63] != 4 { chCastle &= ~1 }; if std[56] != 4 { chCastle &= ~2 }
+        if std[4] != 12 { chCastle &= ~12 }; if std[7] != 10 { chCastle &= ~4 }; if std[0] != 10 { chCastle &= ~8 }
+        // en passant: the opponent's pawn just made a double step
+        var ep = -1
+        if let p = chPrev, p != std {
+            for f in 0..<8 {
+                if meWhite, p[8 + f] == 7, std[8 + f] == 0, p[24 + f] == 0, std[24 + f] == 7 { ep = 16 + f }
+                if !meWhite, p[48 + f] == 1, std[48 + f] == 0, p[32 + f] == 0, std[32 + f] == 1 { ep = 40 + f }
+            }
+        }
+        if chPrev != std { chPrev = std }
+        let meC = meWhite ? 1 : 2
+        guard m.myTurn else {
+            computedFor = []; gen += 1
+            show(Overlay(game: .chess, cells: m.cells, title: "รอ…", line: "ตาคู่แข่ง", meColor: meC)); return
+        }
+        let key = [600 + meC] + std
+        if key == computedFor { return }
+        computedFor = key; gen += 1
+        let g = gen, ms = max(thinkMs, 3000), castle = chCastle
+        show(Overlay(game: .chess, cells: m.cells, title: "คิด…", line: "ตาคุณ · AI กำลังคิด", mine: true, meColor: meC))
+        work.async { [weak self] in
+            guard let self else { return }
+            self.chess.setPosition(std, whiteToMove: meWhite, castling: castle, epSquare: ep)
+            let r = self.chess.think(ms: ms)
+            DispatchQueue.main.async {
+                guard g == self.gen else { return }
+                guard let mv = r.best else {
+                    let st = self.chess.status()
+                    self.show(Overlay(game: .chess, cells: m.cells, title: "—", line: st.check ? "รุกจน" : "ไม่มีตาเดิน", mine: true, meColor: meC)); return
+                }
+                let toScreen = { (i: Int) in meWhite ? i : 63 - i }
+                let piece = std[mv.from]
+                var title = "\(GameModel.glyph[piece]) \(GameModel.sqName(mv.from))→\(GameModel.sqName(mv.to))"
+                if mv.promo > 0 { title += "=" + GameModel.glyph[mv.promo + (meWhite ? 0 : 6)] }
+                var verdict: String
+                if let mt = r.mateIn { verdict = mt > 0 ? "รุกจนใน \(mt)" : "โดนรุกจนใน \(-mt)" }
+                else { let s = r.score; verdict = s >= 300 ? "ได้เปรียบมาก" : s >= 80 ? "ได้เปรียบ" : s > -80 ? "สูสี" : s > -300 ? "เสียเปรียบ" : "เสียเปรียบมาก" }
+                if std[mv.to] != 0 { verdict = "กิน · " + verdict }
+                let line = verdict + (r.depth > 0 ? " · ลึก \(r.depth)" : "")
+                self.show(Overlay(game: .chess, cells: m.cells, path: [toScreen(mv.from), toScreen(mv.to)], title: title, line: line, mine: true, meColor: meC))
+            }
+        }
+    }
+
+    // MARK: Plato checkers (English rules)
+    private let draughts = DraughtsEngine()
+
+    private func handleDraughts(_ m: BoardMessage) {
+        // your colour: the one sitting lower on the screen
+        var rowSum = [0.0, 0.0, 0.0], n = [0.0, 0.0, 0.0]
+        for i in 0..<64 where m.cells[i] != 0 { let c = (m.cells[i] - 1) % 2 + 1; rowSum[c] += Double(i / 8); n[c] += 1 }
+        let mine = (n[1] > 0 ? rowSum[1] / n[1] : 0) > (n[2] > 0 ? rowSum[2] / n[2] : 0) ? 1 : 2
+        var board = [Int](repeating: 0, count: 64)
+        for i in 0..<64 where m.cells[i] != 0 {
+            let c = (m.cells[i] - 1) % 2 + 1, king = m.cells[i] >= 3
+            board[i] = (c == mine ? 1 : -1) * (king ? 2 : 1)
+        }
+        let draw = board.map { $0 == 1 ? 1 : ($0 == 2 ? 2 : ($0 == -1 ? 3 : ($0 == -2 ? 4 : 0))) }
+        let meC = mine == 2 ? 3 : 4        // drawing colours: 3 = you cream / opponent red, 4 = you red / opponent cream
+        guard m.myTurn else {
+            computedFor = []; gen += 1
+            show(Overlay(game: .draughts, cells: draw, title: "รอ…", line: "ตาคู่แข่ง", meColor: meC)); return
+        }
+        let key = [700] + board
+        if key == computedFor { return }
+        computedFor = key; gen += 1
+        let g = gen, ms = max(thinkMs, 2000)
+        show(Overlay(game: .draughts, cells: draw, title: "คิด…", line: "ตาคุณ · AI กำลังคิด", mine: true, meColor: meC))
+        work.async { [weak self] in
+            guard let self else { return }
+            self.draughts.set(board)
+            let r = self.draughts.think(ms: ms)
+            DispatchQueue.main.async {
+                guard g == self.gen else { return }
+                guard let mv = r.best else { self.show(Overlay(game: .draughts, cells: draw, title: "—", line: "ไม่มีตาเดิน", mine: true, meColor: meC)); return }
+                let W = DraughtsEngine.WIN
+                var verdict: String
+                if r.score > W - 1000 { verdict = "ชนะแน่" } else if r.score < -(W - 1000) { verdict = "แพ้ถ้าเขาเล่นถูก" }
+                else { let s = r.score; verdict = s >= 150 ? "ได้เปรียบมาก" : s >= 50 ? "ได้เปรียบ" : s > -50 ? "สูสี" : s > -150 ? "เสียเปรียบ" : "เสียเปรียบมาก" }
+                let what = mv.caps.isEmpty ? "เดิน" : "กิน \(mv.caps.count) ตัว"
+                let title = "\(GameModel.ckName(mv.path[0]))→\(GameModel.ckName(mv.path[mv.path.count - 1]))"
+                self.show(Overlay(game: .draughts, cells: draw, path: mv.path, caps: mv.caps, title: title, line: "\(what) · \(verdict) · ลึก \(r.depth)", mine: true, meColor: meC))
             }
         }
     }
