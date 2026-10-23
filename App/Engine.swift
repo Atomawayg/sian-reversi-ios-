@@ -328,6 +328,26 @@ final class Engine {
             }
             if !aborted {
                 res.best = bestM; res.score = bestV; res.exact = true; res.scores = scores; res.depth = empties
+                // equally good moves: choose the one where the opponent has the most ways to go wrong
+                let ties = ordered.filter { scores[$0] == bestV }
+                if ties.count > 1 && empties <= 13 {
+                    var bestTraps = -1
+                    for mv in ties {
+                        let n = make(mv, me, opp)
+                        var vals: [Int] = []
+                        for r in rootMoves(opp, me) {
+                            let n2 = make(r, opp, me)
+                            vals.append(solve(-64, 64, me, opp, false, empties - 2))   // my result after their reply
+                            unmake(r, n2, opp, me)
+                            if aborted { break }
+                        }
+                        unmake(mv, n, me, opp)
+                        if aborted { break }
+                        let traps = vals.filter { $0 > bestV }.count   // replies that hand me more than I'm owed
+                        if traps > bestTraps { bestTraps = traps; res.best = mv }
+                    }
+                    if aborted { res.best = bestM }
+                }
                 return res
             }
         }
@@ -336,7 +356,9 @@ final class Engine {
         for k in 0..<100 { killer[k] = 0 }
         var order = moves
         var depth = 1
+        var lastIter = 0.0
         while depth <= 60 {
+            let itStart = Double(now() - start) / 1_000_000
             var alpha = Int.min / 2
             let beta = Int.max / 2
             var bm = order[0], bs = Int.min / 2
@@ -362,7 +384,11 @@ final class Engine {
             res.best = bm; res.score = bs; res.depth = depth
             order.removeAll { $0 == bm }; order.insert(bm, at: 0)
             if abs(bs) >= 19000 || depth >= empties { break }
-            if Double(now() - start) / 1_000_000 > Double(timeMs) * 0.55 { break }
+            // start another iteration only if it is likely to finish (the old rule quit at 55% of the time)
+            let el = Double(now() - start) / 1_000_000, it = el - itStart
+            let growth = lastIter > 0.5 ? min(8, max(1.5, it / lastIter)) : 3
+            if el + it * growth > Double(timeMs) * 0.95 { break }
+            lastIter = it
             depth += 1
         }
         return res

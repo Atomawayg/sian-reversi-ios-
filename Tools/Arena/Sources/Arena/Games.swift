@@ -62,6 +62,37 @@ func cnGame(_ first: CnPlayer, _ second: CnPlayer, cols: Int, rows: Int, K: Int,
     return 0
 }
 
+// MARK: reversi
+protocol ReversiLike: AnyObject { func bestSquare(_ cells: [Int], me: Int, ms: Int) -> Int }   // -1 = pass
+private func padded(_ cells: [Int]) -> [Int8] {
+    var b = [Int8](repeating: 3, count: 100)
+    for r in 0..<8 { for c in 0..<8 { b[(r + 1) * 10 + c + 1] = Int8(cells[r * 8 + c]) } }
+    return b
+}
+private func unpad(_ i: Int) -> Int { i > 0 ? (i / 10 - 1) * 8 + (i % 10 - 1) : -1 }
+extension Engine: ReversiLike {
+    func bestSquare(_ cells: [Int], me: Int, ms: Int) -> Int { unpad(think(padded(cells), me: Int8(me), timeMs: ms, exactMs: ms * 2).best) }
+}
+extension EngineV0: ReversiLike {
+    func bestSquare(_ cells: [Int], me: Int, ms: Int) -> Int { unpad(think(padded(cells), me: Int8(me), timeMs: ms, exactMs: ms * 2).best) }
+}
+
+/// +1 black(first) wins, -1 white, 0 draw
+func rvGame(_ black: ReversiLike, _ white: ReversiLike, opening: [Int], ms: Int) -> Int {
+    var b = opening, turn = 1, passes = 0
+    while passes < 2 {
+        let succ = ReversiRules.successors(b, colour: turn)
+        if succ.isEmpty { passes += 1; turn = 3 - turn; continue }
+        passes = 0
+        let sq = (turn == 1 ? black : white).bestSquare(b, me: turn, ms: ms)
+        var next = succ[0]
+        if sq >= 0 { if let n = succ.first(where: { $0[sq] == turn && b[sq] == 0 }) { next = n } }
+        b = next; turn = 3 - turn
+    }
+    let d = b.filter { $0 == 1 }.count - b.filter { $0 == 2 }.count
+    return d > 0 ? 1 : (d < 0 ? -1 : 0)
+}
+
 func extraGames(_ game: String, pairs: Int, ms: Int, result: inout (a: Int, b: Int, d: Int)) {
     switch game {
     case "connect4", "connect5":
@@ -72,6 +103,21 @@ func extraGames(_ game: String, pairs: Int, ms: Int, result: inout (a: Int, b: I
             let a = makeCnA(ms), b = makeCnB(ms)
             let g1 = cnGame(a, b, cols: cols, rows: rows, K: K, opening: open)
             let g2 = cnGame(b, a, cols: cols, rows: rows, K: K, opening: open)
+            return (g1 == 1 ? .a : (g1 == -1 ? .b : .draw), g2 == -1 ? .a : (g2 == 1 ? .b : .draw))
+        }
+    case "reversi":
+        result = runPairs(pairs) { i in
+            var rng = Rng(s: 0xA0761D6478BD642F &+ UInt64(i) &* 0xE7037ED1A0B428DB)
+            var b = [Int](repeating: 0, count: 64)
+            b[27] = 2; b[36] = 2; b[28] = 1; b[35] = 1
+            var turn = 1
+            for _ in 0..<(4 + 2 * rng.int(3)) {
+                let s = ReversiRules.successors(b, colour: turn); if s.isEmpty { break }
+                b = s[rng.int(s.count)]; turn = 3 - turn
+            }
+            if turn != 1 { let s = ReversiRules.successors(b, colour: 2); if !s.isEmpty { b = s[rng.int(s.count)] } }
+            let a = Engine(), o = EngineV0()
+            let g1 = rvGame(a, o, opening: b, ms: ms), g2 = rvGame(o, a, opening: b, ms: ms)
             return (g1 == 1 ? .a : (g1 == -1 ? .b : .draw), g2 == -1 ? .a : (g2 == 1 ? .b : .draw))
         }
     default:
