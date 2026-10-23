@@ -256,23 +256,31 @@ enum BoardReader {
         guard dist(opp, mine) > 20 else { return bad }   // badges hidden (banner) or identical
         var cells = [Int](repeating: 0, count: cols * rows)
         var nMine = 0, nOpp = 0
+        // First pass: brightness and texture of every hole. Then a hole holds a piece only if it is textured
+        // AND clearly brighter/darker than a typical hole on this board. Measured: flat theme holes spread 0,
+        // dark gold theme holes show the background through (spread up to 16, mean 1–10); pieces spread ≥ 24
+        // and differ from the typical hole by ≥ 54.
+        var patches: [[Double]] = [], means: [Double] = [], spreads: [Double] = []
         for r in 0..<rows { for c in 0..<cols {
             let P = patch((25.5 + pitch * (Double(c) + 0.5)) * sx, (top + pitch * (Double(r) + 0.5)) * sy, pitch * 0.36 * sx)
-            // An empty hole is flat (brightness spread ≈ 0 on real frames); every piece skin has a picture
-            // on it (spread ≥ 24). So texture says "is there a piece", the nearer badge says whose it is.
-            // (The old fixed badge-distance limit missed pieces whose board art differs from the badge.)
             var sum = 0.0, sq = 0.0, n = 0.0
             var i = 0
             while i + 2 < P.count { let L = (P[i] + P[i + 1] + P[i + 2]) / 3; sum += L; sq += L * L; n += 1; i += 3 }
-            let mean = sum / max(1, n), spread = (max(0, sq / max(1, n) - mean * mean)).squareRoot()
+            let mean = sum / max(1, n)
+            patches.append(P); means.append(mean); spreads.append((max(0, sq / max(1, n) - mean * mean)).squareRoot())
+        } }
+        // the typical empty hole: median brightness of the low-texture holes (a full board has few of them)
+        let flat = (0..<means.count).filter { spreads[$0] <= 20 }.map { means[$0] }.sorted()
+        let typical: Double? = flat.isEmpty ? nil : flat[flat.count / 2]
+        for k in 0..<patches.count {
             var v = 0
-            if spread > 10 {
-                let dm = dist(P, mine), dop = dist(P, opp)
+            if spreads[k] > 20 && (typical.map { abs(means[k] - $0) > 30 } ?? true) {
+                let dm = dist(patches[k], mine), dop = dist(patches[k], opp)
                 if min(dm, dop) > max(dm, dop) * 0.8 { return bad }   // looks like neither badge: mid-animation
                 if dm < dop { v = 1; nMine += 1 } else { v = 2; nOpp += 1 }
             }
-            cells[r * cols + c] = v
-        } }
+            cells[k] = v
+        }
         // sanity: pieces sit on top of each other (no floating ones), counts differ by at most one
         for c in 0..<cols { for r in 0..<(rows - 1) where cells[r * cols + c] != 0 && cells[(r + 1) * cols + c] == 0 { return bad } }
         if abs(nMine - nOpp) > 1 { return bad }
