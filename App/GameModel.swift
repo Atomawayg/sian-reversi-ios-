@@ -134,7 +134,6 @@ final class GameModel: ObservableObject {
         case .checkers: handleCheckers(m); return
         case .connect4, .connect5: handleConnect(m); return
         case .jackaroo: handleJackaroo(m); return
-        case .pool: handlePool(m); return
         case .reversi: break
         }
         let rv = rvTrack.check(m.cells) { b, p in ReversiRules.successors(b, colour: p + 1) }
@@ -326,73 +325,6 @@ final class GameModel: ObservableObject {
                 self.show(Overlay(game: m.game, cells: draw, rec: res.best, title: "ช่อง \(res.best + 1)", line: line, mine: true, meColor: colourForPiP))
             }
         }
-    }
-
-    // MARK: Pool
-    private var poolBalls: [PoolEngine.Ball] = []      // last cleanly read table
-    private var poolKey: [Int] = []
-    private var poolShot: PoolEngine.Shot? = nil
-    private var poolNote = ""
-
-    private func handlePool(_ m: BoardMessage) {
-        let c = m.cells
-        let clean = c[PoolCodec.flags] & 1 == 1, hasAim = c[PoolCodec.flags] & 2 == 2
-        if clean {
-            var bs: [PoolEngine.Ball] = []
-            for id in 0...15 where c[PoolCodec.balls + 7 * id] == 1 {
-                let p = PoolCodec.get(c, PoolCodec.balls + 7 * id + 1)
-                bs.append(PoolEngine.Ball(id: id, x: p.x, y: p.y))
-            }
-            // balls don't vanish while nothing moves: if this reading is the old one minus a ball or two
-            // (the cue stick lying over them while you aim), keep the fuller old one
-            let same = bs.allSatisfy { b in poolBalls.contains { $0.id == b.id && abs($0.x - b.x) < 4 && abs($0.y - b.y) < 4 } }
-            if !(m.myTurn && same && bs.count < poolBalls.count) { poolBalls = bs }
-        }
-        let balls = poolBalls
-        let aim = hasAim ? PoolCodec.get(c, PoolCodec.aim) : nil
-        func view(_ shot: PoolEngine.Shot?) -> PoolView { PoolView(balls: balls, shot: shot, aimX: aim?.x, aimY: aim?.y) }
-        guard !balls.isEmpty else {
-            computedFor = []; poolShot = nil
-            show(Overlay(game: .pool, title: "⋯", line: "กำลังอ่านโต๊ะ")); return
-        }
-        guard m.myTurn else {
-            computedFor = []; poolShot = nil; poolKey = []
-            var o = Overlay(game: .pool, title: "รอ…", line: "ตาคู่แข่ง"); o.pool = view(nil); show(o); return
-        }
-        let legal = PoolEngine.legal(group: m.me)
-        let key = balls.flatMap { [$0.id, Int($0.x), Int($0.y)] } + [m.me]
-        if key != poolKey {
-            poolKey = key; poolShot = nil; poolNote = ""
-            let cue = balls.first { $0.id == 0 }
-            let others = balls.filter { $0.id != 0 }
-            if PoolEngine.isBreak(others) {
-                poolNote = "break"
-            } else if let cue {
-                poolShot = PoolEngine.shots(cueX: cue.x, cueY: cue.y, balls: others, legal: legal).first
-                if poolShot == nil, let sb = PoolEngine.safety(cueX: cue.x, cueY: cue.y, balls: others, legal: legal) {
-                    poolNote = "ไม่มีลูกลงตรงๆ · แตะลูก \(sb.id) ให้โดนก่อน (เล่นเซฟ)"
-                }
-            } else {
-                poolShot = PoolEngine.bestPlacement(balls: others, legal: legal)   // ball in hand
-            }
-        }
-        let groupName = ["โต๊ะเปิด", "ลูกเต็ม", "ลูกลาย", "ลูก 8"][max(0, min(3, m.me))]
-        var o: Overlay
-        if poolNote == "break" {
-            o = Overlay(game: .pool, title: "เบรก", line: "ยิงตรงกลางลูกหน้าสุด แรงสุด", mine: true)
-        } else if let s = poolShot {
-            var line = "ตัด \(Int(s.cut.rounded()))° · แรง\(s.power)" + (s.scratch ? " · ระวังลูกขาวตก" : "")
-            if s.placed { line = "วางลูกขาวตรงจุดเหลือง · " + line }
-            else if let a = aim {
-                let e = PoolEngine.aimError(s, aimX: a.x, aimY: a.y)
-                if e.ok { line = "✓ เล็งตรงแล้ว ยิงได้ · แรง\(s.power)" }
-                else { line = (e.turn > 0 ? "↻ หมุนตามเข็ม " : "↺ หมุนทวนเข็ม ") + String(format: "%.1f°", abs(e.turn)) + " · " + line }
-            }
-            o = Overlay(game: .pool, title: "ลูก \(s.ball) → \(PoolEngine.pockets[s.pocket].name)", line: line, mine: true)
-        } else {
-            o = Overlay(game: .pool, title: "เซฟ", line: poolNote.isEmpty ? "ไม่เจอช็อตลง · \(groupName)" : poolNote, mine: true)
-        }
-        o.pool = view(poolShot); show(o)
     }
 
     // MARK: Jackaroo

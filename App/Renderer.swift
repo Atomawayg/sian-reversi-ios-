@@ -2,14 +2,6 @@ import UIKit
 import CoreVideo
 
 /// What the floating window shows.
-/// Pool drawing data.
-struct PoolView: Equatable {
-    var balls: [PoolEngine.Ball]
-    var shot: PoolEngine.Shot?
-    var aimX: Double?
-    var aimY: Double?
-}
-
 struct Overlay: Equatable {
     var game: GameKind = .reversi
     /// board cells (row-major from top-left) or nil.
@@ -34,7 +26,6 @@ struct Overlay: Equatable {
     var swap = false             // J: the two marked stones trade places
     var stage = 0                // 1 = tap the card, 2 = card confirmed, tap the stone
     var action = ""              // one word: เดิน 7, ออกลูก, สลับ…
-    var pool: PoolView? = nil    // pool: table, suggested shot, your current aim
 
     init(game: GameKind = .reversi, cells: [Int]? = nil, rec: Int? = nil, path: [Int] = [], caps: [Int] = [],
          title: String, line: String, mine: Bool = false, meColor: Int = 1) {
@@ -96,16 +87,12 @@ enum Renderer {
             drawJackaroo(o, cells, rect)
             return
         }
-        if o.game == .pool, let pv = o.pool {
-            let h = rect.height - pad * 2
-            drawPool(pv, CGRect(x: pad, y: pad, width: h / 2, height: h))
-            textX = pad + h / 2 + 24
-        } else if let cells = o.cells, !cells.isEmpty {
+        if let cells = o.cells, !cells.isEmpty {
             switch o.game {
             case .reversi: drawReversi(o, cells, CGRect(x: pad, y: pad, width: side, height: side))
             case .checkers: drawCheckers(o, cells, CGRect(x: pad, y: pad, width: side, height: side))
             case .connect4, .connect5: drawConnect(o, cells, CGRect(x: pad, y: pad, width: side, height: side))
-            case .jackaroo, .pool: break
+            case .jackaroo: break
             }
             textX = pad + side + 24
         }
@@ -421,54 +408,4 @@ enum Renderer {
     static func image(_ o: Overlay) -> UIImage {
         UIGraphicsImageRenderer(size: size).image { _ in draw(o, in: CGRect(origin: .zero, size: size)) }
     }
-    // MARK: pool
-    private static let poolColours: [UIColor] = [
-        .white, UIColor(red: 0.98, green: 0.80, blue: 0.10, alpha: 1), UIColor(red: 0.10, green: 0.35, blue: 0.95, alpha: 1),
-        UIColor(red: 0.92, green: 0.15, blue: 0.15, alpha: 1), UIColor(red: 0.45, green: 0.15, blue: 0.65, alpha: 1),
-        UIColor(red: 1.0, green: 0.50, blue: 0.10, alpha: 1), UIColor(red: 0.10, green: 0.65, blue: 0.20, alpha: 1),
-        UIColor(red: 0.50, green: 0.12, blue: 0.10, alpha: 1), .black]
-
-    private static func drawPool(_ v: PoolView, _ r: CGRect) {
-        // playing surface 759 × 1551 px on screen → fit the rect
-        let sc = min(r.width / 759, r.height / 1551)
-        let w = 759 * sc, h = 1551 * sc
-        let box = CGRect(x: r.midX - w / 2, y: r.midY - h / 2, width: w, height: h)
-        func pt(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: box.minX + CGFloat(x - 207.5) * sc, y: box.minY + CGFloat(y - 584) * sc) }
-        UIColor(red: 0.36, green: 0.22, blue: 0.12, alpha: 1).setFill(); UIBezierPath(roundedRect: box.insetBy(dx: -6, dy: -6), cornerRadius: 6).fill()
-        UIColor(red: 0.13, green: 0.47, blue: 0.68, alpha: 1).setFill(); UIRectFill(box)
-        UIColor.black.setFill()
-        for p in PoolEngine.pockets { let c = pt(p.x, p.y); UIBezierPath(ovalIn: CGRect(x: c.x - 7, y: c.y - 7, width: 14, height: 14)).fill() }
-        let br = CGFloat(23.5) * sc
-        if let s = v.shot {
-            let cue = pt(s.cueX, s.cueY), g = pt(s.ghostX, s.ghostY)
-            let p = PoolEngine.pockets[s.pocket], pp = pt(p.x, p.y)
-            if let b = v.balls.first(where: { $0.id == s.ball }) {
-                let t = pt(b.x, b.y)
-                let l2 = UIBezierPath(); l2.move(to: t); l2.addLine(to: pp); l2.lineWidth = 3; arrow.setStroke(); l2.stroke()
-            }
-            let l1 = UIBezierPath(); l1.move(to: cue); l1.addLine(to: g); l1.lineWidth = 3; gold.setStroke(); l1.stroke()
-            let gr = UIBezierPath(ovalIn: CGRect(x: g.x - br, y: g.y - br, width: br * 2, height: br * 2)); gr.lineWidth = 2.5; gr.stroke()
-            if s.placed {   // where to put the cue ball
-                gold.withAlphaComponent(0.6).setFill(); UIBezierPath(ovalIn: CGRect(x: cue.x - br * 1.6, y: cue.y - br * 1.6, width: br * 3.2, height: br * 3.2)).fill()
-            }
-        }
-        for b in v.balls {
-            let c = pt(b.x, b.y), rr = CGRect(x: c.x - br, y: c.y - br, width: br * 2, height: br * 2)
-            poolColours[b.id == 0 ? 0 : (b.id == 8 ? 8 : (b.id - 1) % 8 + 1)].setFill()
-            UIBezierPath(ovalIn: rr).fill()
-            if b.id >= 9 {   // stripe: white caps
-                UIColor.white.setFill()
-                UIBezierPath(ovalIn: rr).addClip()
-                UIRectFill(CGRect(x: rr.minX, y: rr.minY, width: rr.width, height: rr.height * 0.28))
-                UIRectFill(CGRect(x: rr.minX, y: rr.maxY - rr.height * 0.28, width: rr.width, height: rr.height * 0.28))
-                UIGraphicsGetCurrentContext()?.resetClip()
-            }
-            if let s = v.shot, s.ball == b.id { gold.setStroke(); let o = UIBezierPath(ovalIn: rr.insetBy(dx: -2, dy: -2)); o.lineWidth = 2; o.stroke() }
-        }
-        if let ax = v.aimX, let ay = v.aimY {   // where you are aiming now
-            let a = pt(ax, ay)
-            UIColor.white.setStroke(); let c = UIBezierPath(ovalIn: CGRect(x: a.x - br, y: a.y - br, width: br * 2, height: br * 2)); c.lineWidth = 2; c.stroke()
-        }
-    }
-
 }
