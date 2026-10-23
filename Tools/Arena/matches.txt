@@ -1,1 +1,2 @@
 checkers 160 100
+connect4 60 500

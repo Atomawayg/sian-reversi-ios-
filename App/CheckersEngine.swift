@@ -10,6 +10,7 @@ struct CheckersResult {
     var depth = 0
     var tb: Int? = nil
     var instant: String? = nil
+    var trap = 0   // replies that look fine to the opponent but lose
 }
 
 final class CheckersEngine {
@@ -436,11 +437,15 @@ final class CheckersEngine {
                 return res
             }
         }
-        deadline = t0 + UInt64(maxMs) * 1_000_000
+        // Main search gets ~80% of the time; the rest is for picking the most "tricky" of equally good moves.
+        let mainBudget = Double(maxMs) * (trapMode ? 0.8 : 0.95)
+        deadline = t0 + UInt64(mainBudget) * 1_000_000
         var list = root
         var stable = 0
         var prevBest = ""
+        var lastIter = 0.0
         for d in 1...64 {
+            let itStart = Double(now() - t0) / 1_000_000
             var alpha = -INF
             var cur: [(m: CheckersMove, score: Int)] = []
             for j in 0..<list.count {
@@ -459,7 +464,15 @@ final class CheckersEngine {
                 cur.append((x.m, s))
                 if s > alpha { alpha = s }
             }
-            if stop { break }
+            if stop {
+                // keep a partly finished iteration when a move already proved better than the old choice
+                if let top = cur.max(by: { $0.score < $1.score }), cur.count >= 1, top.score > (list.first?.score ?? -INF) || top.m.from == list[0].m.from && top.m.to == list[0].m.to {
+                    res.best = top.m; res.score = top.score; res.depth = d
+                    let done = Set(cur.map { "\($0.m.from)-\($0.m.to)-\($0.m.caps)" })
+                    list = cur.sorted { $0.score > $1.score } + list.filter { !done.contains("\($0.m.from)-\($0.m.to)-\($0.m.caps)") }
+                }
+                break
+            }
             cur.sort { $0.score > $1.score }
             list = cur
             res.best = list[0].m; res.score = list[0].score; res.depth = d
@@ -467,17 +480,65 @@ final class CheckersEngine {
             stable = key == prevBest ? stable + 1 : 0
             prevBest = key
             let el = Double(now() - t0) / 1_000_000
+            let iterMs = el - itStart
             if abs(list[0].score) > MATE - 1000 { break }
             if d >= 6 {
                 let second = list.count > 1 ? list[1].score : -INF
                 let margin = list[0].score - second
-                if stable >= 3 && margin >= 150 && el > Double(maxMs) * 0.12 { break }
-                if stable >= 5 && el > Double(maxMs) * 0.3 { break }
+                if stable >= 3 && margin >= 150 && el > mainBudget * 0.15 { break }
+                if stable >= 6 && el > mainBudget * 0.4 { break }
             }
-            if el > Double(maxMs) * 0.5 { break }
+            // don't start an iteration that can't finish (each one costs ~2–3× the previous)
+            let growth = lastIter > 0.5 ? min(6, max(1.5, iterMs / lastIter)) : 3
+            if el + iterMs * growth > mainBudget { break }
+            lastIter = iterMs
         }
         if res.best == nil { res.best = list[0].m }
+        if trapMode && abs(res.score) < MATE - 1000 && list.count > 1 && res.depth >= 4 {
+            deadline = t0 + UInt64(Double(maxMs) * 0.97) * 1_000_000
+            stop = false
+            if let t = pickTrap(list, side: side, depth: res.depth) { res.best = t.m; res.trap = t.traps }
+        }
         return res
+    }
+
+    /// Plays like a strong human: among moves within a hair of the best, prefer the one that leaves the
+    /// opponent the most replies that LOOK fine at a glance (2-ply) but actually lose material (deep).
+    var trapMode = true
+    private func pickTrap(_ list: [(m: CheckersMove, score: Int)], side: Int, depth: Int) -> (m: CheckersMove, traps: Int)? {
+        let best = list[0].score
+        let cands = list.prefix(4).filter { $0.score >= best - 12 }
+        if cands.count < 2 { return nil }
+        let deep = max(3, min(depth - 2, 9))
+        var counts: [(m: CheckersMove, traps: Int)] = []
+        for c in cands {
+            let i = findIndex(c.m); if i < 0 { continue }
+            make(i, 0)
+            let n = gen(-side, 1), base = CheckersEngine.MAXM
+            var replies: [(Int, UInt32, Int)] = []   // from, caps, to of each reply
+            for j in 0..<n { replies.append((MF[base + j], MC[base + j], MT[base + j])) }
+            var glance: [Int] = [], real: [Int] = []
+            for (f, cp, t) in replies {
+                var k = -1
+                let n2 = gen(-side, 1)
+                for j in 0..<n2 where MF[base + j] == f && MT[base + j] == t && MC[base + j] == cp { k = base + j; break }
+                if k < 0 { continue }
+                make(k, 1)
+                let g = negamax(side, 1, -INF, INF, 2)        // what the opponent sees at a glance (their loss = my gain)
+                let r = negamax(side, deep, -INF, INF, 2)     // what really happens
+                unmake(1)
+                if stop { unmake(0); return nil }
+                glance.append(-g); real.append(-r)
+            }
+            unmake(0)
+            guard let gBest = glance.max(), let rBest = real.max() else { continue }
+            var traps = 0
+            for q in 0..<glance.count where glance[q] >= gBest - 30 && real[q] <= rBest - 120 { traps += 1 }
+            counts.append((c.m, traps))
+        }
+        guard let top = counts.max(by: { $0.traps < $1.traps }), top.traps > 0 else { return nil }
+        let base = counts.first { $0.m.from == list[0].m.from && $0.m.to == list[0].m.to && $0.m.caps == list[0].m.caps }?.traps ?? 0
+        return top.traps > base ? top : nil
     }
 
     // MARK: full path of a move (for drawing), squares in 0..63

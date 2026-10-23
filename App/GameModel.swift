@@ -17,6 +17,7 @@ final class GameModel: ObservableObject {
     private let keepAlive = KeepAlive()
     private let engine = Engine()
     private let checkers = CheckersEngine()
+    private lazy var c4 = Connect4Solver()
     private var tbLoaded = false
     private let ckTrack = BoardTracker(), rvTrack = BoardTracker(), cnTrack = BoardTracker()
     private var suspectsPosted = 0
@@ -265,7 +266,7 @@ final class GameModel: ObservableObject {
                 else { let s = r.score; verdict = s >= 250 ? "ได้เปรียบมาก" : s >= 80 ? "ได้เปรียบ" : s > -80 ? "สูสี" : s > -250 ? "เสียเปรียบ" : "เสียเปรียบมาก" }
                 let what = best.caps != 0 ? "กิน \(caps.count) ตัว" : (best.promo ? "เดิน (เข้าฮอส)" : "เดิน")
                 let title = "\(GameModel.ckName(path[0]))→\(GameModel.ckName(path[path.count - 1]))"
-                let line = "\(what) · \(verdict)" + (r.depth > 0 && r.depth < 99 ? " · ลึก \(r.depth)" : "")
+                let line = "\(what) · \(verdict)" + (r.trap > 0 ? " · วางกับดัก" : "") + (r.depth > 0 && r.depth < 99 ? " · ลึก \(r.depth)" : "")
                 self.show(Overlay(game: .checkers, cells: draw, path: path, caps: caps, title: title, line: line, mine: true, meColor: meC))
             }
         }
@@ -302,12 +303,23 @@ final class GameModel: ObservableObject {
         let cells = m.cells
         work.async { [weak self] in
             guard let self else { return }
-            let e = ConnectEngine(W: cols, H: rows, K: K)
-            for c in 0..<cols {
-                var r = rows - 1
-                while r >= 0 { let v = cells[r * cols + c]; if v == 0 { break }; e.play(c, v == meC ? 1 : -1); r -= 1 }
+            var res = ConnectResult()
+            // 7×6 four-in-a-row: try to solve the position exactly first (perfect play from mid-game on)
+            var solved = false
+            if K == 4 && cols == 7 && rows == 6, let a = self.c4.best(cells: cells, ms: ms * 6 / 10) {
+                let WIN = ConnectEngine.WIN
+                res = ConnectResult(best: a.col, score: a.score > 0 ? WIN - 100 + a.score : (a.score < 0 ? -(WIN - 100) + a.score : 0),
+                                    depth: 99, exact: true, trap: 0)
+                solved = true
             }
-            let res = e.search(1, ms: ms)
+            if !solved {
+                let e = ConnectEngine(W: cols, H: rows, K: K)
+                for c in 0..<cols {
+                    var r = rows - 1
+                    while r >= 0 { let v = cells[r * cols + c]; if v == 0 { break }; e.play(c, v == meC ? 1 : -1); r -= 1 }
+                }
+                res = e.search(1, ms: K == 4 && cols == 7 ? ms * 4 / 10 : ms)
+            }
             DispatchQueue.main.async {
                 guard g == self.gen else { return }
                 guard res.best >= 0 else { self.show(Overlay(game: m.game, cells: draw, title: "—", line: "กระดานเต็ม", meColor: colourForPiP)); return }
@@ -315,8 +327,9 @@ final class GameModel: ObservableObject {
                 var verdict: String
                 if res.score > WIN - 1000 { verdict = "ชนะแน่" }
                 else if res.score < -(WIN - 1000) { verdict = res.trap > 0 ? "เสียเปรียบ · วางกับดัก" : "แพ้ถ้าเขาเล่นถูก" }
+                else if res.exact && res.depth == 99 { verdict = "เสมอแน่ (คำนวณครบ)" }
                 else { let s = res.score; verdict = s > 60 ? "ได้เปรียบ" : (s < -60 ? "เสียเปรียบ" : "สูสี") }
-                let line = verdict + (res.depth > 0 ? " · ลึก \(res.depth)" : "") + (m.me == 3 ? "\nเริ่มกลางเกม อาจไม่แม่น" : "")
+                let line = verdict + (res.depth > 0 && res.depth < 99 ? " · ลึก \(res.depth)" : (res.depth == 99 ? " · สมบูรณ์แบบ" : "")) + (m.me == 3 ? "\nเริ่มกลางเกม อาจไม่แม่น" : "")
                 self.show(Overlay(game: m.game, cells: draw, rec: res.best, title: "ช่อง \(res.best + 1)", line: line, mine: true, meColor: colourForPiP))
             }
         }

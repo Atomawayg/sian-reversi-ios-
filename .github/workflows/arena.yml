@@ -18,7 +18,7 @@ jobs:
       - name: Gather engines
         run: |
           S=Tools/Arena/Sources/Arena
-          cp App/CheckersEngine.swift App/Engine.swift App/ConnectEngine.swift App/BoardRules.swift $S/
+          cp App/CheckersEngine.swift App/Engine.swift App/ConnectEngine.swift App/Connect4Solver.swift App/BoardRules.swift $S/
           git show $BASE:App/CheckersEngine.swift | sed -E 's/\bCheckers(Engine|Move|Result)\b/Checkers\1V0/g' > $S/CheckersEngineV0.swift
           git show $BASE:App/Engine.swift | sed -E 's/\b(Engine|ThinkResult)\b/\1V0/g' > $S/EngineV0.swift
           git show $BASE:App/ConnectEngine.swift | sed -E 's/\bConnect(Engine|Result)\b/Connect\1V0/g' > $S/ConnectEngineV0.swift
