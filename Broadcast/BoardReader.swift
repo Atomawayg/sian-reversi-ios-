@@ -175,13 +175,8 @@ enum BoardReader {
     // MARK: Plato 4 / 5 in a Row — board panel spans x 25…1150; 7×6 starts at y 836, 9×7 at y 881.
     // Themes change the board and the piece skins, so pieces are matched against the two player badges
     // at the top (left = opponent, right = you) instead of fixed colours. cells: 1 = yours, 2 = opponent's.
-    private static var cCommitted: [[Double]] = []   // what each hole looked like on the last board we accepted
-    private static var cLastFrame: [[Double]] = []
-    private static var cOwner: [Int] = []             // 0 empty, 1 yours, 2 opponent's
-    private static var cLastOwner = 0
-    private static var cCertain = false               // false when we joined mid-game (owners guessed from badges)
-    private static var cWasMyTurn = false
-    private static var cKindSeen: GameKind? = nil
+    private static var cLastPieces = 0
+    private static var cDropSince = 0.0
     private static var cLastKind: GameKind? = nil
 
     private static func readConnect(_ s: Sampler) -> BoardMessage {
@@ -241,62 +236,31 @@ enum BoardReader {
         func dist(_ a: [Double], _ b: [Double]) -> Double {
             var t = 0.0; for i in 0..<min(a.count, b.count) { t += abs(a[i] - b[i]) }; return t / Double(max(1, a.count))
         }
+        let opp = patch(315 * sx, 310 * sy, 28 * sx), mine = patch(863 * sx, 310 * sy, 28 * sx)
+        guard dist(opp, mine) > 20 else { return bad }   // badges hidden (banner) or identical
+        var cells = [Int](repeating: 0, count: cols * rows)
+        var nMine = 0, nOpp = 0
+        for r in 0..<rows { for c in 0..<cols {
+            let P = patch((25.5 + pitch * (Double(c) + 0.5)) * sx, (top + pitch * (Double(r) + 0.5)) * sy, pitch * 0.36 * sx)
+            let dm = dist(P, mine), dop = dist(P, opp)
+            var v = 0
+            if dm < 32 && dm < dop * 0.6 { v = 1; nMine += 1 }
+            else if dop < 32 && dop < dm * 0.6 { v = 2; nOpp += 1 }
+            cells[r * cols + c] = v
+        } }
+        // sanity: pieces sit on top of each other (no floating ones), counts differ by at most one
+        for c in 0..<cols { for r in 0..<(rows - 1) where cells[r * cols + c] != 0 && cells[(r + 1) * cols + c] == 0 { return bad } }
+        if abs(nMine - nOpp) > 1 { return bad }
+        // pieces never disappear mid-game: a sudden drop is a covered or fading frame, unless it lasts (new game)
+        let total = nMine + nOpp
+        let now = Date().timeIntervalSince1970
+        if total < cLastPieces && cLastPieces >= 2 {
+            if cDropSince == 0 { cDropSince = now }
+            if now - cDropSince < 3 { return bad }
+        }
+        cDropSince = 0; cLastPieces = total
         let pill = s.avg(730 * sx, 398 * sy, 6 * sx)
         let myTurn = pill.2 > 200 && pill.2 - pill.0 > 120
-        let N = cols * rows
-        var patches: [[Double]] = []
-        patches.reserveCapacity(N)
-        for r in 0..<rows { for c in 0..<cols {
-            patches.append(patch((25.5 + pitch * (Double(c) + 0.5)) * sx, (top + pitch * (Double(r) + 0.5)) * sy, pitch * 0.36 * sx))
-        } }
-        // fallback reading (used when we join mid-game or lose track): match each disc to the player badges
-        func badgeRead() -> [Int] {
-            let opp = patch(315 * sx, 310 * sy, 28 * sx), mine = patch(863 * sx, 310 * sy, 28 * sx)
-            var out = [Int](repeating: 0, count: N)
-            if dist(opp, mine) <= 20 { return out }
-            for i in 0..<N {
-                let dm = dist(patches[i], mine), dop = dist(patches[i], opp)
-                if dm < 32 && dm < dop * 0.6 { out[i] = 1 } else if dop < 32 && dop < dm * 0.6 { out[i] = 2 }
-            }
-            // no floating pieces
-            for c in 0..<cols { for r in stride(from: rows - 2, through: 0, by: -1) where out[(r + 1) * cols + c] == 0 { out[r * cols + c] = 0 } }
-            return out
-        }
-        func resync() {
-            let b = badgeRead()
-            let nm = b.filter { $0 == 1 }.count, no = b.filter { $0 == 2 }.count
-            cOwner = b
-            cCertain = nm + no == 0          // an empty board is a fresh game: from here on we know every piece
-            cLastOwner = nm > no ? 1 : (no > nm ? 2 : 0)
-        }
-        // whose piece is it? Not by looks (skins are endless) but by turn order: every turn adds exactly one
-        // disc, and the player whose turn it was put it there.
-        var motion = Double.infinity
-        if cLastFrame.count == N { motion = 0; for i in 0..<N { motion = max(motion, dist(patches[i], cLastFrame[i])) } }
-        cLastFrame = patches
-        if cCommitted.count != N || cKindSeen != kind {
-            cKindSeen = kind; cCommitted = patches; resync()
-        } else if motion > 12 {
-            // a disc is still falling (or something passes over the board): wait for a still picture
-            return BoardMessage(valid: true, game: kind, cells: cOwner, me: cCertain ? 1 : 3, myTurn: false)
-        } else {
-            var changed: [Int] = []
-            for i in 0..<N where dist(patches[i], cCommitted[i]) > 25 { changed.append(i) }
-            if !changed.isEmpty {
-                let drops = changed.filter { i in cOwner[i] == 0 && (i / cols == rows - 1 || cOwner[i + cols] != 0) }
-                if changed.count <= 2 && drops.count == 1 {
-                    let owner = cLastOwner != 0 ? 3 - cLastOwner : (cWasMyTurn ? 1 : 2)
-                    cOwner[drops[0]] = owner; cLastOwner = owner
-                    for i in changed { cCommitted[i] = patches[i] }
-                } else if changed.count >= 3 || drops.count > 1 {
-                    // new game, a pop-up over the board, or we missed moves: start over from what we can see
-                    cCommitted = patches; resync()
-                } else {
-                    for i in changed { cCommitted[i] = patches[i] }   // a highlight ring fading etc.
-                }
-            }
-        }
-        cWasMyTurn = myTurn
-        return BoardMessage(valid: true, game: kind, cells: cOwner, me: cCertain ? 1 : 3, myTurn: myTurn)
+        return BoardMessage(valid: true, game: kind, cells: cells, me: 1, myTurn: myTurn)
     }
 }
