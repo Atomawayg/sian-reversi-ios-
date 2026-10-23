@@ -7,10 +7,9 @@ enum GameKind: Int, Codable {
     case connect4 = 2     // Plato 4 in a Row (7x6)
     case connect5 = 3     // Plato 5 in a Row (9x7)
     case jackaroo = 4     // WePlay Jackaroo (see JK layout)
-    case alpaca = 5       // WePlay Crazy Alpaca (see AL layout)
 
     var size: (w: Int, h: Int) {
-        switch self { case .reversi, .checkers: return (8, 8); case .connect4: return (7, 6); case .connect5: return (9, 7); case .jackaroo: return (JK.count, 1); case .alpaca: return (AL.count, 1) }
+        switch self { case .reversi, .checkers: return (8, 8); case .connect4: return (7, 6); case .connect5: return (9, 7); case .jackaroo: return (JK.count, 1) }
     }
 }
 
@@ -46,15 +45,3 @@ enum JK {
 }
 
 
-/// Crazy Alpaca message layout (cells; every value 0…17).
-/// Tiles sit on a lattice of quarter tiles across (31.75 px) and half tiles down (71 px) of a 1180-wide screen.
-enum AL {
-    static let flags = 0          // 0 no board, 1 board read, 2 a game window covers the board
-    static let rack = 1           // 7 slots: type + 1, 0 = empty
-    static let held = 8           // 3 slots (tiles pulled out with the ⬆ item): type + 1, 0 = empty
-    static let tiles = 11         // tiles, 5 cells each: k / 18, k % 18, j, state, type
-    static let maxTiles = 56      // open tiles first, then covered ones from the top layer down
-    static let count = tiles + 5 * maxTiles
-    static let open = 1, coveredKnown = 2, coveredUnknown = 3   // state (0 = no tile)
-    static let dx = 31.75, dy = 71.0, j0 = 8                    // y ≈ (j + j0) · dy
-}

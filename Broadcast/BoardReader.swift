@@ -68,9 +68,7 @@ enum BoardReader {
         let W = Double(s.w), H = Double(s.h)
         // Portrait only. A landscape frame is not the game screen we expect.
         if W > H { return BoardMessage(valid: false, cells: [], me: 0, myTurn: false) }
-        // Which game? Crazy Alpaca: grass on both sides and the wooden rack.
-        if AlpacaReader.screen(s) != 0 { return AlpacaReader.read(s) }
-        // Jackaroo has a green table under the board; the others differ in the top-left corner.
+        // Which game? Jackaroo has a green table under the board; the others differ in the top-left corner.
         let jg = s.avg(W * 590 / 1180, H * 1650 / 2556, W * 6 / 1180)
         if jg.1 > jg.0 + 60 && jg.1 > jg.2 + 20 { return readJackaroo(s) }
         let tl = s.avg(W * 40 / 1179, H * 400 / 2556, W * 5 / 1179)
