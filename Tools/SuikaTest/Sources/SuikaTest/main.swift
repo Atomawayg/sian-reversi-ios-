@@ -66,6 +66,11 @@ for budget in [500, 1000, 2000] {
     }
 }
 
+for n in ["recbig", "recmelon", "recpine"] {
+    let v = BoardReader.readSuika(load(n)); let q = SK.decode(v.cells)!
+    var c = [Int](repeating: 0, count: SK.types); for f in q.fruits { c[f.t] += 1 }
+    note("\(n): \(q.fruits.count) fruits · " + (0..<SK.types).filter { c[$0] > 0 }.map { "\(SK.names[$0])×\(c[$0])" }.joined(separator: " "))
+}
 // physics sanity: a cherry dropped into an empty jar rests on the floor
 var b = [SuikaEngine.Body(t: 0, x: 500, y: SK.dropY)]
 var made: [Int] = []
