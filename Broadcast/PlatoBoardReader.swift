@@ -57,12 +57,12 @@ enum PlatoBoardReader {
                 if p.0 > 195 && p.0 < 245 && p.1 > 175 && p.1 < 230 && p.2 > 140 && p.2 < 200 { cream += 1 }
             } }
             var v = 0
-            if Double(red) > 0.25 * Double(n) { v = 1 } else if Double(cream) > 0.4 * Double(n) { v = 2 }
+            if Double(red) > 0.25 * Double(n) { v = 1 } else if Double(cream) > 0.25 * Double(n) { v = 2 }   // a cream king's brown crown covers a third of it
             if v != 0 {
                 var odd = 0, m = 0
                 for yy in stride(from: cy - 24, to: cy + 24, by: 2) { for xx in stride(from: cx - 24, to: cx + 24, by: 2) {
                     let p = px(xx, yy); m += 1
-                    if v == 1 ? (p.0 > 200 && p.1 > 170 && p.2 > 150) : (p.0 - p.1 > 60) { odd += 1 }
+                    if v == 1 ? (p.0 > 200 && p.1 > 170 && p.2 > 150) : (p.0 < 170 && p.0 - p.2 > 50) { odd += 1 }   // red: cream crown; cream: brown crown
                 } }
                 if Double(odd) > 0.06 * Double(m) { v += 2 }
                 if v == 1 || v == 3 { reds += 1 } else { creams += 1 }
