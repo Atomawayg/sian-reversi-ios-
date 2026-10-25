@@ -90,13 +90,27 @@ enum BoardReader {
         let gx = W * 159 / 1179, gy = H * 933 / 2556
         var cells = [Int](repeating: 0, count: 64)
         var nb = 0, nw = 0, glow = 0, nonBoard = 0
+        var skins: [(Int, Double)] = []      // decorated discs (Pro Level skins): cell, brightness
         for r in 0..<8 { for c in 0..<8 {
             let cx = gx + cw * (Double(c) + 0.5), cy = gy + cw * (Double(r) + 0.5)
-            let p = s.avg(cx, cy, cw * 0.2)
+            // 9×9 samples over the middle of the cell: mean colour and how busy the picture is
+            var sr = 0.0, sg = 0.0, sb = 0.0, sl = 0.0, sl2 = 0.0
+            for dy in -4...4 { for dx in -4...4 {
+                let q = s.get(min(s.w - 1, max(0, Int(cx + Double(dx) * cw * 0.075))), min(s.h - 1, max(0, Int(cy + Double(dy) * cw * 0.075))))
+                sr += q.0; sg += q.1; sb += q.2
+                let l = (q.0 + q.1 + q.2) / 3; sl += l; sl2 += l * l
+            } }
+            let p = (sr / 81, sg / 81, sb / 81)
             let L = (p.0 + p.1 + p.2) / 3, br = p.2 - p.0
+            let sd = (max(0, sl2 / 81 - (sl / 81) * (sl / 81))).squareRoot()
             var v: Int
-            if br > 4 { v = L > 140 ? 2 : 1 } else { v = L < 95 ? 3 : 0 }
-            if v == 0 {
+            var skin = false
+            if L < 100 && br >= 3 { v = 1 }                    // black disc (cool grey)
+            else if L > 150 && br > 8 { v = 2 }                // white disc (cool white)
+            else if -br > 40 && L < 105 { v = 3 }              // no square here: wooden hole or outside a shaped board
+            else if sd > 16 { v = 0; skin = true; skins.append((r * 8 + c, L)) }   // a decorated disc
+            else { v = 0 }
+            if v == 0 && !skin {
                 // legal-move highlight: yellow glow along the inside of the cell edges
                 var yr = 0.0, yg = 0.0, yb = 0.0
                 for (fx, fy) in [(0.5, 0.1), (0.5, 0.9), (0.1, 0.5), (0.9, 0.5)] {
@@ -110,6 +124,9 @@ enum BoardReader {
             if v == 1 { nb += 1 } else if v == 2 { nw += 1 }
             cells[r * 8 + c] = v
         } }
+        // decorated discs take the colour that has no plain discs (a skin replaces one side's look)
+        for (i, l) in skins { cells[i] = nw == 0 && nb > 0 ? 2 : (nb == 0 && nw > 0 ? 1 : (l < 120 ? 1 : 2)) }
+        for (i, _) in skins { if cells[i] == 1 { nb += 1 } else { nw += 1 } }
         // sanity: a real board has both colours and mostly board-coloured empties
         let valid = nb >= 1 && nw >= 1 && nb + nw >= 4 && nonBoard < 6
 

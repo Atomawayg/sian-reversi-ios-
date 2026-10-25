@@ -24,8 +24,7 @@ enum PlatoBoardReader {
             return t / Double(3 * w * h)
         }
         // board top edge: strongest light/dark flips across the square edges
-        var bestY = 721, bestS = -1.0
-        for y0 in stride(from: 690, through: 780, by: 1) {
+        func edgeScore(_ y0: Int) -> Double {
             var sc = 0.0
             for r in 1..<8 {
                 let y = Int((Double(y0) + Double(r) * CELL).rounded())
@@ -34,8 +33,13 @@ enum PlatoBoardReader {
                     sc += abs(lum(x, y - 8, 6, 5) - lum(x, y + 3, 6, 5))
                 }
             }
-            if sc > bestS { bestS = sc; bestY = y0 }
+            return sc
         }
+        // coarse pass every 4 px, then ±3 px around the best
+        var bestY = 721, bestS = -1.0
+        for y0 in stride(from: 690, through: 780, by: 4) { let sc = edgeScore(y0); if sc > bestS { bestS = sc; bestY = y0 } }
+        let coarse = bestY
+        for y0 in (coarse - 3)...(coarse + 3) where y0 != coarse { let sc = edgeScore(y0); if sc > bestS { bestS = sc; bestY = y0 } }
         let y0 = Double(bestY)
         // turn pill
         let pill = s.avg(745 * sx, 418 * sy, 4 * sx)
@@ -115,21 +119,26 @@ enum PlatoBoardReader {
         let br = rs[rs.count / 2], bg = gs[gs.count / 2], bb = bs[bs.count / 2]
         let G = 24
         var M = [Float](repeating: 0, count: G * G)
+        var P = [Float](repeating: 0, count: G * G)   // piece pixels only: grey/white/black, never the orange wood grain
         var fgSum = 0.0, fgN = 0.0
         for i in 0..<G {
             let ya = y0 + i * h / G, yb = y0 + (i + 1) * h / G
             for j in 0..<G {
                 let xa = x0 + j * w / G, xb = x0 + (j + 1) * w / G
-                var f = 0, n = 0
-                for yy in ya..<yb { for xx in xa..<xb {
+                var f = 0, f2 = 0, n = 0
+                for yy in stride(from: ya, to: yb, by: 2) { for xx in stride(from: xa, to: xb, by: 2) {
                     let p = px(xx, yy); n += 1
-                    if abs(p.0 - br) + abs(p.1 - bg) + abs(p.2 - bb) > 60 { f += 1; fgSum += (p.0 + p.1 + p.2) / 3; fgN += 1 }
+                    if abs(p.0 - br) + abs(p.1 - bg) + abs(p.2 - bb) > 60 {
+                        f += 1; fgSum += (p.0 + p.1 + p.2) / 3; fgN += 1
+                        if p.0 - p.2 < 50 { f2 += 1 }
+                    }
                 } }
                 M[i * G + j] = Float(f) / Float(max(1, n))
+                P[i * G + j] = Float(f2) / Float(max(1, n))
             }
         }
         var centre: Float = 0
-        for i in 6..<18 { for j in 6..<18 { centre += M[i * G + j] } }
+        for i in 6..<18 { for j in 6..<18 { centre += P[i * G + j] } }
         if centre / 144 < 0.35 { return 0 }
         let S = PlatoChessData.shapes
         var best = 0; var bd = Float.greatestFiniteMagnitude

@@ -132,15 +132,19 @@ enum JackarooEngine {
                 } }
             case "7":
                 fw(7, .fwd)
-                for i in 0..<4 { for j in 0..<4 where i != j {
+                // split 7: two of your stones, or one of yours and one of your partner's (WePlay allows both)
+                var pool: [(Int, Int)] = (0..<4).map { (ctrl, $0) }
+                if ctrl == me { pool += (0..<4).map { (partner, $0) } }
+                for (s1i, (sa, i)) in pool.enumerated() { for (s2i, (sb, j)) in pool.enumerated() where s1i != s2i {
+                    if sa != ctrl && sb != ctrl { continue }          // at least one of the stones is yours
                     for a in 1...6 {
-                        guard let d1 = fwdDest(st, ctrl, i, a) else { continue }
-                        let (s1, c1) = apply(st, ctrl, i, d1)
-                        if s1[ctrl][j] < 0 { continue }
-                        guard let d2 = fwdDest(s1, ctrl, j, 7 - a) else { continue }
-                        let (s2, c2) = apply(s1, ctrl, j, d2)
+                        guard let d1 = fwdDest(st, sa, i, a) else { continue }
+                        let (s1, c1) = apply(st, sa, i, d1)
+                        if s1[sb][j] < 0 { continue }
+                        guard let d2 = fwdDest(s1, sb, j, 7 - a) else { continue }
+                        let (s2, c2) = apply(s1, sb, j, d2)
                         out.append(JKMove(card: ci, rank: c, kind: .split, steps: a,
-                                          moves: [(ctrl, i, st[ctrl][i], d1), (ctrl, j, s1[ctrl][j], d2)], after: s2,
+                                          moves: [(sa, i, st[sa][i], d1), (sb, j, s1[sb][j], d2)], after: s2,
                                           captures: [c1, c2].compactMap { $0 }))
                     }
                 } }
@@ -167,6 +171,15 @@ enum JackarooEngine {
         return 6 + Double(dist(s, p))
     }
 
+    /// A stone parked high in the finish lane blocks the slots beyond it for the stones still coming:
+    /// every empty slot deeper than a lane stone costs a little.
+    static func laneGaps(_ row: [Int]) -> Double {
+        var g = 0.0
+        for p in row where p >= 100 { for k in (p - 100 + 1)..<4 where !row.contains(100 + k) { g += 1 } }
+        return g
+    }
+    static let gapCost = 6.0
+
     static func evaluate(_ st: [[Int]], me: Int = 3) -> Double {
         let team: Set<Int> = [me, (me + 2) % 4]
         var sc = 0.0
@@ -174,6 +187,7 @@ enum JackarooEngine {
             let sign: Double = team.contains(s) ? 1 : -1
             for p in st[s] { sc += sign * stoneValue(s, p) }
             if st[s].contains(start(s)) { sc += sign * 3 }
+            sc -= sign * gapCost * laneGaps(st[s])
             // danger: stones the other team could hit on their next turn
             for p in st[s] {
                 if !(p >= 0 && p < T) || p == start(s) { continue }
@@ -204,6 +218,7 @@ enum JackarooEngine {
             let sign: Double = team.contains(s) ? 1 : -1
             for p in st[s] { sc += sign * stoneValue(s, p) }
             if st[s].contains(start(s)) { sc += sign * 3 }
+            sc -= sign * gapCost * laneGaps(st[s])
         }
         return sc
     }

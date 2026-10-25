@@ -282,6 +282,9 @@ final class ChessEngine {
     private var killers = [[Int32]](repeating: [0, 0], count: 128)
     private var history = [Int32](repeating: 0, count: 120 * 120)
     private var nodes = 0, deadline: UInt64 = 0, stopped = false
+    /// Checked with the clock: returns true when a newer board has made this search useless.
+    var cancel: (() -> Bool)? = nil
+    @inline(__always) private func timeUp() -> Bool { DispatchTime.now().uptimeNanoseconds > deadline || (cancel?() ?? false) }
     private var moveBuf = [[M]](repeating: [], count: 130)
     private var repStack: [UInt64] = []
 
@@ -306,7 +309,7 @@ final class ChessEngine {
 
     private func quiesce(_ alphaIn: Int, _ beta: Int) -> Int {
         nodes += 1
-        if nodes & 4095 == 0 && DispatchTime.now().uptimeNanoseconds > deadline { stopped = true }
+        if nodes & 4095 == 0 && timeUp() { stopped = true }
         if stopped { return 0 }
         let stand = evaluate()
         if stand >= beta { return stand }
@@ -341,7 +344,7 @@ final class ChessEngine {
         let depth = check ? depthIn + 1 : depthIn
         if depth <= 0 { return quiesce(alpha, beta) }
         nodes += 1
-        if nodes & 4095 == 0 && DispatchTime.now().uptimeNanoseconds > deadline { stopped = true; return 0 }
+        if nodes & 4095 == 0 && timeUp() { stopped = true; return 0 }
         if ply > 0 {
             // repetition: treat as a draw
             var i = repStack.count - 3          // the last entry is this position; same side to move every 2 plies
@@ -422,7 +425,8 @@ final class ChessEngine {
     struct Result { var best: ChessMove?; var score = 0; var depth = 0; var mateIn: Int? = nil }
 
     /// Best move for the side to move, thinking up to `ms` milliseconds.
-    func think(ms: Int) -> Result {
+    /// `progress` gets every finished depth, so a first answer can be shown after a few milliseconds.
+    func think(ms: Int, progress: ((Result) -> Void)? = nil) -> Result {
         let t0 = DispatchTime.now().uptimeNanoseconds
         deadline = t0 + UInt64(ms) * 1_000_000
         stopped = false; nodes = 0; ply = 0
@@ -439,7 +443,7 @@ final class ChessEngine {
         res.best = toMove(legalRoot[0])
         if legalRoot.count == 1 { return res }
         var order = legalRoot
-        var prevScore = 0
+        var prevScore = 0, sameBest = 0
         for d in 1...64 {
             var alpha = -ChessEngine.MATE - 1, beta = ChessEngine.MATE + 1
             if d >= 5 { alpha = prevScore - 40; beta = prevScore + 40 }
@@ -476,13 +480,20 @@ final class ChessEngine {
                 if let bh = bestHere, bestV > prevScore - 30 { res.best = toMove(bh) }   // a move that already beat the old choice
                 break
             }
-            if let bh = bestHere { res.best = toMove(bh); res.score = bestV; res.depth = d; prevScore = bestV }
+            if let bh = bestHere {
+                let nb = toMove(bh)
+                sameBest = nb == res.best ? sameBest + 1 : 0
+                res.best = nb; res.score = bestV; res.depth = d; prevScore = bestV
+            }
             if abs(bestV) > ChessEngine.MATE - 200 {
                 res.mateIn = bestV > 0 ? (ChessEngine.MATE - bestV + 1) / 2 : -(ChessEngine.MATE + bestV) / 2
                 break
             }
-            let el = DispatchTime.now().uptimeNanoseconds - t0
-            if Double(el) > Double(ms) * 1_000_000 * 0.45 { break }   // the next depth would not finish
+            progress?(res)
+            let el = Double(DispatchTime.now().uptimeNanoseconds - t0)
+            if el > Double(ms) * 1_000_000 * 0.45 { break }   // the next depth would not finish
+            // the same move for many depths in a row: answer early, the clock matters
+            if d >= 8 && sameBest >= 5 && el > Double(ms) * 1_000_000 * 0.2 { break }
         }
         return res
     }

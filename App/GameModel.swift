@@ -21,7 +21,9 @@ final class GameModel: ObservableObject {
     private var tbLoaded = false
     private let ckTrack = BoardTracker(), rvTrack = BoardTracker(), cnTrack = BoardTracker()
     private let work = DispatchQueue(label: "sian.think", qos: .userInitiated)
-    private var gen = 0
+    private var gen = 0 { didSet { liveGen.set(gen) } }
+    /// `gen` readable from the search thread, so a search for an old board stops at once.
+    private let liveGen = SharedInt()
     private var computedFor: [Int] = []
     private var lastMsgAt = Date.distantPast
     private var watchdog: Timer?
@@ -363,35 +365,50 @@ final class GameModel: ObservableObject {
         let key = [600 + meC] + std
         if key == computedFor { return }
         computedFor = key; gen += 1
-        let g = gen, ms = max(thinkMs, 3000), castle = chCastle
+        // fast answers for the clock: the first move shows within a moment, deeper results replace it
+        let g = gen, ms = min(max(thinkMs, 1500), 4000), castle = chCastle
         show(Overlay(game: .chess, cells: m.cells, title: "คิด…", line: "ตาคุณ · AI กำลังคิด", mine: true, meColor: meC))
-        work.async { [weak self] in
-            guard let self else { return }
-            self.chess.setPosition(std, whiteToMove: meWhite, castling: castle, epSquare: ep)
-            let r = self.chess.think(ms: ms)
-            DispatchQueue.main.async {
-                guard g == self.gen else { return }
-                guard let mv = r.best else {
-                    let st = self.chess.status()
-                    self.show(Overlay(game: .chess, cells: m.cells, title: "—", line: st.check ? "รุกจน" : "ไม่มีตาเดิน", mine: true, meColor: meC)); return
-                }
-                let toScreen = { (i: Int) in meWhite ? i : 63 - i }
-                let piece = std[mv.from]
-                var title = "\(GameModel.glyph[piece]) \(GameModel.sqName(mv.from))→\(GameModel.sqName(mv.to))"
-                if mv.promo > 0 { title += "=" + GameModel.glyph[mv.promo + (meWhite ? 0 : 6)] }
-                var verdict: String
-                if let mt = r.mateIn { verdict = mt > 0 ? "รุกจนใน \(mt)" : "โดนรุกจนใน \(-mt)" }
-                else { let s = r.score; verdict = s >= 300 ? "ได้เปรียบมาก" : s >= 80 ? "ได้เปรียบ" : s > -80 ? "สูสี" : s > -300 ? "เสียเปรียบ" : "เสียเปรียบมาก" }
-                if std[mv.to] != 0 { verdict = "กิน · " + verdict }
-                let line = verdict + (r.depth > 0 ? " · ลึก \(r.depth)" : "")
-                self.show(Overlay(game: .chess, cells: m.cells, path: [toScreen(mv.from), toScreen(mv.to)], title: title, line: line, mine: true, meColor: meC))
+        let present = { [weak self] (r: ChessEngine.Result, done: Bool) in
+            guard let self, g == self.gen else { return }
+            guard let mv = r.best else {
+                let st = self.chess.status()
+                self.show(Overlay(game: .chess, cells: m.cells, title: "—", line: st.check ? "รุกจน" : "ไม่มีตาเดิน", mine: true, meColor: meC)); return
             }
+            let toScreen = { (i: Int) in meWhite ? i : 63 - i }
+            let piece = std[mv.from]
+            var title = "\(GameModel.glyph[piece]) \(GameModel.sqName(mv.from))→\(GameModel.sqName(mv.to))"
+            if mv.promo > 0 { title += "=" + GameModel.glyph[mv.promo + (meWhite ? 0 : 6)] }
+            var verdict: String
+            if let mt = r.mateIn { verdict = mt > 0 ? "รุกจนใน \(mt)" : "โดนรุกจนใน \(-mt)" }
+            else { let s = r.score; verdict = s >= 300 ? "ได้เปรียบมาก" : s >= 80 ? "ได้เปรียบ" : s > -80 ? "สูสี" : s > -300 ? "เสียเปรียบ" : "เสียเปรียบมาก" }
+            if std[mv.to] != 0 { verdict = "กิน · " + verdict }
+            let line = verdict + (r.depth > 0 ? " · ลึก \(r.depth)" : "") + (done ? "" : " …")
+            self.show(Overlay(game: .chess, cells: m.cells, path: [toScreen(mv.from), toScreen(mv.to)], title: title, line: line, mine: true, meColor: meC))
+        }
+        let live = liveGen
+        work.async { [weak self] in
+            guard let self, live.get() == g else { return }
+            let t0 = DispatchTime.now().uptimeNanoseconds
+            var lastShown: UInt64 = 0
+            self.chess.cancel = { live.get() != g }
+            self.chess.setPosition(std, whiteToMove: meWhite, castling: castle, epSquare: ep)
+            let r = self.chess.think(ms: ms) { p in
+                let now = DispatchTime.now().uptimeNanoseconds
+                // first answer after ~0.15 s, then at most every 0.3 s
+                if now - t0 > 150_000_000 && now - lastShown > 300_000_000 {
+                    lastShown = now
+                    DispatchQueue.main.async { present(p, false) }
+                }
+            }
+            DispatchQueue.main.async { present(r, true) }
         }
     }
 
     // MARK: Plato checkers (English rules)
     private let draughts = DraughtsEngine()
     private var dMine = 0          // your colour this game: 1 red, 2 white
+    private var dPrev: [Int]? = nil          // last board, +1/+2 mine, −1/−2 theirs
+    private var dKings = Set<Int>()          // squares holding a king, followed from move to move
 
     private func handleDraughts(_ m: BoardMessage) {
         // your colour: read from the captured-pieces trays; before anything is taken, the colour that
@@ -407,9 +424,26 @@ final class GameModel: ObservableObject {
         let mine = dMine
         var board = [Int](repeating: 0, count: 64)
         for i in 0..<64 where m.cells[i] != 0 {
-            let c = (m.cells[i] - 1) % 2 + 1, king = m.cells[i] >= 3
-            board[i] = (c == mine ? 1 : -1) * (king ? 2 : 1)
+            let c = (m.cells[i] - 1) % 2 + 1
+            board[i] = c == mine ? 1 : -1
         }
+        // Kings: a crown seen on screen, a man standing on the far row (it was crowned there), or a king
+        // followed from its last square (a crown can be hard to see, so the move tells us instead).
+        if count >= 24 || dPrev == nil { dKings = [] }
+        var kings = Set<Int>()
+        if let p = dPrev {
+            for side in [1, -1] {
+                let gone = (0..<64).filter { p[$0].signum() == side && board[$0] != side }
+                let came = (0..<64).filter { board[$0] == side && p[$0].signum() != side }
+                if gone.count == 1 && came.count == 1 && dKings.contains(gone[0]) { kings.insert(came[0]) }
+            }
+            for k in dKings where p[k].signum() == board[k] && board[k] != 0 { kings.insert(k) }
+        }
+        for i in 0..<64 where board[i] != 0 {
+            if m.cells[i] >= 3 || (board[i] == 1 && i / 8 == 0) || (board[i] == -1 && i / 8 == 7) { kings.insert(i) }
+        }
+        for k in kings { board[k] *= 2 }
+        if board != dPrev { dPrev = board; dKings = kings }
         let draw = board.map { $0 == 1 ? 1 : ($0 == 2 ? 2 : ($0 == -1 ? 3 : ($0 == -2 ? 4 : 0))) }
         let meC = mine == 2 ? 3 : 4        // drawing colours: 3 = you cream / opponent red, 4 = you red / opponent cream
         guard m.myTurn else {
@@ -419,23 +453,34 @@ final class GameModel: ObservableObject {
         let key = [700] + board
         if key == computedFor { return }
         computedFor = key; gen += 1
-        let g = gen, ms = max(thinkMs, 2000)
+        let g = gen, ms = min(max(thinkMs, 1200), 3000)
         show(Overlay(game: .draughts, cells: draw, title: "คิด…", line: "ตาคุณ · AI กำลังคิด", mine: true, meColor: meC))
+        let present = { [weak self] (r: DraughtsEngine.Result, done: Bool) in
+            guard let self, g == self.gen else { return }
+            guard let mv = r.best else { self.show(Overlay(game: .draughts, cells: draw, title: "—", line: "ไม่มีตาเดิน", mine: true, meColor: meC)); return }
+            let W = DraughtsEngine.WIN
+            var verdict: String
+            if r.score > W - 1000 { verdict = "ชนะแน่" } else if r.score < -(W - 1000) { verdict = "แพ้ถ้าเขาเล่นถูก" }
+            else { let s = r.score; verdict = s >= 150 ? "ได้เปรียบมาก" : s >= 50 ? "ได้เปรียบ" : s > -50 ? "สูสี" : s > -150 ? "เสียเปรียบ" : "เสียเปรียบมาก" }
+            let what = mv.caps.isEmpty ? "เดิน" : "กิน \(mv.caps.count) ตัว"
+            let title = "\(GameModel.ckName(mv.path[0]))→\(GameModel.ckName(mv.path[mv.path.count - 1]))"
+            self.show(Overlay(game: .draughts, cells: draw, path: mv.path, caps: mv.caps, title: title, line: "\(what) · \(verdict) · ลึก \(r.depth)" + (done ? "" : " …"), mine: true, meColor: meC))
+        }
+        let live = liveGen
         work.async { [weak self] in
-            guard let self else { return }
+            guard let self, live.get() == g else { return }
+            let t0 = DispatchTime.now().uptimeNanoseconds
+            var lastShown: UInt64 = 0
+            self.draughts.cancel = { live.get() != g }
             self.draughts.set(board)
-            let r = self.draughts.think(ms: ms)
-            DispatchQueue.main.async {
-                guard g == self.gen else { return }
-                guard let mv = r.best else { self.show(Overlay(game: .draughts, cells: draw, title: "—", line: "ไม่มีตาเดิน", mine: true, meColor: meC)); return }
-                let W = DraughtsEngine.WIN
-                var verdict: String
-                if r.score > W - 1000 { verdict = "ชนะแน่" } else if r.score < -(W - 1000) { verdict = "แพ้ถ้าเขาเล่นถูก" }
-                else { let s = r.score; verdict = s >= 150 ? "ได้เปรียบมาก" : s >= 50 ? "ได้เปรียบ" : s > -50 ? "สูสี" : s > -150 ? "เสียเปรียบ" : "เสียเปรียบมาก" }
-                let what = mv.caps.isEmpty ? "เดิน" : "กิน \(mv.caps.count) ตัว"
-                let title = "\(GameModel.ckName(mv.path[0]))→\(GameModel.ckName(mv.path[mv.path.count - 1]))"
-                self.show(Overlay(game: .draughts, cells: draw, path: mv.path, caps: mv.caps, title: title, line: "\(what) · \(verdict) · ลึก \(r.depth)", mine: true, meColor: meC))
+            let r = self.draughts.think(ms: ms) { p in
+                let now = DispatchTime.now().uptimeNanoseconds
+                if now - t0 > 150_000_000 && now - lastShown > 300_000_000 {
+                    lastShown = now
+                    DispatchQueue.main.async { present(p, false) }
+                }
             }
+            DispatchQueue.main.async { present(r, true) }
         }
     }
 
@@ -736,4 +781,12 @@ final class GameModel: ObservableObject {
 
     func setMe(_ c: Int) { me = c; manualMe = c != 0; computedFor = [] }
     func togglePiP() { keepAlive.start(); pip.start() }
+}
+
+/// An Int shared between the main thread and the search thread.
+final class SharedInt {
+    private var v = 0
+    private let lock = NSLock()
+    func get() -> Int { lock.lock(); defer { lock.unlock() }; return v }
+    func set(_ x: Int) { lock.lock(); v = x; lock.unlock() }
 }
