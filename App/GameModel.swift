@@ -504,7 +504,8 @@ final class GameModel: ObservableObject {
     private var poolMsgs = 0, poolRate = 0, poolRateSince = Date(), poolAppMs = 0.0
     private var poolInZone = false
     private var poolLastLog = ""
-    private var poolSpin: (x: Double, y: Double) = (0, 0)   // the spin set on the game's spin icon (-1…1; y +1 = draw)
+    private var poolSpin: (x: Double, y: Double) = (0, 0)
+    private var poolGuide: (key: [Double], lines: [[Double]]) = ([], [])   // lines from the ball you aim at to every pocket   // the spin set on the game's spin icon (-1…1; y +1 = draw)
     private var poolPlanned: [PoolEngine.Ball] = []   // the table the suggestion below was worked out for
     private var poolPlannedGroup = -1
     private var poolFound: [PoolEngine.Found] = []     // every sure pot from here (PoolEngine.sweep)
@@ -700,6 +701,13 @@ final class GameModel: ObservableObject {
             // power, and while you pull, the part your power really reaches is drawn bold
             let pullPct = c[PoolCodec.power] * 14 + c[PoolCodec.power + 1]
             let tgt = others.first(where: { $0.id == v.ball })
+            // every way the ball you aim at can go into each pocket (straight, and off one cushion), worked out once per
+            // ball and table
+            if let t = tgt {
+                let key = [Double(t.id)] + others.flatMap { [Double($0.id), ($0.x / 4).rounded(), ($0.y / 4).rounded()] }
+                if poolGuide.key != key { poolGuide = (key, PoolEngine.pocketLines(t, balls: others)) }
+                view.guideLines = poolGuide.lines
+            }
             func paths(_ p: Int) -> (obj: [Double], cue: [Double], cueStop: (Double, Double), objDrops: Bool, cueDrops: Bool) {
                 PoolEngine.powerPaths(cueX: cue.x, cueY: cue.y, aimX: a.x, aimY: a.y, target: tgt, balls: balls, dir: dir, power: p)
             }

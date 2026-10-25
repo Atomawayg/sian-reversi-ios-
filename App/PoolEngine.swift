@@ -689,4 +689,30 @@ enum PoolEngine {
         guard let best = beam.max(by: { value($0) < value($1) }) else { return nil }
         return (firsts[best.first], best.n, best.done, best.p)
     }
+
+    // MARK: every way a ball can reach each pocket (the guide lines)
+
+    /// For one ball: the straight line into each pocket it can reach unblocked, and for each pocket the one-cushion
+    /// bank off each cushion (searched around the mirror line with the cushion law). Paths as x,y pairs.
+    static func pocketLines(_ b: Ball, balls: [Ball]) -> [[Double]] {
+        let others = balls.filter { $0.id != 0 && $0.id != b.id }
+        var out: [[Double]] = []
+        for (pi, p) in pockets.enumerated() {
+            var ux = p.x - b.x, uy = p.y - b.y
+            let d = (ux * ux + uy * uy).squareRoot(); ux /= d; uy /= d
+            let r = run(b.x, b.y, ux, uy, balls: others, skip: b.id, maxRails: 0, gap: 2 * R - 3)
+            if r.pocket == pi { out.append(r.pts) }
+            for (mx, my) in [(2 * xMin - p.x, p.y), (2 * xMax - p.x, p.y), (p.x, 2 * yMin - p.y), (p.x, 2 * yMax - p.y)] {
+                let a0 = atan2(my - b.y, mx - b.x)
+                var best: Run? = nil
+                for k in -60...60 {
+                    let a = a0 + Double(k) * 0.2 * Double.pi / 180
+                    let t = run(b.x, b.y, cos(a), sin(a), balls: others, skip: b.id, maxRails: 1, gap: 2 * R - 3)
+                    if t.pocket == pi && t.rails == 1 && (best == nil || t.off < best!.off) { best = t }
+                }
+                if let t = best { out.append(t.pts) }
+            }
+        }
+        return out
+    }
 }

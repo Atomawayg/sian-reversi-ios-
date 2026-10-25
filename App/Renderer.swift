@@ -545,7 +545,8 @@ struct PoolView: Equatable {
     var pick: PoolEngine.Found? = nil          // the one suggested: drawn in gold with the cue ball's way and where it stops
     var objPathFull: [Double] = []             // your line at the power to use (always into the pocket when it drops)
     var powerTarget: Int? = nil, powerNow: Int? = nil
-    var breakSpotX: Double? = nil, breakSpotY: Double? = nil   // the break: where to put the cue ball   // the power bar: where to pull to, and where you are
+    var breakSpotX: Double? = nil, breakSpotY: Double? = nil
+    var guideLines: [[Double]] = []            // from the ball you aim at to every pocket (straight and one-cushion banks)   // the break: where to put the cue ball   // the power bar: where to pull to, and where you are
     var target: Int? = nil                     // the ball your aim hits
     var legal: [Int] = []
 }
@@ -641,6 +642,8 @@ extension Renderer {
         // your aim now: where the ball goes (green = drops, red = doesn't) and where the cue ball runs
         let orange = UIColor(red: 1.0, green: 0.62, blue: 0.15, alpha: 1)
         // a dark edge under your lines so they stand out on the small table
+        // every way the ball you aim at can reach a pocket: thin light lines
+        for g in v.guideLines { poly(g, UIColor(red: 1.0, green: 0.55, blue: 0.45, alpha: 0.75), 1.5) }
         // your line all the way in at the power to use (thin), then what your pull really reaches (bold)
         poly(v.objPathFull, (v.pots ? green : (v.risky ? orange : red)).withAlphaComponent(0.55), 2.5)
         poly(v.objPath, UIColor.black.withAlphaComponent(0.55), 8)
