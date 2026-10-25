@@ -31,10 +31,13 @@ enum PoolReader {
     static func looksLikePool(_ s: BoardReader.Sampler) -> Bool {
         let sx = Double(s.w) / 1180, sy = Double(s.h) / 2556
         func px(_ x: Double, _ y: Double) -> (Double, Double, Double) { s.avg(x * sx, y * sy, 3 * sx) }
+        // the cue stick (or the hand of ball-in-hand) can lie over a pocket or two: four dark ones are enough
+        var darkPockets = 0
         for (x, y) in [(203.0, 581.0), (975, 581), (203, 2140), (976, 2139), (178, 1360), (1000, 1360)] {
             let p = px(x, y)
-            if (p.0 + p.1 + p.2) / 3 > 50 { return false }
+            if (p.0 + p.1 + p.2) / 3 <= 50 { darkPockets += 1 }
         }
+        if darkPockets < 4 { return false }
         var cs: [(h: Double, s: Double, v: Double)] = []
         for y in [700.0, 1000, 1300, 1600, 1900, 2050] { for x in [300.0, 480, 700, 880] { cs.append(hsv(px(x, y))) } }
         // the colour most samples agree on (balls, the cue stick and banners cover only a few)
@@ -42,6 +45,8 @@ enum PoolReader {
         guard let k = cs.indices.max(by: { agree(cs[$0]).count < agree(cs[$1]).count }) else { return false }
         let inl = agree(cs[k])
         if Double(inl.count) < Double(cs.count) * 0.7 { return false }
+        // the felt reaches both the top row (y 700) and the bottom row (y 2050): a square board can't be that tall
+        if inl.filter({ $0 < 4 }).count < 3 || inl.filter({ $0 >= 20 }).count < 3 { return false }
         var sn = 0.0, cn = 0.0
         for i in inl { sn += sin(cs[i].h * Double.pi / 180); cn += cos(cs[i].h * Double.pi / 180) }
         var h0 = atan2(sn, cn) * 180 / Double.pi; if h0 < 0 { h0 += 360 }
@@ -59,7 +64,7 @@ enum PoolReader {
         return true
     }
 
-    struct Ball { var x: Double; var y: Double; var id: Int; var rimWhite: Double }
+    struct Ball { var x: Double; var y: Double; var id: Int; var rimWhite: Double; var colour = 0.0; var alt: Int? = nil }
     /// the last full reading (balls and a colour sample at each centre), and where the aim circle was
     static var cache: (balls: [Ball], clean: Bool, spots: [(x: Double, y: Double, r: Double, g: Double, b: Double)], at: Double)? = nil
     static var lastAim: (Double, Double)? = nil
@@ -183,7 +188,7 @@ enum PoolReader {
                 if abs(pi.0 - po.0) + abs(pi.1 - po.1) + abs(pi.2 - po.2) > 64 { edge += 1 }
             }
             if edge < 14 { continue }
-            balls.append(Ball(x: cx, y: cy, id: id.id, rimWhite: id.rim))
+            balls.append(Ball(x: cx, y: cy, id: id.id, rimWhite: id.rim, colour: id.colour, alt: id.alt))
         }
 
         // 3) a ball that hasn't moved (or only a few px, as a ball by the cushion can read) keeps its number: the glow the game draws round the ball you aim at, or a
@@ -199,8 +204,15 @@ enum PoolReader {
 
         // 4) consistency: one cue ball (the whitest), every number at most once, at most 16 balls
         clean = balls.count <= 16
+        // two "cue balls": a stripe rolled to show almost only white. The one with the least colour is the cue ball,
+        // the other takes the stripe its bit of colour says
+        let whites = balls.indices.filter { balls[$0].id == 0 }
+        if whites.count > 1, let keep = whites.min(by: { balls[$0].colour < balls[$1].colour }) {
+            for k in whites where k != keep { if let a = balls[k].alt { balls[k].id = a } }
+        }
+        // no cue ball read: the whitest stripe with (almost) no colour is it (a glow can make the cue ball look striped)
         if !balls.contains(where: { $0.id == 0 }), let k = balls.indices.filter({ balls[$0].id >= 9 || balls[$0].id == 0 }).max(by: { balls[$0].rimWhite < balls[$1].rimWhite }),
-           balls[k].rimWhite > 0.85 {
+           balls[k].rimWhite > 0.85, balls[k].colour < 0.03 {
             balls[k].id = 0
         }
         var seen = Set<Int>()
@@ -234,6 +246,11 @@ enum PoolReader {
             if aim == nil { aim = findAimCircle(at, balls: centres, cue: cue) }
         }
         lastAim = aim
+        // the cue ball unseen (the hand of ball-in-hand lies on it) but the aim ring is up: the game's white line
+        // runs from the cue ball to the ring, so follow it back to find the cue ball
+        if aim != nil && !balls.contains(where: { $0.id == 0 }), let a = aim, let c = cueFromLine(at, ring: a) {
+            balls.append(Ball(x: c.0, y: c.1, id: 0, rimWhite: 1))
+        }
 
         // 5) the game's own line for where the hit ball goes (more exact than working it out from positions)
         var objDir: Double? = nil
@@ -282,8 +299,8 @@ enum PoolReader {
     }
 
     /// Ball number from colour; 0 = cue, 8 = eight; nil = not a ball.
-    static func classify(_ cx: Double, _ cy: Double, _ at: (Double, Double) -> (Double, Double, Double)) -> (id: Int, rim: Double)? {
-        var white = 0, col = 0, dark = 0, inner = 0, rimWhite = 0, rim = 0, coreFelt = 0, core = 0
+    static func classify(_ cx: Double, _ cy: Double, _ at: (Double, Double) -> (Double, Double, Double)) -> (id: Int, rim: Double, colour: Double, alt: Int?)? {
+        var white = 0, col = 0, dark = 0, inner = 0, rimWhite = 0, rim = 0, coreFelt = 0, core = 0, rimCol = 0
         var hues: [Double] = [], vals: [Double] = [], sats: [Double] = []
         var y = -R
         while y <= R {
@@ -299,7 +316,7 @@ enum PoolReader {
                         if isC { col += 1; hues.append(c.h); vals.append(c.v); sats.append(c.s) }
                         if c.v < 0.25 { dark += 1 }
                     }
-                    if d > 0.55 * R { rim += 1; if isW { rimWhite += 1 } }
+                    if d > 0.55 * R { rim += 1; if isW { rimWhite += 1 }; if isC && d <= 0.8 * R { rimCol += 1 } }
                     if d <= 0.5 * R { core += 1; if isFelt(c) { coreFelt += 1 } }
                 }
                 x += 1.5
@@ -309,20 +326,26 @@ enum PoolReader {
         let n = Double(max(1, inner))
         let wf = Double(white) / n, cf = Double(col) / n, df = Double(dark) / n
         let rw = Double(rimWhite) / Double(max(1, rim))
-        if cf < 0.05 && wf > 0.85 { return (0, wf) }
-        if df > 0.4 { return (8, rw) }
-        if cf < 0.1 || Double(coreFelt) / Double(max(1, core)) > 0.2 { return nil }
         func median(_ a: [Double]) -> Double { let s = a.sorted(); return s[s.count / 2] }
+        func base(_ m: Double, _ mv: Double) -> Int {
+            if m < 12 || m > 340 { return mv < 0.72 ? 7 : 3 }
+            if m < 38 { return 5 }
+            if m < 75 { return 1 }
+            if m < 170 { return 6 }
+            if m < 250 { return 2 }
+            return 4
+        }
+        // a stripe rolled so its white caps face up shows only a sliver of its colour, at the edge: still a stripe
+        // (the cue ball's red tip mark is a few px in the middle, not a band at the edge)
+        var alt: Int? = nil
+        if col >= 8 && rimCol >= 6 && median(sats) >= 0.6 { alt = base(median(hues), median(vals)) + 8 }
+        if wf > 0.6 && cf < 0.1, let a = alt { return (a, rw, cf, nil) }
+        if cf < 0.05 && wf > 0.85 { return (0, wf, cf, col >= 3 ? base(median(hues), median(vals)) + 8 : nil) }
+        if df > 0.4 { return (8, rw, cf, nil) }
+        if cf < 0.1 || Double(coreFelt) / Double(max(1, core)) > 0.2 { return nil }
         if median(sats) < 0.72 { return nil }   // cue-stick wood, translucent overlays
-        let m = median(hues), mv = median(vals)
-        var base: Int
-        if m < 12 || m > 340 { base = mv < 0.72 ? 7 : 3 }
-        else if m < 38 { base = 5 }
-        else if m < 75 { base = 1 }
-        else if m < 170 { base = 6 }
-        else if m < 250 { base = 2 }
-        else { base = 4 }
-        return (rw > 0.22 ? base + 8 : base, rw)
+        let b = base(median(hues), median(vals))
+        return (rw > 0.22 ? b + 8 : b, rw, cf, nil)
     }
 
     /// Cap/band saturation ratio per icon (stripes ≈ 0.42–0.56: white caps; solids ≈ 0.70–0.84); empty slots left out.
@@ -377,6 +400,36 @@ enum PoolReader {
             t += 6
         }
         return n == 0 ? 1 : Double(hit) / Double(n)
+    }
+
+    /// Where the cue ball is, from the game's aim line: the direction from the ring with the longest white run, walked
+    /// to where the white stops. If the white there is ball-wide the run went across the cue ball (centre R back),
+    /// otherwise the line stopped at its edge (centre R on).
+    static func cueFromLine(_ at: (Double, Double) -> (Double, Double, Double), ring a: (Double, Double)) -> (Double, Double)? {
+        func white(_ x: Double, _ y: Double) -> Bool {
+            if x < X0 || x > X1 || y < Y0 || y > Y1 { return false }
+            let q = hsv(at(x, y)); return q.s < 0.25 && q.v > 0.85
+        }
+        var best: (len: Double, ux: Double, uy: Double) = (0, 0, 0)
+        for k in 0..<720 {
+            let th = Double(k) * Double.pi / 360, ux = cos(th), uy = sin(th)
+            var r = R + 3, miss = 0, last = 0.0
+            while r < 1800 && miss <= 3 {
+                if white(a.0 + ux * r, a.1 + uy * r) { last = r; miss = 0 } else { miss += 1 }
+                r += 3
+            }
+            if last > best.len { best = (last, ux, uy) }
+        }
+        guard best.len > 3 * R else { return nil }
+        let ex = a.0 + best.ux * best.len, ey = a.1 + best.uy * best.len
+        // white across the run, R back from its end
+        let bx = ex - best.ux * R, by = ey - best.uy * R
+        var wide = 0
+        for o in stride(from: -R, through: R, by: 3) where white(bx - best.uy * o, by + best.ux * o) { wide += 1 }
+        let inBall = Double(wide) * 3 >= 1.2 * R
+        let cx = inBall ? bx : ex + best.ux * R, cy = inBall ? by : ey + best.uy * R
+        if cx < X0 + R - 4 || cx > X1 - R + 4 || cy < Y0 + R - 4 || cy > Y1 - R + 4 { return nil }
+        return (cx, cy)
     }
 
     /// Centre of the hollow white ball-sized ring the game draws where the cue ball will hit.

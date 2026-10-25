@@ -535,7 +535,8 @@ struct PoolView: Equatable {
     var risky = false                          // it reaches a pocket but only just (off the jaw / a hair from missing)
     var bankX: Double? = nil, bankY: Double? = nil   // where the bank shot meets the cushion
     var win: PoolEngine.Window? = nil          // how far the cue may turn and still pot (for the zoom and the meter)
-    var zoomPocket: Int? = nil                 // no turn pots, but your line ends by this pocket: close-up only
+    var zoomPocket: Int? = nil
+    var options: [PoolEngine.Shot] = []        // every ball that pots straight from here: a thin line to its pocket                 // no turn pots, but your line ends by this pocket: close-up only
     var target: Int? = nil                     // the ball your aim hits
     var legal: [Int] = []
 }
@@ -594,6 +595,14 @@ extension Renderer {
         }
         // suggested shot: gold (faint while you are aiming, so your own line stands out)
         let aiming = v.aimX != nil
+        // every ball that pots straight: thin lines to the pocket (gold yours, grey the others; fainter while aiming)
+        for s in v.options where s.ball != v.shot?.ball {
+            guard let b = v.balls.first(where: { $0.id == s.ball }) else { continue }
+            let p = PoolEngine.pockets[s.pocket], mine = v.legal.contains(s.ball)
+            let col = (mine ? gold : UIColor(white: 0.85, alpha: 1)).withAlphaComponent(aiming ? 0.2 : (mine ? 0.7 : 0.35))
+            let l = UIBezierPath(); l.move(to: pt(b.x, b.y)); l.addLine(to: pt(p.x, p.y))
+            l.lineWidth = mine ? 2 : 1.5; l.setLineDash([4, 4], count: 2, phase: 0); col.setStroke(); l.stroke()
+        }
         let sg = aiming ? gold.withAlphaComponent(0.35) : gold
         if let s = v.shot {
             let cue = pt(s.cueX, s.cueY), g = pt(s.ghostX, s.ghostY)

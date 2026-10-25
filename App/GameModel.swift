@@ -504,36 +504,50 @@ final class GameModel: ObservableObject {
     private var poolMsgs = 0, poolRate = 0, poolRateSince = Date(), poolAppMs = 0.0
     private var poolInZone = false
     private var poolLastLog = ""
+    private var poolPlanned: [PoolEngine.Ball] = []   // the table the suggestion below was worked out for
+    private var poolPlannedGroup = -1
+    private var poolBest: PoolEngine.Shot? = nil, poolNext: PoolEngine.Shot? = nil, poolCueEnd: (Double, Double)? = nil
+    private var poolOptions: [PoolEngine.Shot] = []    // every ball that pots straight from here (yours and the others)
     private var poolAims: [(Double, Double)] = []   // the last few aim-circle readings (a sure pot needs it steady)
 
     private var poolGroup = 0            // your group once it is certain (kept for the whole game)
-    private var poolGroupCand = 0, poolGroupVotes = 0   // a group the bar and the table agree on, and for how many readings
+    private var poolGroupCand = 0, poolGroupCandSince = Date()   // a group the counts agree on, and since when
+    private var poolGroupAltSince: Date? = nil                    // since when the counts fit the other group clearly better
     private var poolStillSince = Date()  // when the balls last stopped moving
     private var poolPrev: [PoolEngine.Ball] = []
 
-    /// Your group. Decided once, from readings with the table at rest: your bar's count matches the solids or
-    /// the stripes left on the table (or, with no count to tell, the bar's icons are solids / stripes) for 20
-    /// readings in a row. Then it stays for the whole game: a ball lost for a moment while it rolls, or misread,
-    /// once flipped it (you on the 5 and the 8 were told to play the 11, and then that the 8 wasn't yours).
-    /// Only a new rack resets it.
+    /// Your group, from counts only: how many balls your bar holds against how many solids and stripes are on the
+    /// table (the bar icons' look is not used any more: on the pink table the phone's capture made stripes read as
+    /// solids, and 3 games of 4 came out wrong). Decided once the counts agree for 1 s with the table at rest, then
+    /// kept; if later the counts fit the other group clearly better for 3 s it switches. A new rack resets it.
     private func poolGroupNow(_ m: BoardMessage, _ others: [PoolEngine.Ball], still: Bool) -> Int {
         let solids = others.filter { (1...7).contains($0.id) }.count, stripes = others.filter { (9...15).contains($0.id) }.count
-        if solids + stripes >= 14 { poolGroup = 0; poolGroupVotes = 0 }   // a new game
+        if solids + stripes >= 14 { poolGroup = 0; poolGroupCand = 0; poolGroupAltSince = nil }   // a new game
         let mine = m.cells[PoolCodec.myLeft]
-        if poolGroup == 0 && still {
+        let ds = abs(mine - solids), dl = abs(mine - stripes)
+        if still && mine > 0 {
+            // which group the counts point at (a ball hidden for a moment is allowed for: one off still counts
+            // when the other group is two further off)
             var cand = 0
-            if mine > 0 && solids != stripes { cand = mine == solids ? 1 : (mine == stripes ? 2 : 0) }
-            if cand == 0 && (m.me == 1 || m.me == 2) && mine > 0 { cand = m.me }
-            if cand != 0 && (m.me == 0 || m.me == 3 || m.me == cand) {
-                if cand == poolGroupCand { poolGroupVotes += 1 } else { poolGroupCand = cand; poolGroupVotes = 1 }
-                if poolGroupVotes >= 20 { poolGroup = cand }
-            } else { poolGroupVotes = 0 }
+            if ds <= 1 && dl >= ds + 2 { cand = 1 } else if dl <= 1 && ds >= dl + 2 { cand = 2 }
+            else if ds == 0 && dl >= 1 { cand = 1 } else if dl == 0 && ds >= 1 { cand = 2 }
+            if poolGroup == 0 {
+                if cand != 0 && cand == poolGroupCand {
+                    if Date().timeIntervalSince(poolGroupCandSince) >= 1 { poolGroup = cand }
+                } else { poolGroupCand = cand; poolGroupCandSince = Date() }
+            } else {
+                let better = poolGroup == 1 ? dl + 2 <= ds : ds + 2 <= dl
+                if better {
+                    if let t = poolGroupAltSince { if Date().timeIntervalSince(t) >= 3 { poolGroup = 3 - poolGroup; poolGroupAltSince = nil } }
+                    else { poolGroupAltSince = Date() }
+                } else { poolGroupAltSince = nil }
+            }
         }
         var g = poolGroup
         // on the 8: none of your group left on the table and none in your bar
         if g == 1 && solids == 0 && mine == 0 { g = 3 }
         if g == 2 && stripes == 0 && mine == 0 { g = 3 }
-        // group never known this game (you joined late, the bar was hidden): the bar showing only the 8 tells
+        // group never known this game (you joined late): the bar showing only the 8 tells
         if g == 0 && m.me == 3 && mine == 0 && (solids == 0 || stripes == 0) { g = 3 }
         return g
     }
@@ -566,7 +580,8 @@ final class GameModel: ObservableObject {
         let cue = balls.first { $0.id == 0 }
         let others = balls.filter { $0.id != 0 }
         // still or rolling: any ball moved more than a few px since the last reading (or one came or went)
-        let movedNow = balls.count != poolPrev.count || !balls.allSatisfy { b in poolPrev.contains { $0.id == b.id && abs($0.x - b.x) < 4 && abs($0.y - b.y) < 4 } }
+        // (the cue ball gets more slack: under the ball-in-hand hand its place comes from the aim line, a few px loose)
+        let movedNow = balls.count != poolPrev.count || !balls.allSatisfy { b in let tol = b.id == 0 ? 8.0 : 4.0; return poolPrev.contains { $0.id == b.id && abs($0.x - b.x) < tol && abs($0.y - b.y) < tol } }
         poolPrev = balls
         if movedNow { poolStillSince = Date() }
         let still = Date().timeIntervalSince(poolStillSince) > 0.35
@@ -587,6 +602,42 @@ final class GameModel: ObservableObject {
         let mineLeft = others.filter { legal.contains($0.id) }.map { $0.id }.sorted()
         let mineText = group == 3 ? "ของคุณ: ลูก 8" : (group == 0 ? "โต๊ะเปิด" : "ของคุณ: " + mineLeft.map(String.init).joined(separator: " · "))
         var title = "เล็งได้เลย", line = mineText
+        // a suggestion (worked out once per resting table): which ball, which pocket, how hard, and the ball after it;
+        // and a thin line for every ball that pots straight from where the cue ball is, yours or not
+        let moved = poolPlannedGroup != group || balls.count != poolPlanned.count
+            || !balls.allSatisfy { b in poolPlanned.contains { $0.id == b.id && abs($0.x - b.x) < 6 && abs($0.y - b.y) < 6 } }
+        if moved {
+            poolPlanned = balls; poolPlannedGroup = group
+            poolBest = nil; poolNext = nil; poolCueEnd = nil; poolOptions = []
+            if let cue, !PoolEngine.isBreak(others) {
+                if let pl = PoolEngine.plan(cueX: cue.x, cueY: cue.y, balls: others, legal: legal, group: group) {
+                    poolBest = pl.first; poolNext = pl.next; poolCueEnd = pl.cueEnd
+                } else {
+                    poolBest = PoolEngine.shots(cueX: cue.x, cueY: cue.y, balls: others, legal: legal, banks: true).first
+                }
+                var seen = Set<Int>()
+                for sh in PoolEngine.shots(cueX: cue.x, cueY: cue.y, balls: others, legal: Set(others.map { $0.id }), banks: false) where !seen.contains(sh.ball) {
+                    seen.insert(sh.ball); poolOptions.append(sh)
+                }
+            }
+        }
+        view.shot = poolBest; view.next = poolNext; view.options = poolOptions
+        if let e = poolCueEnd { view.cueEndX = e.0; view.cueEndY = e.1 }
+        if let s = poolBest {
+            title = "\(s.ball) → \(PoolEngine.pockets[s.pocket].name)"
+            var bankText = "ชิ่ง · "
+            if s.bank, let b = others.first(where: { $0.id == s.ball }) {
+                let d = hypot(b.x - s.ghostX, b.y - s.ghostY)
+                if let h = PoolEngine.cushionHit(b.x, b.y, (b.x - s.ghostX) / d, (b.y - s.ghostY) / d, balls: balls, skip: b.id) {
+                    bankText = "ชิ่ง" + PoolEngine.railSpot(h.0, h.1) + " · "
+                    if !hasAim { view.bankX = h.0; view.bankY = h.1 }
+                }
+            }
+            line = (s.bank ? bankText : "") + "แรง \(s.powerPct)" + (poolNext.map { " · ต่อด้วย \($0.ball)" } ?? "") + "\n" + mineText
+        } else if cue != nil && !PoolEngine.isBreak(others) {
+            title = "เซฟ"
+            if let cue, let sb = PoolEngine.safety(cueX: cue.x, cueY: cue.y, balls: others, legal: legal) { line = "ไม่มีลูกลงตรงๆ · แตะลูก \(sb.id) ก่อน\n" + mineText }
+        }
         if PoolEngine.isBreak(others) { title = "เบรก"; line = "ยิงตรงกลางลูกหน้าสุด แรงสุด" }
         else if cue == nil { title = "วางลูกขาว"; line = mineText }
         // your aim: draw where the balls go; one long tone when it pots one of your balls cleanly
@@ -672,6 +723,7 @@ final class GameModel: ObservableObject {
             var t = "P turn=\(m.myTurn ? 1 : 0) bar=\(m.me) mine=\(c[PoolCodec.myLeft]) group=\(group) balls=" + balls.map { "\($0.id):\(f($0.x)),\(f($0.y))" }.joined(separator: " ")
             if let a = view.aimX, let b = view.aimY { t += " aim=\(f(a)),\(f(b))" }
             if let d = PoolCodec.dir(c) { t += String(format: " dir=%.1f", d * 180 / Double.pi) }
+            if let s = poolBest { t += " best=\(s.ball)>\(s.pocket)@\(s.powerPct)" + (poolNext.map { " next=\($0.ball)" } ?? "") }
             if let w = view.win { t += String(format: " win=%d:%.2f..%.2f", w.pocket, w.lo, w.hi) }
             if pulling { t += " power=\(c[PoolCodec.power] * 14 + c[PoolCodec.power + 1])" }
             t += " says=\(title)|" + line.replacingOccurrences(of: "\n", with: " / ")
