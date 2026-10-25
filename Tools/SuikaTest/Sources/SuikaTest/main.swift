@@ -137,6 +137,9 @@ for n in ["pool_20", "pool_1_5", "pool_12_6", "pool_120", "shot1", "shot2"] {
         let legal = PoolEngine.legal(group: m.me)
         let t1 = DispatchTime.now().uptimeNanoseconds
         let sh = PoolEngine.shots(cueX: cue.x, cueY: cue.y, balls: others, legal: legal)
+        if let pl = PoolEngine.plan(cueX: cue.x, cueY: cue.y, balls: others, legal: legal, group: m.me) {
+            line += " · PLAN \(pl.first.ball)→\(PoolEngine.pockets[pl.first.pocket].name) แรง \(pl.first.powerPct), cue stops (\(Int(pl.cueEnd.0)),\(Int(pl.cueEnd.1))), next \(pl.next.map { "\($0.ball)→\(PoolEngine.pockets[$0.pocket].name)" } ?? "-")"
+        }
         line += " · \(sh.count) shots in \(ms(t1)) ms, best " + sh.prefix(3).map { "\($0.ball)→\(PoolEngine.pockets[$0.pocket].name)\($0.bank ? " ชิ่ง" : "") tol \(String(format: "%.2f", $0.tolerance))° แรง \($0.powerPct)" }.joined(separator: " | ")
         if c[PoolCodec.flags] & 2 == 2 {
             let a = PoolCodec.get(c, PoolCodec.aim)
