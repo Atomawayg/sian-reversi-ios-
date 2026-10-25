@@ -565,7 +565,7 @@ extension Renderer {
         // table on the left: playing surface 759 × 1551 px on screen
         let area = CGRect(x: 18, y: 16, width: (rect.height - 32) * 759 / 1551, height: rect.height - 32)
         // text on the right
-        let zoomAt = v.win?.pocket ?? v.zoomPocket
+        let zoomAt = v.zoomPocket   // steadied in GameModel (the pocket your line ends at)
         let zoom = zoomAt != nil && v.aimX != nil
         let zs: CGFloat = min(250, rect.height - 24)   // the pocket close-up, big on the right while your line nears a pocket
         let barW: CGFloat = 26, barX = rect.width - (zoom ? zs + 12 : 0) - barW - 14
@@ -735,7 +735,7 @@ extension Renderer {
             }
         }
         if zoom, let k = zoomAt {
-            drawPoolZoom(v, k, v.win, CGRect(x: rect.width - zs - 12, y: (rect.height - zs) / 2, width: zs, height: zs), pots: v.pots, risky: v.risky)
+            drawPoolZoom(v, k, v.win?.pocket == k ? v.win : nil, CGRect(x: rect.width - zs - 12, y: (rect.height - zs) / 2, width: zs, height: zs), pots: v.pots, risky: v.risky)
         }
     }
 
