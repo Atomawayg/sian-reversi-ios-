@@ -97,6 +97,35 @@ extension BoardReader {
             }
             return h
         }
+        /// Tests measured on recordings: the disc's edge lies on the fruit, and the big look-alikes are told apart
+        /// (a pear beside a dekopon is not a pineapple, an apple is not a peach, melon vs watermelon).
+        func lookAlikeOK(_ t: Int, _ ci: Double, _ cj: Double, _ rr: Double, _ m: UInt16) -> Bool {
+            var h = 0
+            for a in 0..<32 {
+                let th = 2 * Double.pi * Double(a) / 32
+                if on(Int((ci + 0.93 * rr * cos(th)).rounded()), Int((cj + 0.93 * rr * sin(th)).rounded()), m) { h += 1 }
+            }
+            if Double(h) / 32 < 0.35 { return false }
+            if t < 7 { return true }
+            var n = 0, pale = 0, red = 0, band = 0, bandOwn = 0
+            let R = Int(rr) + 1
+            for y in max(0, Int(cj) - R)...min(gh - 1, Int(cj) + R) {
+                for x in max(0, Int(ci) - R)...min(gw - 1, Int(ci) + R) {
+                    let d = ((Double(x) - ci) * (Double(x) - ci) + (Double(y) - cj) * (Double(y) - cj)).squareRoot()
+                    let g = grid[y * gw + x]
+                    if d <= 0.85 * rr { n += 1; if g == 6 { pale += 1 }; if g == 1 || g == 2 { red += 1 } }
+                    if d > 0.6 * rr && d < 0.95 * rr { band += 1; if on(x, y, m) { bandOwn += 1 } }
+                }
+            }
+            let f = Double(max(1, n))
+            switch t {
+            case 7: return Double(pale) / f >= 0.2                       // a peach is mostly pale pink
+            case 8: return Double(bandOwn) / Double(max(1, band)) >= 0.8 // a pineapple is a solid yellow ring
+            case 9: return Double(red) / f < 0.06                        // a melon has no red
+            case 10: return Double(red) / f >= 0.06                      // a watermelon shows its red mouth
+            default: return true
+            }
+        }
         var found: [(t: Int, x: Double, y: Double, sc: Double)] = []
         for t in stride(from: SK.types - 1, through: 0, by: -1) {
             let rr = SK.radius[t] / S, m = BoardReader.skMask[t]
@@ -128,14 +157,15 @@ extension BoardReader {
                         let dx = Double(x - i), dy = Double(y - j)
                         if dx * dx + dy * dy > rr * rr * 1.1 { continue }
                         let k = y * gw + x
-                        if !claimed[k] && grid[k] != 0 && m & (1 << UInt16(grid[k])) != 0 { sxs += Double(x); sys += Double(y); cnt += 1 }
+                        // a peach is centred on its pale skin alone: a red apple beside it would drag the centre over
+                        if !claimed[k] && grid[k] != 0 && m & (1 << UInt16(grid[k])) != 0 && (t != 7 || grid[k] == 6) { sxs += Double(x); sys += Double(y); cnt += 1 }
                     }
                 }
                 if cnt == 0 { continue }
                 var ci = sxs / cnt, cj = sys / cnt
                 // faces pull the middle of the colour off centre: nudge until the edge ring sits on the fruit
                 var bx = ci, by = cj, bh = edge(ci, cj, rr, m)
-                for dy in -8...8 { for dx in -8...8 {
+                for dy in (t == 7 ? 0...0 : -8...8) { for dx in (t == 7 ? 0...0 : -8...8) {
                     let x = ci + Double(dx) * 0.5, y = cj + Double(dy) * 0.5
                     let h = edge(x, y, rr, m)
                     if h > bh || (h == bh && (x - ci) * (x - ci) + (y - cj) * (y - cj) < (bx - ci) * (bx - ci) + (by - cj) * (by - cj)) { bx = x; by = y; bh = h }
@@ -143,6 +173,7 @@ extension BoardReader {
                 ci = bx; cj = by
                 let sc = score(ci, cj, rr, m)
                 if sc.all < 0.6 || sc.rim < 0.45 { continue }
+                if !lookAlikeOK(t, ci, cj, rr, m) { continue }
                 var px = X0 + ci * S + S / 2, py = Y0 + cj * S + S / 2
                 px = min(max(px, SK.left + SK.radius[t]), SK.right - SK.radius[t])
                 py = min(py, SK.floor - SK.radius[t])
