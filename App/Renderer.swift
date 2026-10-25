@@ -526,6 +526,8 @@ enum Renderer {
 struct PoolView: Equatable {
     var balls: [PoolEngine.Ball]
     var shot: PoolEngine.Shot?                 // the suggested shot
+    var next: PoolEngine.Shot? = nil           // the shot after it (from where the cue ball should stop)
+    var cueEndX: Double? = nil, cueEndY: Double? = nil
     var aimX: Double? = nil, aimY: Double? = nil   // the game's aim circle now
     var objPath: [Double] = []                 // x,y pairs: where the ball you are aiming at goes
     var cuePath: [Double] = []                 // x,y pairs: where the cue ball goes after the hit (no spin)
@@ -601,9 +603,25 @@ extension Renderer {
                 UIGraphicsGetCurrentContext()?.resetClip()
             }
             if b.id != 0 && !v.legal.contains(b.id) {   // not yours: dimmed
-                UIColor.black.withAlphaComponent(0.45).setFill(); UIBezierPath(ovalIn: rr).fill()
+                UIColor.black.withAlphaComponent(0.6).setFill(); UIBezierPath(ovalIn: rr).fill()
+            } else if b.id != 0 {                        // yours: a white ring
+                UIColor.white.setStroke(); let o = UIBezierPath(ovalIn: rr.insetBy(dx: -1.5, dy: -1.5)); o.lineWidth = 1.5; o.stroke()
             }
             if let s = v.shot, s.ball == b.id { gold.setStroke(); let o = UIBezierPath(ovalIn: rr.insetBy(dx: -3, dy: -3)); o.lineWidth = 3; o.stroke() }
+        }
+        // the plan: 1 and 2 on the balls, a ring where the cue ball should stop after shot 1
+        func label(_ txt: String, _ b: PoolEngine.Ball) {
+            let c = pt(b.x, b.y)
+            let at: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 15, weight: .black), .foregroundColor: UIColor.black]
+            gold.setFill(); UIBezierPath(ovalIn: CGRect(x: c.x + br - 2, y: c.y - br - 12, width: 16, height: 16)).fill()
+            (txt as NSString).draw(at: CGPoint(x: c.x + br + 2, y: c.y - br - 12), withAttributes: at)
+        }
+        if let s = v.shot, let b = v.balls.first(where: { $0.id == s.ball }) { label("1", b) }
+        if let n = v.next, let b = v.balls.first(where: { $0.id == n.ball }) { label("2", b) }
+        if let ex = v.cueEndX, let ey = v.cueEndY, !aiming {
+            let e = pt(ex, ey)
+            UIColor.white.setStroke()
+            let r = UIBezierPath(ovalIn: CGRect(x: e.x - br, y: e.y - br, width: br * 2, height: br * 2)); r.lineWidth = 2; r.setLineDash([3, 3], count: 2, phase: 0); r.stroke()
         }
         if let ax = v.aimX, let ay = v.aimY {
             let a = pt(ax, ay)

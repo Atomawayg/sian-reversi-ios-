@@ -173,8 +173,8 @@ struct ContentView: View {
                     Label(model.pipOn ? "ปิดหน้าต่างลอย" : "เปิดหน้าต่างลอย", systemImage: "pip")
                         .font(.footnote.weight(.semibold))
                 }
-                Toggle(isOn: $model.jkLogOn) {
-                    Text("บันทึกเกม Jackaroo (ไว้ส่งให้ตรวจ)").font(.footnote.weight(.semibold))
+                Toggle(isOn: $model.logOn) {
+                    Text("บันทึกเกมพูล (ไว้ส่งให้ตรวจ)").font(.footnote.weight(.semibold))
                 }.tint(Theme.gold)
                 HStack(spacing: 16) {
                     ShareLink(item: GameModel.logURL) { Label("ส่งบันทึก", systemImage: "square.and.arrow.up").font(.footnote.weight(.semibold)) }
