@@ -346,6 +346,48 @@ enum PoolEngine {
     }
 
 
+    /// How far you can turn the cue either way and still pot: cue-angle window in degrees (0 = your aim now,
+    /// + = turning clockwise on screen) for the pocket your line goes to (or the nearest one it could go to).
+    struct Window: Equatable { var pocket: Int; var lo: Double; var hi: Double; var centreDir: Double }
+    static func potWindow(cueX: Double, cueY: Double, aimX: Double, aimY: Double, target t: Ball, balls: [Ball], dir: Double?) -> Window? {
+        let a0 = atan2(aimY - cueY, aimX - cueX)
+        func objDir(_ d: Double) -> Double? {
+            let ux = cos(a0 + d * Double.pi / 180), uy = sin(a0 + d * Double.pi / 180)
+            let fx = cueX - t.x, fy = cueY - t.y, b = fx * ux + fy * uy, c = fx * fx + fy * fy - 4 * R * R
+            let disc = b * b - c
+            if disc < 0 || b >= 0 { return nil }
+            let sDist = -b - disc.squareRoot()
+            return atan2(t.y - (cueY + uy * sDist), t.x - (cueX + ux * sDist))
+        }
+        guard let g0 = objDir(0) else { return nil }
+        // the game's own line is a little more exact than the geometry: shift every direction by the difference
+        var shift = 0.0
+        if let gd = dir {
+            var d = gd - g0
+            while d > Double.pi { d -= 2 * Double.pi }; while d < -Double.pi { d += 2 * Double.pi }
+            if abs(d) < 0.2 { shift = d }
+        }
+        let step = 0.05, n = 80
+        var res = [Int](repeating: -1, count: 2 * n + 1)
+        for k in -n...n {
+            if let o = objDir(Double(k) * step), let tr = trace(t.x, t.y, cos(o + shift), sin(o + shift), balls: balls, skip: t.id){
+                res[k + n] = tr.pocket
+            }
+        }
+        // the pocket at 0, or the nearest potting turn
+        var k0 = n
+        if res[n] < 0 {
+            guard let near = res.indices.filter({ res[$0] >= 0 }).min(by: { abs($0 - n) < abs($1 - n) }) else { return nil }
+            k0 = near
+        }
+        let p = res[k0]
+        var lo = k0, hi = k0
+        while lo > 0 && res[lo - 1] == p { lo -= 1 }
+        while hi < 2 * n && res[hi + 1] == p { hi += 1 }
+        let l = Double(lo - n) * step, h = Double(hi - n) * step
+        return Window(pocket: p, lo: l, hi: h, centreDir: (objDir((l + h) / 2) ?? g0) + shift)
+    }
+
     // MARK: paths to draw
 
     /// Where a ball rolling from (x,y) along (ux,uy) goes: off up to two cushions (and the jaws), stopping at a
