@@ -711,8 +711,7 @@ final class GameModel: ObservableObject {
             // ball and table
             if let t = tgt {
                 let key = [Double(t.id)] + others.flatMap { [Double($0.id), ($0.x / 4).rounded(), ($0.y / 4).rounded()] }
-                if poolGuide.key != key { poolGuide = (key, PoolEngine.pocketLines(t, balls: others)) }
-                view.guideLines = poolGuide.lines
+                _ = key   // guide lines to every pocket: no longer drawn (3.22)
             }
             func paths(_ p: Int) -> (obj: [Double], cue: [Double], cueStop: (Double, Double), objDrops: Bool, cueDrops: Bool) {
                 PoolEngine.powerPaths(cueX: cue.x, cueY: cue.y, aimX: a.x, aimY: a.y, target: tgt, balls: balls, dir: dir, power: p)

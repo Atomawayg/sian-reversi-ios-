@@ -17,14 +17,21 @@ enum PoolEngine {
     // the cue ball leaves at about 4150 px/s × power (51 % → 2070, 54 % → 2230, 63 % → 2700 px/s),
     // and slows by (100 + 1.4·v) px/s every second (fast balls lose speed quickly, slow ones roll on).
     // Refit Oct 26 on where 24 cue balls really came to rest (positions only, no clock): 6000 px/s at full power
-    static let fullSpeed = 6000.0
+    static let fullSpeed = 4480.0
+    /// Measured on Atom's in-app clip (Oct 26, 60 fps, exact frame times) and the old 60 fps recording: the cue ball
+    /// leaves at about 50 px/s per power % minus 520 (25 % → ~730, 35 % → ~1230, 100 % → ~4480), not in proportion.
+    static func speedAt(power p: Double) -> Double { max(40, 50 * p - 520) }
+    static func powerFor(speed v: Double) -> Double { (v + 520) / 50 }
     // Oct 25 logs (rolling balls, 36 shots): slow balls coast much further than (100 + 1.4·v) allowed, and full-power
     // runs went ~2300 px with two cushions; the low-speed part is eased to 30 (only total distances, not times, could be
     // trusted from the log)
-    static let decel0 = 100.0, decelV = 0.8
+    // clip: a struck ball first skids, losing ~2040 px/s every second until it is down to ~80 % of its start pace,
+    // then rolls on, losing only (3 + 0.57·v) px/s every second
+    static let slideDecel = 2040.0, slideTo = 0.8
+    static let decel0 = 3.0, decelV = 0.57
     /// the cue ball rolls into the hit (a centre hit in this game is a rolling ball): afterwards it keeps this share of
     /// the pace along the hit ball's line on top of the tangent pace (2/7, as for a rolling ball; a full hit follows through)
-    static let follow = 2.0 / 7.0
+    static let follow = 0.15   // clip: after a near-full hit the cue ball crept on at ~0.15 of its hit pace
 
     struct Ball: Equatable { var id: Int; var x: Double; var y: Double }
     struct Shot: Equatable {
@@ -221,7 +228,7 @@ enum PoolEngine {
     /// With no ball hit, the cue ball's own run. `cueStop` is where the cue ball comes to rest.
     static func powerPaths(cueX: Double, cueY: Double, aimX: Double, aimY: Double, target: Ball?, balls: [Ball], dir: Double?, power: Int) -> (obj: [Double], cue: [Double], cueStop: (Double, Double), objDrops: Bool, cueDrops: Bool) {
         let others = balls.filter { $0.id != 0 }
-        let v0 = Double(max(1, power)) / 100 * fullSpeed
+        let v0 = speedAt(power: Double(max(1, power)))
         var ax = aimX - cueX, ay = aimY - cueY
         let d1 = (ax * ax + ay * ay).squareRoot(); ax /= max(d1, 1e-6); ay /= max(d1, 1e-6)
         guard let b = target else {
@@ -272,8 +279,10 @@ enum PoolEngine {
 
     /// how far a ball rolls from speed v before it stops
     static func rollDistance(_ v: Double) -> Double {
-        let c = decelV, a = decel0
-        return v / c - a / (c * c) * log(1 + c * v / a)
+        if v <= 0 { return 0 }
+        let c = decelV, a = decel0, vr = slideTo * v
+        let skid = (v * v - vr * vr) / (2 * slideDecel)
+        return skid + vr / c - a / (c * c) * log(1 + c * vr / a)
     }
     /// start speed that leaves `arrive` px/s after rolling d
     static func speedNeeded(toRoll d: Double, arriving: Double) -> Double {
@@ -288,7 +297,7 @@ enum PoolEngine {
         let vObj = speedNeeded(toRoll: d2 * (bank ? 1.25 : 1), arriving: 260)
         let vHit = vObj / max(0.3, cos(cut * Double.pi / 180))
         let v0 = speedNeeded(toRoll: d1, arriving: vHit)
-        let pct = v0 / fullSpeed * 100
+        let pct = powerFor(speed: v0)
         return max(10, min(100, Int((pct / 5).rounded()) * 5))
     }
 
@@ -516,7 +525,7 @@ enum PoolEngine {
     static func cueEnd(_ s: Shot, balls: [Ball]) -> (Double, Double) {
         guard let b = balls.first(where: { $0.id == s.ball }) else { return (s.cueX, s.cueY) }
         let d1 = hypot(s.ghostX - s.cueX, s.ghostY - s.cueY)
-        let v0 = Double(s.powerPct) / 100 * fullSpeed
+        let v0 = speedAt(power: Double(s.powerPct))
         let vHit = speedFor(distance: max(0, rollDistance(v0) - d1))
         let ix = (s.ghostX - s.cueX) / max(d1, 1e-6), iy = (s.ghostY - s.cueY) / max(d1, 1e-6)
         let od = max(1e-6, hypot(b.x - s.ghostX, b.y - s.ghostY))
@@ -613,7 +622,7 @@ enum PoolEngine {
             var p = 10
             var objPts: [Double] = [], stop: [Double] = []
             while p <= 90 {
-                let v0 = Double(p) / 100 * fullSpeed
+                let v0 = speedAt(power: Double(p))
                 let cr = run(cueX, cueY, cos(mid), sin(mid), balls: others, skip: 0, maxLen: 4000, maxRails: 2, gap: 2 * R, speed: v0)
                 if cr.ball == h.ball, cr.pts.count >= 4 {
                     let gx = cr.pts[cr.pts.count - 2], gy = cr.pts[cr.pts.count - 1]

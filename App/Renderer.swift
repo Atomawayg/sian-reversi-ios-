@@ -641,7 +641,7 @@ extension Renderer {
         let orange = UIColor(red: 1.0, green: 0.62, blue: 0.15, alpha: 1)
         // a dark edge under your lines so they stand out on the small table
         // every way the ball you aim at can reach a pocket: thin light lines
-        for g in v.guideLines { poly(g, UIColor(red: 1.0, green: 0.55, blue: 0.45, alpha: 0.75), 1.5) }
+        // (guide lines to every pocket dropped in 3.22: Atom found them cluttered and of little use)
         // your line all the way in at the power to use (thin), then what your pull really reaches (bold)
         poly(v.objPathFull, (v.pots ? green : (v.risky ? orange : red)).withAlphaComponent(0.55), 2.5)
         poly(v.objPath, UIColor.black.withAlphaComponent(0.55), 8)
