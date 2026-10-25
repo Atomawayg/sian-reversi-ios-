@@ -407,6 +407,8 @@ final class GameModel: ObservableObject {
     // MARK: Plato checkers (English rules)
     private let draughts = DraughtsEngine()
     private var dMine = 0          // your colour this game: 1 red, 2 white
+    private var dPrev: [Int]? = nil          // last board, +1/+2 mine, −1/−2 theirs
+    private var dKings = Set<Int>()          // squares holding a king, followed from move to move
 
     private func handleDraughts(_ m: BoardMessage) {
         // your colour: read from the captured-pieces trays; before anything is taken, the colour that
@@ -422,9 +424,26 @@ final class GameModel: ObservableObject {
         let mine = dMine
         var board = [Int](repeating: 0, count: 64)
         for i in 0..<64 where m.cells[i] != 0 {
-            let c = (m.cells[i] - 1) % 2 + 1, king = m.cells[i] >= 3
-            board[i] = (c == mine ? 1 : -1) * (king ? 2 : 1)
+            let c = (m.cells[i] - 1) % 2 + 1
+            board[i] = c == mine ? 1 : -1
         }
+        // Kings: a crown seen on screen, a man standing on the far row (it was crowned there), or a king
+        // followed from its last square (a crown can be hard to see, so the move tells us instead).
+        if count >= 24 || dPrev == nil { dKings = [] }
+        var kings = Set<Int>()
+        if let p = dPrev {
+            for side in [1, -1] {
+                let gone = (0..<64).filter { p[$0].signum() == side && board[$0] != side }
+                let came = (0..<64).filter { board[$0] == side && p[$0].signum() != side }
+                if gone.count == 1 && came.count == 1 && dKings.contains(gone[0]) { kings.insert(came[0]) }
+            }
+            for k in dKings where p[k].signum() == board[k] && board[k] != 0 { kings.insert(k) }
+        }
+        for i in 0..<64 where board[i] != 0 {
+            if m.cells[i] >= 3 || (board[i] == 1 && i / 8 == 0) || (board[i] == -1 && i / 8 == 7) { kings.insert(i) }
+        }
+        for k in kings { board[k] *= 2 }
+        if board != dPrev { dPrev = board; dKings = kings }
         let draw = board.map { $0 == 1 ? 1 : ($0 == 2 ? 2 : ($0 == -1 ? 3 : ($0 == -2 ? 4 : 0))) }
         let meC = mine == 2 ? 3 : 4        // drawing colours: 3 = you cream / opponent red, 4 = you red / opponent cream
         guard m.myTurn else {
