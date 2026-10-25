@@ -6,6 +6,8 @@ import QuartzCore
 class SampleHandler: RPBroadcastSampleHandler {
     private var lastRead: CFTimeInterval = 0
     private var lastSent: CFTimeInterval = 0
+    private var lastFull: CFTimeInterval = 0
+    private var poolMode = false
     private var prev: BoardMessage?
     private var sent: BoardMessage?
     private var busy = false
@@ -24,7 +26,8 @@ class SampleHandler: RPBroadcastSampleHandler {
     override func processSampleBuffer(_ sampleBuffer: CMSampleBuffer, with sampleBufferType: RPSampleBufferType) {
         guard sampleBufferType == .video else { return }
         let t = CACurrentMediaTime()
-        if busy || t - lastRead < 0.15 { return }
+        // pool reads every frame it can (the aim moves under your finger); the board games every 0.15 s
+        if busy || t - lastRead < (poolMode ? 0.03 : 0.15) { return }
         lastRead = t
         guard let pb = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         busy = true
@@ -34,7 +37,14 @@ class SampleHandler: RPBroadcastSampleHandler {
         if msg.game == .suika && msg.valid { suika(msg, t); return }
         // pool: the aim and the power bar move all the time and the app keeps the last clean table itself,
         // so pass every reading on at once (the sound has to follow your finger)
-        if msg.game == .pool && msg.valid { prev = msg; if msg != sent || t - lastSent > 1.0 { send(msg); sent = msg; lastSent = t }; return }
+        if msg.game == .pool && msg.valid {
+            prev = msg; poolMode = true
+            // full board once a second, otherwise just the cells that moved (the aim, the power bar)
+            if t - lastFull > 1.0 || sent?.game != .pool { DarwinBoard.send(msg); lastFull = t; sent = msg; lastSent = t }
+            else if msg != sent { DarwinBoard.send(msg, since: sent); sent = msg; lastSent = t }
+            return
+        }
+        poolMode = false
         skStableSince = 0; skPrev = nil
         // only trust cells that stayed the same across two frames (discs animate when flipping)
         let stable = prev.map { $0.valid == msg.valid && $0.game == msg.game && $0.cells == msg.cells && $0.me == msg.me } ?? false

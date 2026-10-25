@@ -571,22 +571,24 @@ extension Renderer {
             l.lineWidth = width; if dash { l.setLineDash([8, 6], count: 2, phase: 0) }
             col.setStroke(); l.stroke()
         }
-        // suggested shot: gold
+        // suggested shot: gold (faint while you are aiming, so your own line stands out)
+        let aiming = v.aimX != nil
+        let sg = aiming ? gold.withAlphaComponent(0.35) : gold
         if let s = v.shot {
             let cue = pt(s.cueX, s.cueY), g = pt(s.ghostX, s.ghostY)
             if let b = v.balls.first(where: { $0.id == s.ball }) {
                 let p = PoolEngine.pockets[s.pocket]
-                poly(PoolEngine.objectPath(b.x, b.y, gx: s.ghostX, gy: s.ghostY, balls: v.balls, skip: b.id, pocket: p), gold.withAlphaComponent(0.8), 3)
+                poly(PoolEngine.objectPath(b.x, b.y, gx: s.ghostX, gy: s.ghostY, balls: v.balls, skip: b.id, pocket: p), sg, 2.5, dash: s.bank)
             }
-            let l1 = UIBezierPath(); l1.move(to: cue); l1.addLine(to: g); l1.lineWidth = 3; gold.setStroke(); l1.stroke()
+            let l1 = UIBezierPath(); l1.move(to: cue); l1.addLine(to: g); l1.lineWidth = 2.5; sg.setStroke(); l1.stroke()
             let gr = UIBezierPath(ovalIn: CGRect(x: g.x - br, y: g.y - br, width: br * 2, height: br * 2)); gr.lineWidth = 2.5; gr.stroke()
             if s.placed {   // where to put the cue ball
                 gold.withAlphaComponent(0.6).setFill(); UIBezierPath(ovalIn: CGRect(x: cue.x - br * 1.6, y: cue.y - br * 1.6, width: br * 3.2, height: br * 3.2)).fill()
             }
         }
         // your aim now: where the ball goes (green = drops, red = doesn't) and where the cue ball runs
-        poly(v.objPath, v.pots ? green : red, 3)
-        poly(v.cuePath, UIColor.white.withAlphaComponent(0.8), 2, dash: true)
+        poly(v.objPath, v.pots ? green : red, 5)
+        poly(v.cuePath, UIColor.white.withAlphaComponent(0.85), 3, dash: true)
         for b in v.balls {
             let c = pt(b.x, b.y), rr = CGRect(x: c.x - br, y: c.y - br, width: br * 2, height: br * 2)
             poolColours[b.id == 0 ? 0 : (b.id == 8 ? 8 : (b.id - 1) % 8 + 1)].setFill()

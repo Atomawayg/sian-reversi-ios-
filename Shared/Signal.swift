@@ -59,13 +59,17 @@ enum DarwinBoard {
         for (i, v) in cells.enumerated() { mix(i); mix(v) }
         return Int((h ^ (h >> 8) ^ (h >> 16) ^ (h >> 24)) & 0xff)
     }
-    static func send(_ m: BoardMessage) {
+    /// `since`: the board sent just before; only cells that changed are posted (the app keeps the rest).
+    /// A lost notification fails the checksum and the next full send (at least once a second) repairs it.
+    static func send(_ m: BoardMessage, since: BoardMessage? = nil) {
         let cells = m.valid && m.cells.count <= maxCells ? m.cells.map { max(0, min(values - 1, $0)) } : []
         let h = checksum(valid: m.valid, game: m.game.rawValue, cells: cells, me: m.me, turn: m.myTurn)
+        var old: [Int]? = nil
+        if let p = since, p.valid, m.valid, p.game == m.game, p.cells.count == m.cells.count { old = p.cells.map { max(0, min(values - 1, $0)) } }
         Signal.post(prefix + "begin")
         Signal.post(prefix + "valid\(m.valid ? 1 : 0)")
         Signal.post(prefix + "g\(m.game.rawValue)")
-        for (i, v) in cells.enumerated() { Signal.post(prefix + "c\(i)v\(v)") }
+        for (i, v) in cells.enumerated() where old == nil || old![i] != v { Signal.post(prefix + "c\(i)v\(v)") }
         Signal.post(prefix + "me\(m.me)")
         Signal.post(prefix + "turn\(m.myTurn ? 1 : 0)")
         Signal.post(prefix + "ha\(h >> 4)")
