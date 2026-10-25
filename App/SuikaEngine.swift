@@ -39,7 +39,13 @@ final class SuikaEngine {
     static func made(_ k: Int) -> Double { Double(k * (k + 1)) / 2 }
 
     /// Runs the jar until everything stops (or maxT seconds). Merged kinds are appended to `created`.
+    /// `tagX` ends as the x where the dropped fruit (tag 1) came to rest or merged.
     static func simulate(_ b: inout [Body], created: inout [Int], merge: Bool = true, maxT: Double = 3.0) {
+        var tagX = 0.0
+        simulate(&b, created: &created, tagX: &tagX, merge: merge, maxT: maxT)
+    }
+
+    static func simulate(_ b: inout [Body], created: inout [Int], tagX: inout Double, merge: Bool = true, maxT: Double = 3.0) {
         var t = 0.0, quiet = 0
         var order: [Int] = Array(b.indices)
         while t < maxT {
@@ -102,6 +108,7 @@ final class SuikaEngine {
             if !pairs.isEmpty {
                 for (i, j) in pairs where b[i].alive && b[j].alive {
                     b[i].alive = false; b[j].alive = false
+                    if b[i].tag == 1 { tagX = b[i].x } else if b[j].tag == 1 { tagX = b[j].x }
                     let k = b[i].t + 1
                     created.append(k)
                     if k < SK.types {
@@ -114,6 +121,7 @@ final class SuikaEngine {
                 order = Array(b.indices)
                 quiet = 0
             }
+            if let me = b.first(where: { $0.tag == 1 }) { tagX = me.x }
             t += dt
             if fastest < 25 * 25 { quiet += 1; if quiet >= 12 && t > 0.25 { break } } else { quiet = 0 }
         }
@@ -158,17 +166,20 @@ final class SuikaEngine {
         return (0..<n).map { lo + (hi - lo) * Double($0) / Double(n - 1) }
     }
 
-    private struct Try { var x: Double; var jar: [Body]; var created: [Int]; var v1: Double; var fill: Double; var land: (Double, Double)? }
+    private struct Try { var x: Double; var jar: [Body]; var created: [Int]; var v1: Double; var fill: Double; var land: (Double, Double)?; var travel: Double }
 
     private static func drop(_ base: [Body], _ t: Int, _ x: Double) -> Try {
         var b = base
         b.append(Body(t: t, x: x, y: SK.dropY, tag: 1))
         var created: [Int] = []
-        simulate(&b, created: &created)
+        var end = x
+        simulate(&b, created: &created, tagX: &end)
         let e = eval(b)
         let gain = created.reduce(0.0) { $0 + made($1) }
         let me = b.first { $0.tag == 1 }
-        return Try(x: x, jar: b, created: created, v1: gain + e.v, fill: e.fill, land: me.map { ($0.x, $0.y) })
+        // a long roll is where the game's physics and ours part ways: prefer drops that land where they fall
+        let travel = abs(end - x)
+        return Try(x: x, jar: b, created: created, v1: gain + e.v - 0.3 * travel / 100, fill: e.fill, land: me.map { ($0.x, $0.y) }, travel: travel)
     }
 
     /// Best drop for the held fruit. `cancel` is checked between simulations.
@@ -205,7 +216,7 @@ final class SuikaEngine {
         if st.next >= 0 && !late() {
             let order = tries.indices.sorted { tries[$0].v1 > tries[$1].v1 }
             let pos2 = SuikaEngine.xs(st.next, 21)
-            var done = Set<Int>()
+            var done: [Int] = []
             for k in order.prefix(10) {
                 if late() { break }
                 var b2 = tries[k].jar
@@ -218,7 +229,7 @@ final class SuikaEngine {
                 }
                 total[k] = gain1 + 0.9 * bestV + 0.1 * tries[k].v1
                 nextX[k] = bestX
-                done.insert(k)
+                done.append(k)
             }
             if done.count == min(10, tries.count) { depth = 2 }
             // only spots looked at twice compete, so the second look decides
