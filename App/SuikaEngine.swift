@@ -179,7 +179,7 @@ final class SuikaEngine {
         let me = b.first { $0.tag == 1 }
         // a long roll is where the game's physics and ours part ways: prefer drops that land where they fall
         let travel = abs(end - x)
-        return Try(x: x, jar: b, created: created, v1: gain + e.v - 0.3 * travel / 100, fill: e.fill, land: me.map { ($0.x, $0.y) }, travel: travel)
+        return Try(x: x, jar: b, created: created, v1: gain + e.v - 1.5 * travel / 100, fill: e.fill, land: me.map { ($0.x, $0.y) }, travel: travel)
     }
 
     /// Best drop for the held fruit. `cancel` is checked between simulations.
