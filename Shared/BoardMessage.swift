@@ -66,7 +66,15 @@ enum PoolCodec {
                                   // exactly while you pulled with the line seen)
     static let readMs = 126       // 2 digits: how long one screen reading takes (ms, averaged; set once a second)
     static let readRate = 128     // 2 digits: readings per second
-    static let count = 130
+    static let spinX = 130        // where the red mark sits on the spin icon (bottom right): 0…12, 6 = centre, 13 = not seen
+    static let spinY = 131        //   (x: left → right, y: top = follow … bottom = draw)
+    static let menu = 132         // 1 = the spin menu is open (its big cue ball covers the table: nothing on it is read)
+    static let count = 133
+    /// spin as -1…1 on each axis (nil when the icon wasn't read)
+    static func spin(_ cells: [Int]) -> (x: Double, y: Double)? {
+        guard cells.count > spinY, cells[spinX] <= 12, cells[spinY] <= 12 else { return nil }
+        return (Double(cells[spinX] - 6) / 6, Double(cells[spinY] - 6) / 6)
+    }
     static func two(_ cells: [Int], _ at: Int) -> Int { cells[at] * 14 + cells[at + 1] }
     static func dir(_ cells: [Int]) -> Double? {
         let q = cells[objDir] * 196 + cells[objDir + 1] * 14 + cells[objDir + 2]

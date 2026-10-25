@@ -544,7 +544,8 @@ struct PoolView: Equatable {
     var found: [PoolEngine.Found] = []         // every sure pot from here: a thin line along the ball's way to its pocket
     var pick: PoolEngine.Found? = nil          // the one suggested: drawn in gold with the cue ball's way and where it stops
     var objPathFull: [Double] = []             // your line at the power to use (always into the pocket when it drops)
-    var powerTarget: Int? = nil, powerNow: Int? = nil   // the power bar: where to pull to, and where you are
+    var powerTarget: Int? = nil, powerNow: Int? = nil
+    var breakSpotX: Double? = nil, breakSpotY: Double? = nil   // the break: where to put the cue ball   // the power bar: where to pull to, and where you are
     var target: Int? = nil                     // the ball your aim hits
     var legal: [Int] = []
 }
@@ -700,6 +701,10 @@ extension Renderer {
             let e = pt(ex, ey)
             UIColor.white.setStroke()
             let r = UIBezierPath(ovalIn: CGRect(x: e.x - br, y: e.y - br, width: br * 2, height: br * 2)); r.lineWidth = 2; r.setLineDash([3, 3], count: 2, phase: 0); r.stroke()
+        }
+        if let bx = v.breakSpotX, let by = v.breakSpotY {
+            let e = pt(bx, by)
+            gold.setStroke(); let r = UIBezierPath(ovalIn: CGRect(x: e.x - br * 1.3, y: e.y - br * 1.3, width: br * 2.6, height: br * 2.6)); r.lineWidth = 3; r.stroke()
         }
         if let ax = v.aimX, let ay = v.aimY {
             let a = pt(ax, ay)

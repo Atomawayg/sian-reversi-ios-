@@ -504,6 +504,7 @@ final class GameModel: ObservableObject {
     private var poolMsgs = 0, poolRate = 0, poolRateSince = Date(), poolAppMs = 0.0
     private var poolInZone = false
     private var poolLastLog = ""
+    private var poolSpin: (x: Double, y: Double) = (0, 0)   // the spin set on the game's spin icon (-1…1; y +1 = draw)
     private var poolPlanned: [PoolEngine.Ball] = []   // the table the suggestion below was worked out for
     private var poolPlannedGroup = -1
     private var poolFound: [PoolEngine.Found] = []     // every sure pot from here (PoolEngine.sweep)
@@ -560,6 +561,9 @@ final class GameModel: ObservableObject {
             if Date().timeIntervalSince(poolRateSince) >= 1 { poolRate = poolMsgs; poolMsgs = 0; poolRateSince = Date() }
         }
         let c = m.cells
+        // the spin menu is open: nothing on the table can be read (keep showing what was there)
+        if c.count > PoolCodec.menu && c[PoolCodec.menu] == 1 { return }
+        if let sp = PoolCodec.spin(c) { poolSpin = sp }
         let clean = c[PoolCodec.flags] & 1 == 1, hasAim = c[PoolCodec.flags] & 2 == 2, pulling = c[PoolCodec.flags] & 4 == 4
         if clean {
             var bs: [PoolEngine.Ball] = []
@@ -598,7 +602,7 @@ final class GameModel: ObservableObject {
             poolSound.set(.off); poolAims = []
             var o = Overlay(game: .pool, title: "รอลูกหยุด", line: groupName, mine: true); o.pool = view; show(o)
             if logOn {   // the balls while they roll: to measure cushions and pace from real shots
-                let t = "M balls=" + balls.map { "\($0.id):\(Int($0.x.rounded())),\(Int($0.y.rounded()))" }.joined(separator: " ")
+                let t = "M" + String(format: " spin=%.2f,%.2f", poolSpin.x, poolSpin.y) + " balls=" + balls.map { "\($0.id):\(Int($0.x.rounded())),\(Int($0.y.rounded()))" }.joined(separator: " ")
                 if t != poolLastLog { poolLastLog = t; log(t) }
             }
             return
@@ -647,10 +651,40 @@ final class GameModel: ObservableObject {
             title = "ไม่มีลูกชัวร์"
             if let cue, let sb = PoolEngine.safety(cueX: cue.x, cueY: cue.y, balls: others, legal: legal) { line = "แตะลูก \(sb.id) ก่อน (เซฟ)" }
         }
-        if PoolEngine.isBreak(others) { title = "เบรก"; line = "ยิงตรงกลางลูกหน้าสุด แรงสุด" }
+        // the break (the clips' pattern): cue ball in the middle of the line, dead straight into the front ball, full power
+        var breakShot = false
+        if PoolEngine.isBreak(others), let cue, let apex = others.filter({ $0.y < 1150 }).max(by: { $0.y < $1.y }) {
+            breakShot = true
+            title = "เบรก"; line = ""
+            view.powerTarget = 100
+            if abs(cue.x - apex.x) > 6 { view.breakSpotX = apex.x; view.breakSpotY = cue.y; line = "วางลูกขาวตรงวงทอง" }
+            if hasAim {
+                let a = PoolCodec.get(c, PoolCodec.aim)
+                view.aimX = a.x; view.aimY = a.y
+                let pullPct = c[PoolCodec.power] * 14 + c[PoolCodec.power + 1]
+                if pulling { view.powerNow = pullPct }
+                let straight = abs(a.x - apex.x) <= 1.5 && abs(cue.x - apex.x) <= 6 && a.y > apex.y
+                view.pots = straight
+                view.cuePath = [cue.x, cue.y, a.x, a.y]
+                if straight {
+                    title = "✓ เบรก"
+                    if pulling {
+                        poolSound.set(.off)
+                        let inZone = pullPct >= 96
+                        if inZone && !poolInZone { poolSound.ding() }
+                        poolInZone = inZone
+                    } else { poolInZone = false; poolSound.set(.tone(660)) }
+                } else {
+                    poolSound.set(.off); poolInZone = false
+                    line = a.x < apex.x ? "หมุนไม้ ↻ ตามเข็ม" : "หมุนไม้ ↺ ทวนเข็ม"
+                }
+            } else { poolSound.set(.off) }
+        }
         else if cue == nil { title = "วางลูกขาว"; line = "" }
         // your aim: draw where the balls go; one long tone when it pots one of your balls cleanly
-        if hasAim, let cue {
+        if breakShot {
+            // handled above
+        } else if hasAim, let cue {
             let a = PoolCodec.get(c, PoolCodec.aim)
             view.aimX = a.x; view.aimY = a.y
             let dir = PoolCodec.dir(c)
@@ -743,6 +777,7 @@ final class GameModel: ObservableObject {
             if let f = poolPick { t += String(format: " best=%d>%d@%d r%d/%d w%.1f", f.ball, f.pocket, f.power, f.objRails, f.cueRails, f.width) + (poolNextBall.map { " next=\($0)" } ?? "") + " n=\(poolFound.count)" }
             if let w = view.win { t += String(format: " win=%d:%.2f..%.2f", w.pocket, w.lo, w.hi) }
             if pulling { t += " power=\(c[PoolCodec.power] * 14 + c[PoolCodec.power + 1])" }
+            if poolSpin.x != 0 || poolSpin.y != 0 { t += String(format: " spin=%.2f,%.2f", poolSpin.x, poolSpin.y) }
             t += " says=\(title)|" + line.replacingOccurrences(of: "\n", with: " / ")
             if !view.objPath.isEmpty { t += " path=" + view.objPath.map(f).joined(separator: ",") }
             if t != poolLastLog {
