@@ -419,6 +419,7 @@ final class CheckersEngine {
         if !TB.isEmpty && kingRule == 0 && pieces() <= 4 {
             let tv = tbProbe(side)
             if tv >= 0 {
+                var trapOf = [Int](repeating: 0, count: root.count), avgOf = [Int](repeating: 0, count: root.count)
                 for k in 0..<root.count {
                     let i = findIndex(root[k].m)
                     if i < 0 { continue }
@@ -428,12 +429,38 @@ final class CheckersEngine {
                     if opp == 0 { sc = MATE - 1 } else {
                         let v = tbProbe(-side)
                         sc = v < 0 ? 0 : (v == 0 ? 0 : (v < 128 ? -(MATE - 1 - v) : (MATE - 1 - (v - 128))))
+                        // Look at every reply. Won ending: our average remaining distance (a human rarely finds the
+                        // longest defence, and WePlay ends the game as a draw after a few moves). Drawn ending: how
+                        // many replies lose, so the AI keeps setting the trap that is easiest to fall into.
+                        if sc >= 0 {
+                            let n2 = gen(-side, 1)
+                            var tot = 0, bad = 0
+                            for j in 0..<n2 {
+                                make(CheckersEngine.MAXM + j, 1)
+                                let theirs = side == 1 ? (P[2] | P[3]) : (P[0] | P[1]), mine = side == 1 ? (P[0] | P[1]) : (P[2] | P[3])
+                                if theirs == 0 { bad += 1 }
+                                else if mine == 0 { tot += 200 }
+                                else { let w = tbProbe(side); if w > 0 && w < 128 { tot += w; bad += 1 } else { tot += 200 } }
+                                unmake(1)
+                            }
+                            if n2 > 0 { avgOf[k] = tot * 10 / n2; trapOf[k] = bad * 1000 / n2 + bad }
+                        }
                     }
                     unmake(0)
                     root[k].score = sc
                 }
-                root.sort { $0.score > $1.score }
-                res.best = root[0].m; res.score = root[0].score; res.tb = tv; res.depth = 99; res.instant = "tb"
+                var bestK = 0
+                for k in root.indices where root[k].score > root[bestK].score { bestK = k }
+                let top = root[bestK].score
+                if top > 0 && humanTieBreak {
+                    // among wins at most 4 plies longer than the fastest, take the one that is fastest on average
+                    func cost(_ k: Int) -> Int { avgOf[k] + (top - root[k].score) * 5 }
+                    for k in root.indices where root[k].score > 0 && top - root[k].score <= 4 && cost(k) < cost(bestK) { bestK = k }
+                } else if top == 0 {
+                    for k in root.indices where root[k].score == 0 && trapOf[k] > trapOf[bestK] { bestK = k }
+                    if trapOf[bestK] > 0 { res.trap = trapOf[bestK] % 1000 }
+                }
+                res.best = root[bestK].m; res.score = top; res.tb = tv; res.depth = 99; res.instant = "tb"
                 return res
             }
         }
@@ -491,6 +518,17 @@ final class CheckersEngine {
     /// Plays like a strong human: among moves within a hair of the best, prefer the one that leaves the
     /// opponent the most replies that LOOK fine at a glance (2-ply) but actually lose material (deep).
     var trapMode = true
+    /// Won table endings: prefer the win that is fastest on average over all replies (off = always the fastest
+    /// against perfect defence).
+    var humanTieBreak = true
+    /// Legal moves (for tests).
+    func moves(_ b64: [Int], side: Int) -> [CheckersMove] {
+        var b32 = [Int](repeating: 0, count: 32)
+        for s in 0..<32 { b32[s] = b64[S64[s]] }
+        setFrom32(b32, side); curSide = side
+        let n = gen(side, 0)
+        return (0..<n).map { CheckersMove(from: MF[$0], to: MT[$0], caps: MC[$0], promo: MP[$0]) }
+    }
     private func pickTrap(_ list: [(m: CheckersMove, score: Int)], side: Int, depth: Int) -> (m: CheckersMove, traps: Int)? {
         // Only the first move's score is exact (the others are bounds from a null-window search), so every
         // candidate is re-scored below at the same depth before it may be chosen.
