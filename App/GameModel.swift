@@ -502,6 +502,8 @@ final class GameModel: ObservableObject {
     private let poolSound = PoolSound()
     private var poolBalls: [PoolEngine.Ball] = []      // last cleanly read table
     private var poolKey: [Int] = []
+    private var poolPlanned: [PoolEngine.Ball] = []   // the table the current suggestion was worked out for
+    private var poolMsgs = 0, poolRate = 0, poolRateSince = Date(), poolAppMs = 0.0
     private var poolBest: PoolEngine.Shot? = nil
     private var poolNote = ""
     private var poolInZone = false
@@ -531,6 +533,12 @@ final class GameModel: ObservableObject {
     }
 
     private func handlePool(_ m: BoardMessage) {
+        let started = Date()
+        defer {
+            poolAppMs = poolAppMs * 0.9 + Date().timeIntervalSince(started) * 1000 * 0.1
+            poolMsgs += 1
+            if Date().timeIntervalSince(poolRateSince) >= 1 { poolRate = poolMsgs; poolMsgs = 0; poolRateSince = Date() }
+        }
         let c = m.cells
         let clean = c[PoolCodec.flags] & 1 == 1, hasAim = c[PoolCodec.flags] & 2 == 2, pulling = c[PoolCodec.flags] & 4 == 4
         if clean {
@@ -556,13 +564,15 @@ final class GameModel: ObservableObject {
         let groupName = ["โต๊ะเปิด", "คุณ: ลูกเต็ม", "คุณ: ลูกลาย", "คุณ: ลูก 8"][max(0, min(3, group))]
         var view = PoolView(balls: balls, shot: nil, legal: Array(legal))
         guard m.myTurn else {
-            poolSound.set(.off); computedFor = []; poolBest = nil; poolKey = []
+            poolSound.set(.off); computedFor = []; poolBest = nil; poolKey = []; poolPlanned = []
             var o = Overlay(game: .pool, title: "รอ…", line: "ตาคู่แข่ง · " + groupName); o.pool = view; show(o); return
         }
         // a new table on your turn: choose a shot (straight-in first, a bank if there is none)
-        let key = balls.flatMap { [$0.id, Int($0.x / 6), Int($0.y / 6)] } + [group]
-        if key != poolKey {
-            poolKey = key; poolBest = nil; poolNote = ""; poolNext = nil; poolCueEnd = nil
+        // only when a ball really moved (reading jitter of a pixel or two must not start the search again)
+        let moved = balls.count != poolPlanned.count || !balls.allSatisfy { b in poolPlanned.contains { $0.id == b.id && abs($0.x - b.x) < 6 && abs($0.y - b.y) < 6 } }
+        let key = [group]
+        if key != poolKey || moved {
+            poolKey = key; poolPlanned = balls; poolBest = nil; poolNote = ""; poolNext = nil; poolCueEnd = nil
             if PoolEngine.isBreak(others) {
                 poolNote = "break"
             } else if let cue {
@@ -586,7 +596,15 @@ final class GameModel: ObservableObject {
         var title = "เซฟ", line = (poolNote.isEmpty ? "" : poolNote + "\n") + mineText
         if let s = poolBest {
             title = "\(s.ball) → \(PoolEngine.pockets[s.pocket].name)"
-            line = (s.bank ? "ชิ่ง · " : "") + (s.placed ? "วางลูกขาวตรงวงทอง · " : "") + "แรง \(s.powerPct)"
+            var bankText = "ชิ่ง · "
+            if s.bank, let b = others.first(where: { $0.id == s.ball }) {
+                let d = hypot(b.x - s.ghostX, b.y - s.ghostY)
+                if let h = PoolEngine.cushionHit(b.x, b.y, (b.x - s.ghostX) / d, (b.y - s.ghostY) / d, balls: balls, skip: b.id) {
+                    bankText = "ชิ่ง" + PoolEngine.railSpot(h.0, h.1) + " · "
+                    if !hasAim { view.bankX = h.0; view.bankY = h.1 }
+                }
+            }
+            line = (s.bank ? bankText : "") + (s.placed ? "วางลูกขาวตรงวงทอง · " : "") + "แรง \(s.powerPct)"
                 + (poolNext.map { " · ต่อด้วย \($0.ball)" } ?? "") + "\n" + mineText
         }
         if poolNote == "break" { title = "เบรก"; line = "ยิงตรงกลางลูกหน้าสุด แรงสุด" }
@@ -602,9 +620,16 @@ final class GameModel: ObservableObject {
             }
             let good = v.ball >= 0 && v.pocket >= 0 && !v.foul && !v.scratch && v.off < 0.75   // the game's own line makes the edge of the mouth trustworthy
             view.pots = good
+            view.risky = !good && v.ball >= 0 && v.pocket >= 0 && !v.foul && !v.scratch
+            var bankText = "ชิ่ง · "
+            if v.bank && v.pocket >= 0 && view.objPath.count >= 4 && PoolEngine.onRail(view.objPath[2], view.objPath[3]) {
+                let hx = view.objPath[2], hy = view.objPath[3]
+                view.bankX = hx; view.bankY = hy
+                bankText = "ชิ่ง" + PoolEngine.railSpot(hx, hy) + " · "
+            }
             if good {
                 title = "✓ \(v.ball) → \(PoolEngine.pockets[v.pocket].name)"
-                line = (v.bank ? "ชิ่ง · " : "") + "แรง \(v.powerPct)" + "\n" + mineText
+                line = (v.bank ? bankText : "") + "แรง \(v.powerPct)" + "\n" + mineText
                 if pulling {
                     // pulling the power bar: tone off, one blip when it reaches the strength
                     poolSound.set(.off)
@@ -619,7 +644,7 @@ final class GameModel: ObservableObject {
                 }
             } else {
                 poolSound.set(.off); poolInZone = false
-                if v.ball >= 0 && v.pocket >= 0 { line = v.foul ? "ลูกนี้ไม่ใช่ของคุณ (ฟาวล์)" : (v.scratch ? "ลูกขาวจะตกตาม" : "เฉียดขอบหลุม") }
+                if v.ball >= 0 && v.pocket >= 0 { line = v.foul ? "ลูกนี้ไม่ใช่ของคุณ (ฟาวล์)" : (v.scratch ? "ลูกขาวจะตกตาม" : "เสี่ยง: เฉียดจมูกหลุม ขยับนิดเดียว") }
             }
         } else {
             poolSound.set(.off)
@@ -636,7 +661,11 @@ final class GameModel: ObservableObject {
             if let s = poolBest { t += " best=\(s.ball)>\(s.pocket)@\(s.powerPct)" + (poolNext.map { " next=\($0.ball)" } ?? "") }
             t += " says=\(title)|" + line.replacingOccurrences(of: "\n", with: " / ")
             if !view.objPath.isEmpty { t += " path=" + view.objPath.map(f).joined(separator: ",") }
-            if t != poolLastLog { poolLastLog = t; log(t) }
+            if t != poolLastLog {
+                poolLastLog = t
+                // speed: screen reading (ms, readings/s) in the recorder, handling here (ms, updates/s)
+                log(t + String(format: " rd=%dms/%d ap=%.1fms/%d", PoolCodec.two(c, PoolCodec.readMs), PoolCodec.two(c, PoolCodec.readRate), poolAppMs, poolRate))
+            }
         }
     }
 

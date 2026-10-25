@@ -2,7 +2,7 @@ import Foundation
 
 /// Reads WePlay Pool (8-ball). Calibrated on 1180×2556 screen recordings of the game (Oct 23 and Oct 25):
 /// playing surface x 207.5…966.5, y 584…2135 (cushion noses), ball radius 23.5 px.
-/// Measured: felt hue 190–210°, saturation 0.55–0.84, brightness 0.59–0.85; balls are far more saturated
+/// The felt colour depends on the theme and is learnt from the table (blue: hue ~200°, pink: ~338°); balls are far more saturated
 /// or white/black; a striped ball always shows white near its rim (≥ 0.33 of the rim) and a solid doesn't (≤ 0.12).
 enum PoolReader {
     static let R = 23.5
@@ -18,27 +18,54 @@ enum PoolReader {
         }
         return (h, s, mx)
     }
+    /// The felt changes colour with the table theme (blue, pink, purple…): its colour is learnt from the table
+    /// itself every frame (see looksLikePool). Defaults: the blue table.
+    static var feltH = 201.0, feltSLo = 0.42, feltSHi = 0.9, feltVLo = 0.45, feltVHi = 0.92
+    @inline(__always) static func hueGap(_ a: Double, _ b: Double) -> Double { var d = abs(a - b).truncatingRemainder(dividingBy: 360); if d > 180 { d = 360 - d }; return d }
     @inline(__always) static func isFelt(_ c: (h: Double, s: Double, v: Double)) -> Bool {
-        c.h > 183 && c.h < 213 && c.s > 0.42 && c.s < 0.9 && c.v > 0.45 && c.v < 0.92
+        hueGap(c.h, feltH) < 16 && c.s > feltSLo && c.s < feltSHi && c.v > feltVLo && c.v < feltVHi
     }
 
-    /// Quick check that the screen shows the pool table (felt in the middle, wood rails, dark pockets).
+    /// Quick check that the screen shows the pool table: six dark pockets where they belong and one even
+    /// colour over most of the playing surface (whatever the theme). Learns that colour as the felt.
     static func looksLikePool(_ s: BoardReader.Sampler) -> Bool {
         let sx = Double(s.w) / 1180, sy = Double(s.h) / 2556
         func px(_ x: Double, _ y: Double) -> (Double, Double, Double) { s.avg(x * sx, y * sy, 3 * sx) }
-        var felt = 0
-        for (x, y) in [(400.0, 700.0), (780, 700), (400, 2000), (780, 2000), (300, 1360), (880, 1360)] where isFelt(hsv(px(x, y))) { felt += 1 }
-        let pocket = px(203, 581), pocket2 = px(976, 2139)
-        let dark = (pocket.0 + pocket.1 + pocket.2) / 3 < 45 && (pocket2.0 + pocket2.1 + pocket2.2) / 3 < 45
-        let wood = px(590, 540)
-        let woody = wood.0 > wood.2 + 40 && wood.0 > 120
-        return felt >= 5 && dark && woody
+        for (x, y) in [(203.0, 581.0), (975, 581), (203, 2140), (976, 2139), (178, 1360), (1000, 1360)] {
+            let p = px(x, y)
+            if (p.0 + p.1 + p.2) / 3 > 50 { return false }
+        }
+        var cs: [(h: Double, s: Double, v: Double)] = []
+        for y in [700.0, 1000, 1300, 1600, 1900, 2050] { for x in [300.0, 480, 700, 880] { cs.append(hsv(px(x, y))) } }
+        // the colour most samples agree on (balls, the cue stick and banners cover only a few)
+        func agree(_ c: (h: Double, s: Double, v: Double)) -> [Int] { cs.indices.filter { hueGap(cs[$0].h, c.h) < 12 && cs[$0].s > 0.2 && cs[$0].v > 0.3 } }
+        guard let k = cs.indices.max(by: { agree(cs[$0]).count < agree(cs[$1]).count }) else { return false }
+        let inl = agree(cs[k])
+        if Double(inl.count) < Double(cs.count) * 0.7 { return false }
+        var sn = 0.0, cn = 0.0
+        for i in inl { sn += sin(cs[i].h * Double.pi / 180); cn += cos(cs[i].h * Double.pi / 180) }
+        var h0 = atan2(sn, cn) * 180 / Double.pi; if h0 < 0 { h0 += 360 }
+        let ss = inl.map { cs[$0].s }, vv = inl.map { cs[$0].v }
+        let lo = max(0.25, vv.min()! - 0.17), hi = min(0.99, vv.max()! + 0.08)
+        let sLo = max(0.15, ss.min()! - 0.15), sHi = min(0.92, ss.max()! + 0.12)
+        // the side rails are not felt (a board game filling the screen with one colour is)
+        var rail = 0
+        for (x, y) in [(150.0, 1000.0), (1030, 1000), (150, 1700), (1030, 1700)] {
+            let c = hsv(px(x, y))
+            if !(hueGap(c.h, h0) < 16 && c.s > sLo && c.s < sHi && c.v > lo && c.v < hi) { rail += 1 }
+        }
+        if rail < 2 { return false }
+        feltH = h0; feltSLo = sLo; feltSHi = sHi; feltVLo = lo; feltVHi = hi
+        return true
     }
 
     struct Ball { var x: Double; var y: Double; var id: Int; var rimWhite: Double }
     /// the last full reading (balls and a colour sample at each centre), and where the aim circle was
     static var cache: (balls: [Ball], clean: Bool, spots: [(x: Double, y: Double, r: Double, g: Double, b: Double)], at: Double)? = nil
     static var lastAim: (Double, Double)? = nil
+    static var barCache: (group: Int, mine: Int, opp: Int, at: Double)? = nil
+    static var lastReuse = false   // the last frame's table matched the one before (nothing moving)
+    static var lastDir: (ball: Int, angle: Double)? = nil
 
     static func read(_ s: BoardReader.Sampler) -> BoardMessage {
         let sx = Double(s.w) / 1180, sy = Double(s.h) / 2556
@@ -56,21 +83,27 @@ enum PoolReader {
         }
         let myTurn = green >= 8
 
-        // group: the bars show the balls each player still has to pot
-        let mine = barIcons(s, xs: (0..<7).map { 206 + 46.8 * Double($0) }, y: 398)
-        let opp = barIcons(s, xs: (0..<7).map { 697 + 47 * Double($0) }, y: 397)
-        // the 8 appears in a bar near the end (with a player's last ball, or alone): it says nothing about
-        // solids or stripes, so leave it out; a bar holding only the 8 means that player is on the 8
+        // group: the bars show the balls each player still has to pot (they only change after a shot, so while
+        // the table stands still the last reading of them is reused)
+        let now = Date().timeIntervalSince1970
         var group = 0
-        func avg(_ a: [Double]) -> Double { a.reduce(0, +) / Double(max(1, a.count)) }
-        let mineC = mine.filter { !$0.black }.map { $0.ratio }, oppC = opp.filter { !$0.black }.map { $0.ratio }
-        // your own bar decides (the opponent's bar is usually under the floating window): stripes show white caps
-        if !mine.isEmpty && mineC.isEmpty { group = 3 }
-        else if !mineC.isEmpty { group = avg(mineC) < 0.63 ? 2 : 1 }
-        cells[PoolCodec.myLeft] = min(13, mineC.count); cells[PoolCodec.oppLeft] = min(13, oppC.count)
+        if let b = barCache, now - b.at < 0.5, lastReuse {
+            group = b.group; cells[PoolCodec.myLeft] = b.mine; cells[PoolCodec.oppLeft] = b.opp
+        } else {
+            let mine = barIcons(s, xs: (0..<7).map { 206 + 46.8 * Double($0) }, y: 398)
+            let opp = barIcons(s, xs: (0..<7).map { 697 + 47 * Double($0) }, y: 397)
+            // the 8 appears in a bar near the end (with a player's last ball, or alone): it says nothing about
+            // solids or stripes, so leave it out; a bar holding only the 8 means that player is on the 8
+            func avg(_ a: [Double]) -> Double { a.reduce(0, +) / Double(max(1, a.count)) }
+            let mineC = mine.filter { !$0.black }.map { $0.ratio }, oppC = opp.filter { !$0.black }.map { $0.ratio }
+            // your own bar decides (the opponent's bar is usually under the floating window): stripes show white caps
+            if !mine.isEmpty && mineC.isEmpty { group = 3 }
+            else if !mineC.isEmpty { group = avg(mineC) < 0.63 ? 2 : 1 }
+            cells[PoolCodec.myLeft] = min(13, mineC.count); cells[PoolCodec.oppLeft] = min(13, oppC.count)
+            barCache = (group, cells[PoolCodec.myLeft], cells[PoolCodec.oppLeft], now)
+        }
 
         // fast path while you aim: nothing on the table moves, so only check every ball is still where it was
-        let now = Date().timeIntervalSince1970
         var balls: [Ball] = []
         var clean = false
         var reuse = false
@@ -81,6 +114,7 @@ enum PoolReader {
             }
             if reuse { balls = c.balls; clean = c.clean }
         }
+        lastReuse = reuse
         if !reuse {
         // 1) coarse felt grid → candidate ball centres
         let g = 3.0
@@ -171,23 +205,32 @@ enum PoolReader {
         if let a = aim, let t = balls.filter({ $0.id != 0 }).min(by: { hypot($0.x - a.0, $0.y - a.1) < hypot($1.x - a.0, $1.y - a.1) }),
            hypot(t.x - a.0, t.y - a.1) < 2 * R + 12 {
             let u0 = atan2(t.y - a.1, t.x - a.0)
-            var counts: [(Int, Double)] = []
-            var best = 0
-            for k in -120...120 {
-                let th = u0 + Double(k) * 0.25 * Double.pi / 180
-                var c = 0
-                var r = R + 4
-                while r <= R + 150 {
-                    let q = hsv(at(t.x + r * cos(th), t.y + r * sin(th)))
-                    if q.s < 0.25 && q.v > 0.85 { c += 1 }
-                    r += 2
+            // count white along each direction from the ball; near the last direction first (it moves little per frame)
+            func scan(_ c0: Double, _ steps: Int) -> Double? {
+                var counts: [(Int, Double)] = []
+                var best = 0
+                for k in -steps...steps {
+                    let th = c0 + Double(k) * 0.25 * Double.pi / 180
+                    var c = 0
+                    var r = R + 4
+                    while r <= R + 150 {
+                        let q = hsv(at(t.x + r * cos(th), t.y + r * sin(th)))
+                        if q.s < 0.25 && q.v > 0.85 { c += 1 }
+                        r += 2
+                    }
+                    counts.append((c, th)); best = max(best, c)
                 }
-                counts.append((c, th)); best = max(best, c)
-            }
-            if best >= 8 {
+                // the peak must not sit on the edge of a narrow window (the line may be just outside it)
+                guard best >= 8 else { return nil }
                 let top = counts.filter { $0.0 >= best - 1 }.map { $0.1 }
-                objDir = top.reduce(0, +) / Double(top.count)
+                if steps < 120, let f = top.first, let l = top.last, abs(f - (c0 - Double(steps) * 0.25 * Double.pi / 180)) < 1e-9 || abs(l - (c0 + Double(steps) * 0.25 * Double.pi / 180)) < 1e-9 { return nil }
+                return top.reduce(0, +) / Double(top.count)
             }
+            if let ld = lastDir, ld.ball == t.id { objDir = scan(ld.angle, 32) }
+            if objDir == nil { objDir = scan(u0, 120) }
+            if let d = objDir { lastDir = (ball: t.id, angle: d) } else { lastDir = nil }
+        } else {
+            lastDir = nil
         }
         if let d = objDir {
             var deg = d * 180 / Double.pi; while deg < 0 { deg += 360 }; while deg >= 360 { deg -= 360 }

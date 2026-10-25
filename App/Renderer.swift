@@ -532,6 +532,8 @@ struct PoolView: Equatable {
     var objPath: [Double] = []                 // x,y pairs: where the ball you are aiming at goes
     var cuePath: [Double] = []                 // x,y pairs: where the cue ball goes after the hit (no spin)
     var pots = false                           // your current aim pots one of your balls
+    var risky = false                          // it reaches a pocket but only just (off the jaw / a hair from missing)
+    var bankX: Double? = nil, bankY: Double? = nil   // where the bank shot meets the cushion
     var legal: [Int] = []
 }
 
@@ -563,6 +565,17 @@ extension Renderer {
         func pt(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: box.minX + CGFloat(x - 207.5) * sc, y: box.minY + CGFloat(y - 584) * sc) }
         UIColor(red: 0.36, green: 0.22, blue: 0.12, alpha: 1).setFill(); UIBezierPath(roundedRect: box.insetBy(dx: -6, dy: -6), cornerRadius: 6).fill()
         UIColor(red: 0.13, green: 0.47, blue: 0.68, alpha: 1).setFill(); UIRectFill(box)
+        // the diamonds on the rails (as in the game), to aim banks by
+        UIColor(red: 0.95, green: 0.80, blue: 0.55, alpha: 1).setFill()
+        func dot(_ c: CGPoint) { UIBezierPath(ovalIn: CGRect(x: c.x - 2.2, y: c.y - 2.2, width: 4.4, height: 4.4)).fill() }
+        for k in 1...3 {
+            let x = 203 + Double(k) * (975 - 203) / 4
+            dot(CGPoint(x: pt(x, 584).x, y: box.minY - 3)); dot(CGPoint(x: pt(x, 584).x, y: box.maxY + 3))
+        }
+        for k in [1.0, 2, 3, 5, 6, 7] {
+            let y = k < 4 ? 581 + k * (PoolEngine.midY - 581) / 4 : PoolEngine.midY + (k - 4) * (2140 - PoolEngine.midY) / 4
+            dot(CGPoint(x: box.minX - 3, y: pt(207.5, y).y)); dot(CGPoint(x: box.maxX + 3, y: pt(207.5, y).y))
+        }
         UIColor.black.setFill()
         for p in PoolEngine.pockets { let c = pt(p.x, p.y); UIBezierPath(ovalIn: CGRect(x: c.x - 7, y: c.y - 7, width: 14, height: 14)).fill() }
         let br = CGFloat(PoolEngine.R) * sc
@@ -589,7 +602,15 @@ extension Renderer {
             }
         }
         // your aim now: where the ball goes (green = drops, red = doesn't) and where the cue ball runs
-        poly(v.objPath, v.pots ? green : red, 5)
+        let orange = UIColor(red: 1.0, green: 0.62, blue: 0.15, alpha: 1)
+        poly(v.objPath, v.pots ? green : (v.risky ? orange : red), 5)
+        if let bx = v.bankX, let by = v.bankY {   // where to hit the cushion: a gold mark on the rail by the diamonds
+            let c = pt(bx, by)
+            var m = c
+            if abs(bx - PoolEngine.xMin) < 3 { m.x = box.minX - 3 } else if abs(bx - PoolEngine.xMax) < 3 { m.x = box.maxX + 3 }
+            else if by < PoolEngine.midY { m.y = box.minY - 3 } else { m.y = box.maxY + 3 }
+            gold.setFill(); UIBezierPath(ovalIn: CGRect(x: m.x - 5, y: m.y - 5, width: 10, height: 10)).fill()
+        }
         poly(v.cuePath, UIColor.white.withAlphaComponent(0.85), 3, dash: true)
         for b in v.balls {
             let c = pt(b.x, b.y), rr = CGRect(x: c.x - br, y: c.y - br, width: br * 2, height: br * 2)

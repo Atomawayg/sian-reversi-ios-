@@ -12,8 +12,6 @@ enum PoolEngine {
         Pocket(name: "มุมซ้ายบน", x: 203, y: 581, side: false), Pocket(name: "มุมขวาบน", x: 975, y: 581, side: false),
         Pocket(name: "กลางซ้าย", x: 187, y: 1360, side: true), Pocket(name: "กลางขวา", x: 992, y: 1360, side: true),
         Pocket(name: "มุมซ้ายล่าง", x: 203, y: 2140, side: false), Pocket(name: "มุมขวาล่าง", x: 976, y: 2139, side: false)]
-    /// how far off the pocket centre a ball's line may pass and still drop
-    static func mouth(_ p: Pocket) -> Double { p.side ? 20 : 27 }
 
     // Measured on the Oct 25 recording (cue ball tracked at 60 fps over five of your shots):
     // the cue ball leaves at about 4150 px/s × power (51 % → 2070, 54 % → 2230, 63 % → 2700 px/s),
@@ -62,6 +60,134 @@ enum PoolEngine {
         return (nx / l, ny / l)
     }
 
+    // MARK: table edges with the pocket jaws
+    // Measured on the 1180×2556 screen (same on every table theme). All for the ball's centre: a ball touches a
+    // cushion nose when its centre is R from it. Corner pockets: the noses stop 62 px from the corner and a jaw runs
+    // back at 45° (a channel 87 px wide, so the centre has ±20 px). Side pockets: an 80 px gap with short jaws.
+    struct Seg { let x1, y1, x2, y2: Double; let jaw: Bool }
+    static let segs: [Seg] = {
+        var out: [Seg] = []
+        func mx(_ x: Double) -> Double { 2 * PoolEngine.midX - x }
+        func my(_ y: Double) -> Double { 2 * PoolEngine.midY - y }
+        let x0 = 207.5, x1 = 966.5, y0 = 584.0, y1 = 2135.0
+        out.append(Seg(x1: 270, y1: y0, x2: mx(270), y2: y0, jaw: false))
+        out.append(Seg(x1: 270, y1: y1, x2: mx(270), y2: y1, jaw: false))
+        for x in [x0, x1] {
+            out.append(Seg(x1: x, y1: 650, x2: x, y2: 1319.5, jaw: false))
+            out.append(Seg(x1: x, y1: 1399.5, x2: x, y2: my(650), jaw: false))
+        }
+        for (a, b) in [((270.0, y0), (240.0, y0 - 30)), ((x0, 650.0), (x0 - 30, 620.0))] {
+            for fx in [false, true] { for fy in [false, true] {
+                out.append(Seg(x1: fx ? mx(a.0) : a.0, y1: fy ? my(a.1) : a.1, x2: fx ? mx(b.0) : b.0, y2: fy ? my(b.1) : b.1, jaw: true))
+            } }
+        }
+        for fx in [false, true] {
+            for (a, b) in [((x0, 1319.5), (190.0, 1321.0)), ((x0, 1399.5), (190.0, 1398.0))] {
+                out.append(Seg(x1: fx ? mx(a.0) : a.0, y1: a.1, x2: fx ? mx(b.0) : b.0, y2: b.1, jaw: true))
+            }
+        }
+        return out
+    }()
+    /// where a ball drops: its centre gets this close to the hole's centre (same order as `pockets`)
+    static let holes: [(x: Double, y: Double, r: Double)] = [
+        (195, 570, 40), (979, 570, 40), (170, 1360, 37), (1004, 1360, 37), (195, 2149, 40), (979, 2149, 40)]
+
+    @inline(__always) static func rayCircle(_ px: Double, _ py: Double, _ ux: Double, _ uy: Double, _ cx: Double, _ cy: Double, _ r: Double) -> Double? {
+        let fx = px - cx, fy = py - cy, b = fx * ux + fy * uy, c = fx * fx + fy * fy - r * r
+        if b >= 0 { return nil }       // moving away (balls read a pixel too close together don't stop each other)
+        if c < 0 { return 0 }
+        let d = b * b - c
+        if d < 0 { return nil }
+        let t = -b - d.squareRoot()
+        return t > 1e-6 ? t : nil
+    }
+    /// first touch of a ball centre moving from p along u with a cushion piece (a line with rounded ends);
+    /// returns the distance and the push-out direction
+    static func rayCapsule(_ px: Double, _ py: Double, _ ux: Double, _ uy: Double, _ s: Seg) -> (Double, Double, Double)? {
+        let dx = s.x2 - s.x1, dy = s.y2 - s.y1, l = (dx * dx + dy * dy).squareRoot()
+        let tx = dx / l, ty = dy / l, nx = -ty, ny = tx
+        var best: (Double, Double, Double)? = nil
+        for sg in [1.0, -1.0] {
+            let den = ux * nx * sg + uy * ny * sg
+            if den >= 0 { continue }   // only when moving towards this face
+            let ox = s.x1 + nx * R * sg, oy = s.y1 + ny * R * sg
+            let t = ((ox - px) * nx * sg + (oy - py) * ny * sg) / den
+            if t <= 1e-6 { continue }
+            let hx = px + ux * t, hy = py + uy * t, a = (hx - s.x1) * tx + (hy - s.y1) * ty
+            if a >= 0 && a <= l && (best == nil || t < best!.0) { best = (t, nx * sg, ny * sg) }
+        }
+        for (ex, ey) in [(s.x1, s.y1), (s.x2, s.y2)] {
+            if let t = rayCircle(px, py, ux, uy, ex, ey, R), t > 1e-6, best == nil || t < best!.0 {
+                let hx = px + ux * t, hy = py + uy * t
+                best = (t, (hx - ex) / R, (hy - ey) / R)
+            }
+        }
+        return best
+    }
+
+    struct Run { var pts: [Double]; var pocket = -1; var ball: Int? = nil; var rails = 0; var jaws = 0; var len = 0.0; var off = 1.0 }
+    /// A ball rolling from (x,y) along (ux,uy): off cushions and jaws (they bend it: tan of the angle from the
+    /// normal grows ×1.28), until it drops, touches another ball, or has gone `maxLen` / `maxRails` cushions.
+    static func run(_ x0: Double, _ y0: Double, _ ux0: Double, _ uy0: Double, balls: [Ball], skip: Int, maxLen: Double = 3000, maxRails: Int = 2, gap: Double = 2 * R) -> Run {
+        var r = Run(pts: [x0, y0])
+        var x = x0, y = y0, ux = ux0, uy = uy0, left = maxLen
+        for _ in 0..<8 {
+            var best = left, kind = 0, which = -1, nx = 0.0, ny = 0.0, isJaw = false
+            for (k, h) in holes.enumerated() { if let t = rayCircle(x, y, ux, uy, h.x, h.y, h.r), t < best { best = t; kind = 1; which = k } }
+            for sg in segs { if let c = rayCapsule(x, y, ux, uy, sg), c.0 < best { best = c.0; kind = 2; nx = c.1; ny = c.2; isJaw = sg.jaw } }
+            for b in balls where b.id != skip {
+                if let t = rayCircle(x, y, ux, uy, b.x, b.y, gap), t > 1e-6, t < best { best = t; kind = 3; which = b.id }
+            }
+            x += ux * best; y += uy * best; left -= best; r.pts += [x, y]
+            if kind == 1 {
+                r.pocket = which
+                // how central: the last leg's line against the hole centre (0 middle … 1 by the jaw)
+                let h = holes[which], perp = abs((h.x - x) * uy - (h.y - y) * ux)
+                r.off = r.jaws > 0 ? 0.85 : min(1, perp / (which == 2 || which == 3 ? 16.5 : 20))
+            }
+            if kind == 3 { r.ball = which }
+            if kind != 2 { break }
+            if isJaw { r.jaws += 1 } else { r.rails += 1 }
+            if r.rails > maxRails { break }
+            let vn = ux * nx + uy * ny, tx = ux - vn * nx, ty = uy - vn * ny
+            ux = tx * bounceFlatten - vn * nx; uy = ty * bounceFlatten - vn * ny
+            let l = (ux * ux + uy * uy).squareRoot(); ux /= l; uy /= l
+            x += nx * 0.01; y += ny * 0.01
+        }
+        r.len = maxLen - left
+        return r
+    }
+
+    // MARK: diamonds (the light dots on the rails)
+    // Three on the top and bottom rails, six on each side (three either side of the middle pocket), a quarter of
+    // the way between pocket centres each. Rails are named as you see the table; dots count from the top / left.
+    static func railSpot(_ x: Double, _ y: Double) -> String {
+        func half(_ k: Double) -> String {
+            let q = (k * 2).rounded() / 2, w = Int(q)
+            return q == Double(w) ? "\(w)" : (w == 0 ? "½" : "\(w)½")
+        }
+        if abs(x - xMin) < 3 || abs(x - xMax) < 3 {
+            let rail = abs(x - xMin) < 3 ? "ขอบซ้าย" : "ขอบขวา"
+            // 0 … 4 from the corner pocket to the middle pocket on the top half, 4 … 8 on the bottom half
+            let k = y < midY ? (y - 581) / ((midY - 581) / 4) : 4 + (y - midY) / ((2140 - midY) / 4)
+            if k < 0.25 || k > 7.75 { return rail + " ข้างหลุมมุม" }
+            if k > 3.75 && k < 4.25 { return rail + " ข้างหลุมกลาง" }
+            return rail + " จุด " + half(k < 4 ? k : k - 1)   // the dots below the middle pocket are 4, 5, 6
+        }
+        let rail = y < midY ? "ขอบบน" : "ขอบล่าง"
+        let k = (x - 203) / ((975 - 203) / 4.0)
+        if k < 0.25 || k > 3.75 { return rail + " ข้างหลุมมุม" }
+        return rail + " จุด " + half(k)
+    }
+    static func onRail(_ x: Double, _ y: Double) -> Bool { abs(x - xMin) < 3 || abs(x - xMax) < 3 || abs(y - yMin) < 3 || abs(y - yMax) < 3 }
+    /// where a ball sent from (bx,by) along (ux,uy) first meets a cushion, if it does before anything else
+    static func cushionHit(_ bx: Double, _ by: Double, _ ux: Double, _ uy: Double, balls: [Ball], skip: Int) -> (Double, Double)? {
+        let r = run(bx, by, ux, uy, balls: balls.filter { $0.id != 0 }, skip: skip, maxRails: 1)
+        guard r.rails >= 1, r.pts.count >= 4 else { return nil }
+        let x = r.pts[2], y = r.pts[3]
+        return onRail(x, y) ? (x, y) : nil
+    }
+
     // MARK: rolling and power
 
     /// how far a ball rolls from speed v before it stops
@@ -88,40 +214,13 @@ enum PoolEngine {
 
     // MARK: shots
 
-    /// An object ball heading along (ux,uy) from (tx,ty): where it ends up. Direct into a pocket, or off one
-    /// cushion into one. Returns pocket index, path length, whether it banked, and how far off the pocket
-    /// centre it runs (0 = dead centre, 1 = on the edge of the mouth).
+    /// An object ball heading along (ux,uy) from (tx,ty): where it ends up. Direct into a pocket (jaws included),
+    /// or off one cushion into one. Returns pocket index, path length, whether it banked, and how far off the
+    /// pocket centre it runs (0 = dead centre, 1 = on the edge; 0.85 = it needs the jaw).
     static func trace(_ tx: Double, _ ty: Double, _ ux0: Double, _ uy0: Double, balls: [Ball], skip: Int) -> (pocket: Int, len: Double, bank: Bool, off: Double)? {
-        var x = tx, y = ty, ux = ux0, uy = uy0, len = 0.0
-        for leg in 0..<2 {
-            // the cushion it would reach
-            var tw = Double.infinity
-            if ux < 0 { tw = min(tw, (xMin - x) / ux) }; if ux > 0 { tw = min(tw, (xMax - x) / ux) }
-            if uy < 0 { tw = min(tw, (yMin - y) / uy) }; if uy > 0 { tw = min(tw, (yMax - y) / uy) }
-            // a pocket on the way, before (or at) that cushion
-            var best: (Int, Double, Double)? = nil
-            for (i, p) in pockets.enumerated() {
-                let wx = p.x - x, wy = p.y - y, along = wx * ux + wy * uy
-                // near a pocket the cushion is cut away (the jaws), so a ball can run past the cushion line into it
-                if along <= 0 || along > tw + (p.side ? 70 : 140) { continue }
-                let perp = abs(wx * uy - wy * ux)
-                if perp > mouth(p) { continue }
-                if p.side && abs(uy) > sin(64 * Double.pi / 180) { continue }   // too steep into a side pocket
-                if best == nil || along < best!.1 { best = (i, along, perp / mouth(p)) }
-            }
-            if let b = best {
-                let p = pockets[b.0]
-                if !clear(x, y, p.x, p.y, balls, skip: skip, gap: 2 * R - 3) { return nil }
-                return (b.0, len + b.1, leg == 1, b.2)
-            }
-            if leg == 1 || !tw.isFinite { return nil }
-            let hx = x + ux * tw, hy = y + uy * tw
-            if !clear(x, y, hx, hy, balls, skip: skip, gap: 2 * R - 3) { return nil }
-            len += tw
-            x = hx; y = hy
-            (ux, uy) = bounce(x, ux, uy)
-        }
-        return nil
+        let r = run(tx, ty, ux0, uy0, balls: balls.filter { $0.id != 0 }, skip: skip, maxRails: 1, gap: 2 * R - 3)
+        guard r.pocket >= 0 else { return nil }
+        return (r.pocket, r.len, r.rails == 1, r.off)
     }
 
     /// Scratch after a stun hit: the cue ball runs along the tangent line from the ghost position.
@@ -129,11 +228,7 @@ enum PoolEngine {
         let vx = gx - cueX, vy = gy - cueY
         let side = vx * -uy + vy * ux > 0
         let tx = side ? -uy : uy, ty = side ? ux : -ux
-        for q in pockets {
-            let wx = q.x - gx, wy = q.y - gy, along = wx * tx + wy * ty
-            if along > 0 && along < 500 && abs(wx * ty - wy * tx) < (q.side ? 21 : 28) { return true }
-        }
-        return false
+        return run(gx, gy, tx, ty, balls: [], skip: 0, maxLen: 500, maxRails: 0).pocket >= 0
     }
 
     /// All shots from a cue position (straight-in and one-cushion banks), best first.
@@ -239,6 +334,9 @@ enum PoolEngine {
         if let a = dir { ux = cos(a); uy = sin(a) }    // the game's own line beats our estimate from positions
         if let tr = trace(t.x, t.y, ux, uy, balls: balls, skip: t.id) {
             v.pocket = tr.pocket; v.bank = tr.bank; v.off = tr.off
+            // on a knife edge (a hair either way and it stays out): not a sure pot
+            let a = atan2(uy, ux), e = 0.3 * Double.pi / 180
+            for da in [-e, e] where trace(t.x, t.y, cos(a + da), sin(a + da), balls: balls, skip: t.id)?.pocket != tr.pocket { v.off = max(v.off, 0.8) }
             let vx = aimX - cueX, vy = aimY - cueY, d1 = (vx * vx + vy * vy).squareRoot()
             let cut = acos(max(-1, min(1, (vx * ux + vy * uy) / max(d1, 1e-6)))) * 180 / Double.pi
             v.powerPct = powerPct(cueToGhost: d1, objLen: tr.len, cut: cut, bank: tr.bank)
@@ -250,33 +348,10 @@ enum PoolEngine {
 
     // MARK: paths to draw
 
-    /// Where a ball rolling from (x,y) along (ux,uy) goes: up to two legs (one cushion), stopping at a pocket,
-    /// a ball in the way, or after `maxLen` px. x,y pairs.
+    /// Where a ball rolling from (x,y) along (ux,uy) goes: off up to two cushions (and the jaws), stopping at a
+    /// pocket, a ball in the way, or after `maxLen` px. x,y pairs.
     static func path(_ x0: Double, _ y0: Double, _ ux0: Double, _ uy0: Double, balls: [Ball], skip: Int, maxLen: Double = 2400) -> [Double] {
-        var out = [x0, y0]
-        var x = x0, y = y0, ux = ux0, uy = uy0, left = maxLen
-        for _ in 0..<2 {
-            var tw = Double.infinity
-            if ux < 0 { tw = min(tw, (xMin - x) / ux) }; if ux > 0 { tw = min(tw, (xMax - x) / ux) }
-            if uy < 0 { tw = min(tw, (yMin - y) / uy) }; if uy > 0 { tw = min(tw, (yMax - y) / uy) }
-            var stop = min(tw, left)
-            // a pocket on the way
-            for p in pockets {
-                let wx = p.x - x, wy = p.y - y, along = wx * ux + wy * uy
-                if along > 0 && along < stop + (p.side ? 70 : 140) && abs(wx * uy - wy * ux) < mouth(p) { out += [p.x, p.y]; return out }
-            }
-            // a ball in the way (stop where it touches)
-            for b in balls where b.id != skip && b.id != 0 {
-                let wx = b.x - x, wy = b.y - y, along = wx * ux + wy * uy
-                let perp = abs(wx * uy - wy * ux)
-                if along > 0 && perp < 2 * R { let hit = along - (4 * R * R - perp * perp).squareRoot(); if hit < stop { stop = max(0, hit) } }
-            }
-            x += ux * stop; y += uy * stop; left -= stop
-            out += [x, y]
-            if stop < tw - 0.5 || left <= 0 { return out }
-            (ux, uy) = bounce(x, ux, uy)
-        }
-        return out
+        run(x0, y0, ux0, uy0, balls: balls.filter { $0.id != 0 }, skip: skip, maxLen: maxLen, maxRails: 2).pts
     }
 
     /// The object ball's path for a hit from ghost position (gx,gy).
