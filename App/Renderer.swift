@@ -609,10 +609,8 @@ extension Renderer {
         // every sure pot: a thin line along the ball's way into the pocket, cushions included (the best per ball)
         var drawnBalls = Set<Int>()
         let thin = UIColor(red: 1.0, green: 0.45, blue: 0.35, alpha: aiming ? 0.25 : 0.8)
-        for f in v.found where f != v.pick && !drawnBalls.contains(f.ball) {
-            drawnBalls.insert(f.ball)
-            poly(f.objPts, thin, 1.5)
-        }
+        // (thin lines for every sure pot were dropped in 3.21: the guide lines to every pocket cover it)
+        _ = thin; _ = drawnBalls
         // the pick: the cue ball's way to the ball (gold), the ghost ring, the ball's way in, and where the cue ball stops
         if let f = v.pick {
             let col = aiming ? gold.withAlphaComponent(0.3) : gold
@@ -738,7 +736,6 @@ extension Renderer {
         }
         if zoom, let k = zoomAt {
             drawPoolZoom(v, k, v.win, CGRect(x: rect.width - zs - 12, y: (rect.height - zs) / 2, width: zs, height: zs), pots: v.pots, risky: v.risky)
-            if let w = v.win { drawPoolMeter(w, CGRect(x: tx, y: rect.height - 44, width: tw, height: 26)) }
         }
     }
 

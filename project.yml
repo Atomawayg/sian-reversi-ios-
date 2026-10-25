@@ -10,7 +10,7 @@ settings:
     CODE_SIGNING_REQUIRED: "NO"
     CODE_SIGN_IDENTITY: ""
     TARGETED_DEVICE_FAMILY: "1"
-    MARKETING_VERSION: "3.20.1"
+    MARKETING_VERSION: "3.21.0"
     CURRENT_PROJECT_VERSION: "1"
 targets:
   SianReversi:
@@ -27,6 +27,7 @@ targets:
         UIBackgroundModes: [audio]
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIRequiresFullScreen: true
+        NSPhotoLibraryAddUsageDescription: "เซฟคลิปเกมพูลที่อัดไว้ลงรูปภาพ"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.atomawayg.sianreversi
@@ -50,6 +51,7 @@ targets:
           NSExtensionPointIdentifier: com.apple.broadcast-services-upload
           NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).SampleHandler"
           RPBroadcastProcessMode: RPBroadcastProcessModeSampleBuffer
+        NSPhotoLibraryAddUsageDescription: "เซฟคลิปเกมพูลที่อัดไว้ลงรูปภาพ"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.atomawayg.sianreversi.broadcast

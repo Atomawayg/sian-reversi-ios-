@@ -6,6 +6,13 @@ enum Signal {
     static let started = "com.atomawayg.sian.started"
     static let frame = "com.atomawayg.sian.frame"
     static let stopped = "com.atomawayg.sian.stopped"
+    // clip recording: the app asks the screen reader to start / stop; the reader answers how it went
+    static let clipStart = "com.atomawayg.sian.clip.start"
+    static let clipStop = "com.atomawayg.sian.clip.stop"
+    static let clipRecording = "com.atomawayg.sian.clip.recording"
+    static let clipSaved = "com.atomawayg.sian.clip.saved"
+    static let clipFailed = "com.atomawayg.sian.clip.failed"
+    static let clipNoAccess = "com.atomawayg.sian.clip.noaccess"
 
     static func post(_ name: String) {
         CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),

@@ -176,6 +176,10 @@ struct ContentView: View {
                 Toggle(isOn: $model.logOn) {
                     Text("บันทึกเกมพูล (ไว้ส่งให้ตรวจ)").font(.footnote.weight(.semibold))
                 }.tint(Theme.gold)
+                Toggle(isOn: $model.clipOn) {
+                    Text("อัดคลิป (เซฟลงรูปภาพ · สูงสุด 3 นาที)").font(.footnote.weight(.semibold))
+                }.tint(Theme.gold)
+                if !model.clipStatus.isEmpty { Text(model.clipStatus).font(.caption2).foregroundColor(Theme.muted) }
                 HStack(spacing: 16) {
                     ShareLink(item: GameModel.logURL) { Label("ส่งบันทึก", systemImage: "square.and.arrow.up").font(.footnote.weight(.semibold)) }
                     Button(role: .destructive) { model.clearLog() } label: { Label("ล้าง", systemImage: "trash").font(.footnote) }

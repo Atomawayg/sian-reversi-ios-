@@ -16,16 +16,19 @@ class SampleHandler: RPBroadcastSampleHandler {
     private var readMs = 0.0, reads = 0, rate = 0, rateSince: CFTimeInterval = 0
 
     override func broadcastStarted(withSetupInfo setupInfo: [String: NSObject]?) {
+        _ = ClipRecorder.shared   // starts listening for the app's record switch
         Signal.post(Signal.started)
     }
 
     override func broadcastFinished() {
+        ClipRecorder.shared.finish()
         send(BoardMessage(valid: false, cells: [], me: 0, myTurn: false))
         Signal.post(Signal.stopped)
     }
 
     override func processSampleBuffer(_ sampleBuffer: CMSampleBuffer, with sampleBufferType: RPSampleBufferType) {
         guard sampleBufferType == .video else { return }
+        ClipRecorder.shared.add(sampleBuffer)
         let t = CACurrentMediaTime()
         // pool reads every frame it can (the aim moves under your finger); the board games every 0.15 s
         if busy || t - lastRead < (poolMode ? 0 : 0.15) { return }

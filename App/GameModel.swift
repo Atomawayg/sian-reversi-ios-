@@ -1,3 +1,4 @@
+import Photos
 import Foundation
 import SwiftUI
 
@@ -33,7 +34,7 @@ final class GameModel: ObservableObject {
         pip.onStateChange = { [weak self] on in DispatchQueue.main.async { self?.pipOn = on } }
         GameModel.shared = self
         let center = CFNotificationCenterGetDarwinNotifyCenter()
-        for name in [Signal.started, Signal.frame, Signal.stopped] + DarwinBoard.names() {
+        for name in [Signal.started, Signal.frame, Signal.stopped, Signal.clipRecording, Signal.clipSaved, Signal.clipFailed, Signal.clipNoAccess] + DarwinBoard.names() {
             CFNotificationCenterAddObserver(center, nil, { _, _, name, _, _ in
                 let n = (name?.rawValue as String?) ?? ""
                 DispatchQueue.main.async { GameModel.shared?.signal(n) }
@@ -43,6 +44,7 @@ final class GameModel: ObservableObject {
         watchdog = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             guard let self else { return }
             self.refreshDebug()
+            if self.clipOn && self.clipStatus == "รอเริ่ม…" { Signal.post(Signal.clipStart) }
             self.show(self.overlay)
             let alive = Date().timeIntervalSince(self.lastMsgAt) < 4
             if self.linked != alive {
@@ -104,6 +106,10 @@ final class GameModel: ObservableObject {
             else if k.hasPrefix("valid") { dValid = k == "valid1" }
             return
         }
+        if n == Signal.clipRecording { clipStatus = "กำลังอัด…" }
+        if n == Signal.clipSaved { clipOn = false; clipStatus = "เซฟคลิปลงรูปภาพแล้ว" }
+        if n == Signal.clipFailed { clipOn = false; clipStatus = "อัดคลิปไม่สำเร็จ" }
+        if n == Signal.clipNoAccess { clipOn = false; clipStatus = "ไม่มีสิทธิ์เซฟลงรูปภาพ (เปิดในตั้งค่า → เซียน → รูปภาพ)" }
         if n == Signal.started { started = true; frames = 0 }
         if n == Signal.stopped { started = false }
         if n == Signal.frame { frames += 1; started = true }
@@ -680,7 +686,7 @@ final class GameModel: ObservableObject {
                     } else { poolInZone = false; poolSound.set(.tone(660)) }
                 } else {
                     poolSound.set(.off); poolInZone = false
-                    line = a.x < apex.x ? "หมุนไม้ ↻ ตามเข็ม" : "หมุนไม้ ↺ ทวนเข็ม"
+                    line = ""
                 }
             } else { poolSound.set(.off) }
         }
@@ -751,7 +757,7 @@ final class GameModel: ObservableObject {
 
             if good {
                 title = "✓ \(v.ball) → \(PoolEngine.pockets[v.pocket].name)"
-                line = turnHint
+                line = ""; _ = turnHint
                 if pulling {
                     // pulling the power bar: tone off, one blip when it reaches the strength
                     poolSound.set(.off)
@@ -770,8 +776,7 @@ final class GameModel: ObservableObject {
                 } else if let w = view.win {
                     // your line misses or only just drops: which pocket it is near and which way to turn
                     title = "\(v.ball) → \(PoolEngine.pockets[w.pocket].name)" + (v.pocket >= 0 ? " เสี่ยง" : "?")
-                    let why = cleanPot ? (dir == nil ? "ช็อตบาง" : "รอวงเล็งนิ่ง") : ""
-                    line = cleanPot || turnHint.isEmpty ? why : turnHint
+                    line = ""
                 }
             }
         } else {
@@ -990,6 +995,23 @@ final class GameModel: ObservableObject {
     private struct JKLock { let board: [Int]; let hand: [String]; let ranks: [String]; let rank: String; let discard: Bool; let overlay: Overlay }
     private var jkLock: JKLock? = nil
     // MARK: game log (settings → บันทึกเกมพูล): what was read and suggested, to check against the real shots
+    // MARK: clip (settings → อัดคลิป): the screen reader records what it sees and saves it to Photos
+    @Published var clipStatus = ""
+    @Published var clipOn = false {
+        didSet {
+            guard clipOn != oldValue else { return }
+            if clipOn {
+                clipStatus = "รอเริ่ม…"
+                PHPhotoLibrary.requestAuthorization(for: .addOnly) { _ in }
+                Signal.post(Signal.clipStart)
+                log("--- เริ่มอัดคลิป \(Date())")
+            } else {
+                Signal.post(Signal.clipStop)
+                if clipStatus == "กำลังอัด…" || clipStatus == "รอเริ่ม…" { clipStatus = "กำลังเซฟ…" }
+                log("--- หยุดอัดคลิป \(Date())")
+            }
+        }
+    }
     @Published var logOn = UserDefaults.standard.bool(forKey: "poolLog") { didSet { UserDefaults.standard.set(logOn, forKey: "poolLog"); if logOn { log("--- เริ่มบันทึก \(Date())") } } }
     private var jkLastLog = ""
     static var logURL: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("sian-pool-log.txt") }
