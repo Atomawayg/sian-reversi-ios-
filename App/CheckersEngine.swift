@@ -322,7 +322,8 @@ final class CheckersEngine {
         if pc(P[2]) == 1 && pc(P[3]) == 1 && P[0] == 0 && pc(P[1]) == 1 { return -1 }
         return 0
     }
-    /// Our moves still allowed under the count at the root (set by the app; 0 = the count is not running).
+    /// Our moves still allowed under the count at the root (set by the app; 0 = the count is not running,
+    /// −1 = ignore the count, for tests).
     var countLeft = 0
 
     private func negamax(_ side: Int, _ depth: Int, _ alphaIn: Int, _ betaIn: Int, _ ply: Int) -> Int {
@@ -442,7 +443,7 @@ final class CheckersEngine {
             if tv >= 0 {
                 var trapOf = [Int](repeating: 0, count: root.count), avgOf = [Int](repeating: 0, count: root.count)
                 // our moves left under the count (fresh 8 when the counted ending starts now)
-                let limit = countSide() == side ? (countLeft > 0 ? countLeft : CheckersEngine.countMoves) : 0
+                let limit = countLeft < 0 ? 0 : (countSide() == side ? (countLeft > 0 ? countLeft : CheckersEngine.countMoves) : 0)
                 for k in 0..<root.count {
                     let i = findIndex(root[k].m)
                     if i < 0 { continue }

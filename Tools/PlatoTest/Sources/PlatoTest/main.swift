@@ -58,14 +58,13 @@ if mode == "hos" {
         let res = e.search(b, side: 1, maxMs: 100)
         if res.instant == "tb" { starts.append(b) }
     }
-    for random in [false, true] { for tie in [true] {
-        e.humanTieBreak = tie
+    for random in [false, true] { for tie in [false, true] {
         var wins = 0, plies = 0
         var seed: UInt64 = 777
         for st in starts {
             var b = st, won = false
             for mv in 0..<8 {
-                e.countLeft = 8 - mv
+                e.countLeft = tie ? 8 - mv : -1
                 guard let m = e.search(b, side: 1, maxMs: 100).best else { break }
                 b = apply(b, m, 1)
                 let ms = e.moves(b, side: -1)
@@ -78,7 +77,7 @@ if mode == "hos" {
             }
             if won { wins += 1 }
         }
-        out("K+man v K, opponent \(random ? "random" : "perfect"), average-tiebreak \(tie): won within 8 moves \(wins)/\(starts.count), avg moves \(wins > 0 ? Double(plies) / Double(wins) : 0)")
+        out("K+man v K, opponent \(random ? "random" : "perfect"), count-aware \(tie): won within 8 moves \(wins)/\(starts.count), avg moves \(wins > 0 ? Double(plies) / Double(wins) : 0)")
     } }
     exit(0)
 }
