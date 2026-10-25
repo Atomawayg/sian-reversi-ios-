@@ -35,18 +35,25 @@ if mode == "hos" {
     var dark: [Int] = []; for i in 0..<64 where (i / 8 + i % 8) % 2 == 1 { dark.append(i) }
     var rng: UInt64 = 12345
     func r(_ n: Int) -> Int { rng = rng &* 6364136223846793005 &+ 1442695040888963407; return Int((rng >> 33) % UInt64(n)) }
-    var shown = 0, draws = 0, trapped = 0
-    for _ in 0..<400 {
-        var b = [Int](repeating: 0, count: 64)
-        let a = dark[r(32)], c = dark[r(32)], d = dark[r(32)]
-        if a == c || a == d || c == d { continue }
-        b[a] = 2; b[c] = 2; b[d] = -2
-        let res = e.search(b, side: 1, maxMs: 500)
-        guard res.instant == "tb", res.score == 0, let m = res.best else { continue }
-        draws += 1; if res.trap > 0 { trapped += 1 }
-        if shown < 6 { shown += 1; out("2K v K draw: kings \(a),\(c) vs \(d) → move \(m.from)->\(m.to) trap \(res.trap)") }
+    for (label, mine, theirs) in [("K+man v K", [2, 1], [-2]), ("2K v K", [2, 2], [-2]), ("2K+man v K", [2, 2, 1], [-2]), ("3K v K", [2, 2, 2], [-2]), ("2K v K+man", [2, 2], [-2, -1])] {
+        var draws = 0, trapped = 0, wins = 0, total = 0, unknown = 0, sumDepth = 0
+        for _ in 0..<300 {
+            var b = [Int](repeating: 0, count: 64)
+            var used = Set<Int>(); var ok = true
+            for v in mine + theirs {
+                var sq = dark[r(32)]; var tries = 0
+                while used.contains(sq) || (v == 1 && sq / 8 == 0) || (v == -1 && sq / 8 == 7) { sq = dark[r(32)]; tries += 1; if tries > 50 { ok = false; break } }
+                used.insert(sq); b[sq] = v
+            }
+            if !ok { continue }
+            let res = e.search(b, side: 1, maxMs: 300)
+            guard res.best != nil else { continue }
+            total += 1
+            if res.instant == "tb" { if res.score == 0 { draws += 1; if res.trap > 0 { trapped += 1 } } else if res.score > 0 { wins += 1 } }
+            else { unknown += 1; if res.score > CheckersEngine.MATE - 1000 { wins += 1; sumDepth += CheckersEngine.MATE - res.score } }
+        }
+        out("\(label): \(total) positions, tb-win/found-win \(wins), tb-draw \(draws) (trap move \(trapped)), searched \(unknown)")
     }
-    out("2K v K drawn positions \(draws), with a trap move \(trapped)")
     exit(0)
 }
 if mode == "perft" || mode == "all" {
