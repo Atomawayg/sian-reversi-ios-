@@ -34,6 +34,7 @@ final class SuikaEngine {
     static let g = 3200.0
     static let dt = 1.0 / 120
     static let iters = 6
+    static let mu = 0.4
     static let maxR = SK.radius.max()!
 
     /// value of making a fruit of kind k (the game scores roughly like this)
@@ -92,12 +93,30 @@ final class SuikaEngine {
                         let wi = b[i].im / w, wj = b[j].im / w
                         b[i].x -= nx * pen * wi; b[i].y -= ny * pen * wi
                         b[j].x += nx * pen * wj; b[j].y += ny * pen * wj
+                        // friction: take back some of the sliding along the contact made this step
+                        // (without it a pile slides apart that holds in the game)
+                        let tx = -ny, ty = nx
+                        let slide = ((b[j].x - b[j].px) - (b[i].x - b[i].px)) * tx + ((b[j].y - b[j].py) - (b[i].y - b[i].py)) * ty
+                        let cap = SuikaEngine.mu * pen
+                        let f = abs(slide) <= cap ? slide : (slide > 0 ? cap : -cap)
+                        b[i].x += tx * f * wi; b[i].y += ty * f * wi
+                        b[j].x -= tx * f * wj; b[j].y -= ty * f * wj
                     }
                     // walls and floor
                     let r = b[i].r
-                    if b[i].x < SK.left + r { b[i].x = SK.left + r }
-                    if b[i].x > SK.right - r { b[i].x = SK.right - r }
-                    if b[i].y > SK.floor - r { b[i].y = SK.floor - r }
+                    if b[i].x < SK.left + r || b[i].x > SK.right - r {
+                        let wx = b[i].x < SK.left + r ? SK.left + r : SK.right - r
+                        let pen = abs(b[i].x - wx)
+                        b[i].x = wx
+                        let slide = b[i].y - b[i].py, cap = SuikaEngine.mu * pen
+                        b[i].y -= abs(slide) <= cap ? slide : (slide > 0 ? cap : -cap)
+                    }
+                    if b[i].y > SK.floor - r {
+                        let pen = b[i].y - (SK.floor - r)
+                        b[i].y = SK.floor - r
+                        let slide = b[i].x - b[i].px, cap = SuikaEngine.mu * pen
+                        b[i].x -= abs(slide) <= cap ? slide : (slide > 0 ? cap : -cap)
+                    }
                 }
             }
             var fastest = 0.0
