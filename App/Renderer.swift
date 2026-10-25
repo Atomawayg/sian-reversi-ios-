@@ -566,7 +566,7 @@ extension Renderer {
         let area = CGRect(x: 18, y: 16, width: (rect.height - 32) * 759 / 1551, height: rect.height - 32)
         // text on the right
         let zoomAt = v.zoomPocket   // steadied in GameModel (the pocket your line ends at)
-        let zoom = zoomAt != nil && v.aimX != nil
+        let zoom = false && zoomAt != nil && v.aimX != nil   // the pocket close-up confused more than it helped (3.23): off
         let zs: CGFloat = min(250, rect.height - 24)   // the pocket close-up, big on the right while your line nears a pocket
         let barW: CGFloat = 26, barX = rect.width - (zoom ? zs + 12 : 0) - barW - 14
         let tx = area.maxX + 30, tw = barX - tx - 10
@@ -692,10 +692,16 @@ extension Renderer {
         // the plan: 1 and 2 on the balls, a ring where the cue ball should stop after shot 1
         func label(_ txt: String, _ b: PoolEngine.Ball) {
             let c = pt(b.x, b.y)
-            let at: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 15, weight: .black), .foregroundColor: UIColor.black]
-            gold.setFill(); UIBezierPath(ovalIn: CGRect(x: c.x + br - 2, y: c.y - br - 12, width: 16, height: 16)).fill()
-            (txt as NSString).draw(at: CGPoint(x: c.x + br + 2, y: c.y - br - 12), withAttributes: at)
+            let d: CGFloat = 22
+            let at: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 17, weight: .black), .foregroundColor: UIColor.black]
+            let r = CGRect(x: c.x + br - 4, y: c.y - br - d + 4, width: d, height: d)
+            UIColor.black.setFill(); UIBezierPath(ovalIn: r.insetBy(dx: -2, dy: -2)).fill()
+            gold.setFill(); UIBezierPath(ovalIn: r).fill()
+            let sz = (txt as NSString).size(withAttributes: at)
+            (txt as NSString).draw(at: CGPoint(x: r.midX - sz.width / 2, y: r.midY - sz.height / 2), withAttributes: at)
         }
+        // the ball to play now: a "1" on it (only ever 1 — once it drops, the 1 moves to the next ball)
+        if let f = v.pick, let b = v.balls.first(where: { $0.id == f.ball }) { label("1", b) }
         if let s = v.shot, let b = v.balls.first(where: { $0.id == s.ball }) { label("1", b) }
         if let n = v.next, let b = v.balls.first(where: { $0.id == n.ball }) { label("2", b) }
         if let ex = v.cueEndX, let ey = v.cueEndY, !aiming {

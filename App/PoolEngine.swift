@@ -69,12 +69,14 @@ enum PoolEngine {
     /// Oct 25 log, nine cushion hits read off rolling balls: the ball keeps ~85 % of its pace along the cushion and
     /// about 1/1.45 of that into it (tan of the angle from the normal grows ×1.45; fast hits 1.36–1.55, slow up to 2).
     /// "Sure" shots must still drop with this anywhere in `flatRange`.
-    /// Refit on 21 object-ball cushion hits (Oct 26 logs): fast balls come off much flatter than slow ones and
-    /// shallow hits flatten most: tan(out) = 1.14·tan(in) + 0.40·sin(2·in) (±6° scatter per cushion). `flat` scales it;
-    /// "sure" shots must drop across `flatRange`.
+    /// Measured on 8 clean object-ball cushion hits in Atom's in-app clips (60 fps): the ball keeps ~0.8 of its pace
+    /// along the cushion and ~0.43 of its pace into it, so tan(out) ≈ 1.85·tan(in) — scatter about ±6° per cushion
+    /// (a ball still skidding comes off differently from a rolling one). `flat` scales the ratio; "sure" banks must
+    /// drop for any ratio 1.55…2.2 (`flatRange` 0.84…1.19).
     static let bounceFlatten = 1.0
-    static let flatRange = [0.9, 1.1]
-    static let keepAlong = 0.85
+    static let flatRange = [0.84, 1.19]
+    static let keepAlong = 0.8
+    static let keepInto = 0.8 / 1.85
     /// a cushion hit this close to a pocket's centre is where the game's jaws behave unlike the model: never "sure"
     static let mouthNear = 90.0
 
@@ -190,12 +192,10 @@ enum PoolEngine {
             }
             if r.rails > maxRails { break }
             if !isJaw && abs(vn) >= sin(12 * Double.pi / 180) && holes.contains(where: { hypot($0.x - x, $0.y - y) < mouthNear }) { r.nearMouth = true }
-            // off the cushion: the pace along it × keepAlong; the way out from the fitted angle law
-            let tm = (tx * tx + ty * ty).squareRoot(), an = abs(vn)
-            let tin = tm / max(an, 1e-6), th = atan(tin)
-            let tout = flat * (1.14 * tin + 0.40 * sin(2 * th))
-            let vt2 = keepAlong * tm, vn2 = tout > 1e-4 ? vt2 / tout : 0.5 * an
-            ux = (tm > 1e-9 ? tx / tm : 0) * vt2 + nx * vn2; uy = (tm > 1e-9 ? ty / tm : 0) * vt2 + ny * vn2
+            // off the cushion: pace along it × keepAlong, into it × keepInto (÷ flat)
+            let an = abs(vn)
+            let vt2 = keepAlong, vn2 = an * keepInto / flat
+            ux = tx * vt2 + nx * vn2; uy = ty * vt2 + ny * vn2
             let l = (ux * ux + uy * uy).squareRoot(); ux /= l; uy /= l
             if speed != nil && (isJaw || abs(vn) >= sin(12 * Double.pi / 180)) { left = rollDistance(l * speedFor(distance: left)) }
             x += nx * 0.01; y += ny * 0.01
