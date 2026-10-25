@@ -119,15 +119,19 @@ do {
     note(out)
 }
 // pool frames from the Oct 25 recording
-for n in ["pool_20", "pool_1_5", "pool_12_6", "pool_120"] {
+for n in ["pool_20", "pool_1_5", "pool_12_6", "pool_120", "shot1", "shot2"] {
     let sm = load(n)
+    PoolReader.cache = nil; PoolReader.lastAim = nil
     let t0p = DispatchTime.now().uptimeNanoseconds
     guard PoolReader.looksLikePool(sm) else { note("\(n): looksLikePool = false"); continue }
     let m = PoolReader.read(sm)
     let c = m.cells
     var bs: [PoolEngine.Ball] = []
     for id in 0...15 where c[PoolCodec.balls + 7 * id] == 1 { let p = PoolCodec.get(c, PoolCodec.balls + 7 * id + 1); bs.append(PoolEngine.Ball(id: id, x: p.x, y: p.y)) }
-    var line = "\(n): read \(ms(t0p)) ms · turn \(m.myTurn) · group \(m.me) · flags \(c[PoolCodec.flags]) · power \(c[PoolCodec.power] * 14 + c[PoolCodec.power + 1]) · balls " + bs.map { "\($0.id)(\(Int($0.x)),\(Int($0.y)))" }.joined(separator: " ")
+    let t0q = DispatchTime.now().uptimeNanoseconds
+    _ = PoolReader.read(sm)
+    let fastMs = ms(t0q)
+    var line = "\(n): read \(ms(t0p)) ms, again \(fastMs) ms · dir \(PoolCodec.dir(c).map { String(format: "%.1f°", $0 * 180 / Double.pi) } ?? "-") · turn \(m.myTurn) · group \(m.me) · flags \(c[PoolCodec.flags]) · power \(c[PoolCodec.power] * 14 + c[PoolCodec.power + 1]) · balls " + bs.map { "\($0.id)(\(Int($0.x)),\(Int($0.y)))" }.joined(separator: " ")
     if let cue = bs.first(where: { $0.id == 0 }) {
         let others = bs.filter { $0.id != 0 }
         let legal = PoolEngine.legal(group: m.me)
@@ -136,7 +140,7 @@ for n in ["pool_20", "pool_1_5", "pool_12_6", "pool_120"] {
         line += " · \(sh.count) shots in \(ms(t1)) ms, best " + sh.prefix(3).map { "\($0.ball)→\(PoolEngine.pockets[$0.pocket].name)\($0.bank ? " ชิ่ง" : "") tol \(String(format: "%.2f", $0.tolerance))° แรง \($0.powerPct)" }.joined(separator: " | ")
         if c[PoolCodec.flags] & 2 == 2 {
             let a = PoolCodec.get(c, PoolCodec.aim)
-            let v = PoolEngine.judge(cueX: cue.x, cueY: cue.y, aimX: a.x, aimY: a.y, balls: others, legal: legal)
+            let v = PoolEngine.judge(cueX: cue.x, cueY: cue.y, aimX: a.x, aimY: a.y, balls: others, legal: legal, dir: PoolCodec.dir(c))
             line += " · aim (\(Int(a.x)),\(Int(a.y))) hits \(v.ball) pocket \(v.pocket) off \(String(format: "%.2f", v.off)) foul \(v.foul) scratch \(v.scratch) power \(v.powerPct)"
         }
     }
