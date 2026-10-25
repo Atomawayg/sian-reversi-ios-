@@ -95,7 +95,7 @@ enum PoolEngine {
                 if along <= 0 || along > tw + 60 { continue }
                 let perp = abs(wx * uy - wy * ux)
                 if perp > mouth(p) { continue }
-                if p.side && abs(uy) > sin(58 * Double.pi / 180) { continue }   // too steep into a side pocket
+                if p.side && abs(uy) > sin(64 * Double.pi / 180) { continue }   // too steep into a side pocket
                 if best == nil || along < best!.1 { best = (i, along, perp / mouth(p)) }
             }
             if let b = best {
@@ -139,14 +139,14 @@ enum PoolEngine {
                     var ux = ax - t.x, uy = ay - t.y
                     let dd = (ux * ux + uy * uy).squareRoot(); if dd < 1 { continue }
                     ux /= dd; uy /= dd
-                    guard let tr = trace(t.x, t.y, ux, uy, balls: balls, skip: t.id), tr.pocket == pi, tr.bank == bank, tr.off < 0.6 else { continue }
+                    guard let tr = trace(t.x, t.y, ux, uy, balls: balls, skip: t.id), tr.pocket == pi, tr.bank == bank, tr.off < 0.8 else { continue }
                     let gx = t.x - ux * 2 * R, gy = t.y - uy * 2 * R
                     if gx < xMin - 2 || gx > xMax + 2 || gy < yMin - 2 || gy > yMax + 2 { continue }
                     let vx = gx - cueX, vy = gy - cueY, d1 = (vx * vx + vy * vy).squareRoot()
                     if d1 < 1 { continue }
                     let cosCut = (vx * ux + vy * uy) / d1
-                    if cosCut < cos(78 * Double.pi / 180) { continue }
-                    if !clear(cueX, cueY, gx, gy, balls, skip: t.id, gap: 2 * R - 1) { continue }
+                    if cosCut < cos(82 * Double.pi / 180) { continue }   // thin cuts still count (the game forgives them)
+                    if !clear(cueX, cueY, gx, gy, balls, skip: t.id, gap: 2 * R - 3) { continue }
                     var tol = (p.side ? 13.0 : 20.0) * 2 * R * cosCut / (max(d1, 2 * R) * max(tr.len, R))
                     if bank { tol *= 0.5 }
                     let cut = acos(max(-1, min(1, cosCut))) * 180 / Double.pi
@@ -221,6 +221,59 @@ enum PoolEngine {
         }
         v.scratch = scratches(cueX: cueX, cueY: cueY, gx: aimX, gy: aimY, ux: ux, uy: uy)
         return v
+    }
+
+
+    // MARK: paths to draw
+
+    /// Where a ball rolling from (x,y) along (ux,uy) goes: up to two legs (one cushion), stopping at a pocket,
+    /// a ball in the way, or after `maxLen` px. x,y pairs.
+    static func path(_ x0: Double, _ y0: Double, _ ux0: Double, _ uy0: Double, balls: [Ball], skip: Int, maxLen: Double = 2400) -> [Double] {
+        var out = [x0, y0]
+        var x = x0, y = y0, ux = ux0, uy = uy0, left = maxLen
+        for _ in 0..<2 {
+            var tw = Double.infinity
+            if ux < 0 { tw = min(tw, (xMin - x) / ux) }; if ux > 0 { tw = min(tw, (xMax - x) / ux) }
+            if uy < 0 { tw = min(tw, (yMin - y) / uy) }; if uy > 0 { tw = min(tw, (yMax - y) / uy) }
+            var stop = min(tw, left)
+            // a pocket on the way
+            for p in pockets {
+                let wx = p.x - x, wy = p.y - y, along = wx * ux + wy * uy
+                if along > 0 && along < stop + 60 && abs(wx * uy - wy * ux) < mouth(p) { out += [p.x, p.y]; return out }
+            }
+            // a ball in the way (stop where it touches)
+            for b in balls where b.id != skip && b.id != 0 {
+                let wx = b.x - x, wy = b.y - y, along = wx * ux + wy * uy
+                let perp = abs(wx * uy - wy * ux)
+                if along > 0 && perp < 2 * R { let hit = along - (4 * R * R - perp * perp).squareRoot(); if hit < stop { stop = max(0, hit) } }
+            }
+            x += ux * stop; y += uy * stop; left -= stop
+            out += [x, y]
+            if stop < tw - 0.5 || left <= 0 { return out }
+            if abs(x - xMin) < 0.5 || abs(x - xMax) < 0.5 { ux = -ux } else { uy = -uy }
+        }
+        return out
+    }
+
+    /// The object ball's path for a hit from ghost position (gx,gy).
+    static func objectPath(_ bx: Double, _ by: Double, gx: Double, gy: Double, balls: [Ball], skip: Int, pocket: Pocket? = nil) -> [Double] {
+        var ux = bx - gx, uy = by - gy
+        let d = (ux * ux + uy * uy).squareRoot(); ux /= max(d, 1e-6); uy /= max(d, 1e-6)
+        return path(bx, by, ux, uy, balls: balls, skip: skip)
+    }
+
+    /// Where the cue ball runs after a centre-ball hit: along the tangent line (a dead-straight hit stops it).
+    static func cuePath(cueX: Double, cueY: Double, gx: Double, gy: Double, bx: Double, by: Double, balls: [Ball]) -> [Double] {
+        var ux = bx - gx, uy = by - gy
+        let d = (ux * ux + uy * uy).squareRoot(); ux /= max(d, 1e-6); uy /= max(d, 1e-6)
+        let vx = gx - cueX, vy = gy - cueY
+        let dv = (vx * vx + vy * vy).squareRoot()
+        let along = (vx * ux + vy * uy) / max(dv, 1e-6)          // cos of the cut
+        if along > 0.995 { return [] }                            // straight hit: the cue ball stops
+        let side = vx * -uy + vy * ux > 0
+        let tx = side ? -uy : uy, ty = side ? ux : -ux
+        let len = 900 * (1 - along * along).squareRoot()          // thinner cut, more pace left on the cue ball
+        return path(gx, gy, tx, ty, balls: balls, skip: 0, maxLen: len)
     }
 
     /// Opening break: most balls still racked at the top.

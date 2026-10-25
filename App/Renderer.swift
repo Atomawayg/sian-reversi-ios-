@@ -28,6 +28,7 @@ struct Overlay: Equatable {
     var action = ""              // one word: เดิน 7, ออกลูก, สลับ…
     // fruit game
     var drop: Int? = nil         // x (screen px) to drop the held fruit at
+    var pool: PoolView? = nil    // pool: the table, the suggested shot and what your aim does
     var land: [Int] = []         // x, y where it comes to rest (empty when it merges)
 
     init(game: GameKind = .reversi, cells: [Int]? = nil, rec: Int? = nil, path: [Int] = [], caps: [Int] = [],
@@ -39,6 +40,9 @@ struct Overlay: Equatable {
 
 enum Renderer {
     static let size = CGSize(width: 640, height: 360)
+    /// pool is drawn upright like the game, so its window is tall
+    static let poolSize = CGSize(width: 400, height: 870)
+    static func frameSize(_ o: Overlay) -> CGSize { o.game == .pool && o.pool != nil ? poolSize : size }
     /// flips twice a second so the stones to tap blink
     static var pulse = false
 
@@ -59,6 +63,7 @@ enum Renderer {
     private static let arrow = UIColor(red: 0.25, green: 0.88, blue: 0.68, alpha: 1)
 
     static func pixelBuffer(_ o: Overlay) -> CVPixelBuffer? {
+        let size = frameSize(o)
         let w = Int(size.width), h = Int(size.height)
         var pbOut: CVPixelBuffer?
         let attrs: [CFString: Any] = [
@@ -83,6 +88,7 @@ enum Renderer {
 
     static func draw(_ o: Overlay, in rect: CGRect) {
         bg.setFill(); UIRectFill(rect)
+        if o.game == .pool, let pv = o.pool { drawPool(o, pv, rect); return }
         let pad: CGFloat = 20
         let side = rect.height - pad * 2
         var textX = pad
@@ -485,7 +491,7 @@ enum Renderer {
     }
 
     static func image(_ o: Overlay) -> UIImage {
-        UIGraphicsImageRenderer(size: size).image { _ in draw(o, in: CGRect(origin: .zero, size: size)) }
+        UIGraphicsImageRenderer(size: frameSize(o)).image { _ in draw(o, in: CGRect(origin: .zero, size: frameSize(o))) }
     }
     // MARK: chess
     private static func drawChess(_ o: Overlay, _ cells: [Int], _ r: CGRect) {
@@ -515,4 +521,89 @@ enum Renderer {
         }
     }
 
+}
+
+/// Pool drawing data (screen pixels of a 1180×2556 screen).
+struct PoolView: Equatable {
+    var balls: [PoolEngine.Ball]
+    var shot: PoolEngine.Shot?                 // the suggested shot
+    var aimX: Double? = nil, aimY: Double? = nil   // the game's aim circle now
+    var objPath: [Double] = []                 // x,y pairs: where the ball you are aiming at goes
+    var cuePath: [Double] = []                 // x,y pairs: where the cue ball goes after the hit (no spin)
+    var pots = false                           // your current aim pots one of your balls
+    var legal: [Int] = []
+}
+
+extension Renderer {
+    private static let poolColours: [UIColor] = [
+        .white, UIColor(red: 0.98, green: 0.80, blue: 0.10, alpha: 1), UIColor(red: 0.10, green: 0.35, blue: 0.95, alpha: 1),
+        UIColor(red: 0.92, green: 0.15, blue: 0.15, alpha: 1), UIColor(red: 0.45, green: 0.15, blue: 0.65, alpha: 1),
+        UIColor(red: 1.0, green: 0.50, blue: 0.10, alpha: 1), UIColor(red: 0.10, green: 0.65, blue: 0.20, alpha: 1),
+        UIColor(red: 0.50, green: 0.12, blue: 0.10, alpha: 1), .black]
+
+    /// The table upright, as in the game, with a line of text on top.
+    static func drawPool(_ o: Overlay, _ v: PoolView, _ rect: CGRect) {
+        let gold = UIColor(red: 0.949, green: 0.757, blue: 0.306, alpha: 1)
+        let green = UIColor(red: 0.30, green: 0.95, blue: 0.45, alpha: 1), red = UIColor(red: 1.0, green: 0.35, blue: 0.30, alpha: 1)
+        // text
+        let tAttr: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 30, weight: .heavy), .foregroundColor: o.mine ? gold : UIColor.white]
+        (o.title as NSString).draw(with: CGRect(x: 12, y: 6, width: rect.width - 24, height: 38), options: .usesLineFragmentOrigin, attributes: tAttr, context: nil)
+        let lAttr: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 21, weight: .semibold), .foregroundColor: UIColor(white: 0.8, alpha: 1)]
+        (o.line as NSString).draw(with: CGRect(x: 12, y: 42, width: rect.width - 24, height: 28), options: .usesLineFragmentOrigin, attributes: lAttr, context: nil)
+        // table: playing surface 759 × 1551 px on screen
+        let area = CGRect(x: 14, y: 80, width: rect.width - 28, height: rect.height - 92)
+        let sc = min(area.width / 759, area.height / 1551)
+        let w = 759 * sc, h = 1551 * sc
+        let box = CGRect(x: area.midX - w / 2, y: area.minY + (area.height - h) / 2, width: w, height: h)
+        func pt(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: box.minX + CGFloat(x - 207.5) * sc, y: box.minY + CGFloat(y - 584) * sc) }
+        UIColor(red: 0.36, green: 0.22, blue: 0.12, alpha: 1).setFill(); UIBezierPath(roundedRect: box.insetBy(dx: -9, dy: -9), cornerRadius: 9).fill()
+        UIColor(red: 0.13, green: 0.47, blue: 0.68, alpha: 1).setFill(); UIRectFill(box)
+        UIColor.black.setFill()
+        for p in PoolEngine.pockets { let c = pt(p.x, p.y); UIBezierPath(ovalIn: CGRect(x: c.x - 11, y: c.y - 11, width: 22, height: 22)).fill() }
+        let br = CGFloat(PoolEngine.R) * sc
+        func poly(_ xy: [Double], _ col: UIColor, _ width: CGFloat, dash: Bool = false) {
+            guard xy.count >= 4 else { return }
+            let l = UIBezierPath(); l.move(to: pt(xy[0], xy[1]))
+            var i = 2; while i + 1 < xy.count { l.addLine(to: pt(xy[i], xy[i + 1])); i += 2 }
+            l.lineWidth = width; if dash { l.setLineDash([8, 6], count: 2, phase: 0) }
+            col.setStroke(); l.stroke()
+        }
+        // suggested shot: gold
+        if let s = v.shot {
+            let cue = pt(s.cueX, s.cueY), g = pt(s.ghostX, s.ghostY)
+            if let b = v.balls.first(where: { $0.id == s.ball }) {
+                let p = PoolEngine.pockets[s.pocket]
+                poly(PoolEngine.objectPath(b.x, b.y, gx: s.ghostX, gy: s.ghostY, balls: v.balls, skip: b.id, pocket: p), gold.withAlphaComponent(0.8), 3)
+            }
+            let l1 = UIBezierPath(); l1.move(to: cue); l1.addLine(to: g); l1.lineWidth = 3; gold.setStroke(); l1.stroke()
+            let gr = UIBezierPath(ovalIn: CGRect(x: g.x - br, y: g.y - br, width: br * 2, height: br * 2)); gr.lineWidth = 2.5; gr.stroke()
+            if s.placed {   // where to put the cue ball
+                gold.withAlphaComponent(0.6).setFill(); UIBezierPath(ovalIn: CGRect(x: cue.x - br * 1.6, y: cue.y - br * 1.6, width: br * 3.2, height: br * 3.2)).fill()
+            }
+        }
+        // your aim now: where the ball goes (green = drops, red = doesn't) and where the cue ball runs
+        poly(v.objPath, v.pots ? green : red, 3)
+        poly(v.cuePath, UIColor.white.withAlphaComponent(0.8), 2, dash: true)
+        for b in v.balls {
+            let c = pt(b.x, b.y), rr = CGRect(x: c.x - br, y: c.y - br, width: br * 2, height: br * 2)
+            poolColours[b.id == 0 ? 0 : (b.id == 8 ? 8 : (b.id - 1) % 8 + 1)].setFill()
+            UIBezierPath(ovalIn: rr).fill()
+            if b.id >= 9 {   // stripe: white caps
+                UIColor.white.setFill()
+                UIBezierPath(ovalIn: rr).addClip()
+                UIRectFill(CGRect(x: rr.minX, y: rr.minY, width: rr.width, height: rr.height * 0.28))
+                UIRectFill(CGRect(x: rr.minX, y: rr.maxY - rr.height * 0.28, width: rr.width, height: rr.height * 0.28))
+                UIGraphicsGetCurrentContext()?.resetClip()
+            }
+            if b.id != 0 && !v.legal.contains(b.id) {   // not yours: dimmed
+                UIColor.black.withAlphaComponent(0.45).setFill(); UIBezierPath(ovalIn: rr).fill()
+            }
+            if let s = v.shot, s.ball == b.id { gold.setStroke(); let o = UIBezierPath(ovalIn: rr.insetBy(dx: -3, dy: -3)); o.lineWidth = 3; o.stroke() }
+        }
+        if let ax = v.aimX, let ay = v.aimY {
+            let a = pt(ax, ay)
+            (v.pots ? green : UIColor.white).setStroke()
+            let c = UIBezierPath(ovalIn: CGRect(x: a.x - br, y: a.y - br, width: br * 2, height: br * 2)); c.lineWidth = 2.5; c.stroke()
+        }
+    }
 }
