@@ -14,7 +14,7 @@ jobs:
       - name: Gather sources
         run: |
           S=Tools/SuikaTest/Sources/SuikaTest
-          cp Shared/SuikaShared.swift Shared/BoardMessage.swift Broadcast/SuikaReader.swift App/SuikaEngine.swift $S/
+          cp Shared/SuikaShared.swift Shared/BoardMessage.swift Broadcast/SuikaReader.swift App/SuikaEngine.swift Broadcast/PoolReader.swift App/PoolEngine.swift $S/
           gunzip -k Tools/SuikaTest/*.rgb.gz
           swift --version
       - name: Build
