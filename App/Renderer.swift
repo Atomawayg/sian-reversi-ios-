@@ -727,10 +727,12 @@ extension Renderer {
         let barY = r.midY - 5
         UIColor(white: 1, alpha: 0.18).setFill()
         UIBezierPath(roundedRect: CGRect(x: r.minX, y: barY, width: r.width, height: 10), cornerRadius: 5).fill()
-        UIColor(red: 0.30, green: 0.95, blue: 0.45, alpha: 0.45).setFill()
+        // green: drops for sure; orange: only drops if the jaws are kind (nothing sure on this line)
+        let zone = w.sure ? UIColor(red: 0.30, green: 0.95, blue: 0.45, alpha: 1) : UIColor(red: 1.0, green: 0.62, blue: 0.15, alpha: 1)
+        zone.withAlphaComponent(0.45).setFill()
         UIBezierPath(roundedRect: CGRect(x: x(w.lo), y: barY, width: max(3, x(w.hi) - x(w.lo)), height: 10), cornerRadius: 5).fill()
         let q = (w.hi - w.lo) / 4
-        UIColor(red: 0.30, green: 0.95, blue: 0.45, alpha: 1).setFill()
+        zone.setFill()
         UIBezierPath(roundedRect: CGRect(x: x(w.lo + q), y: barY, width: max(2, x(w.hi - q) - x(w.lo + q)), height: 10), cornerRadius: 5).fill()
         // your aim now
         let m = x(0)
