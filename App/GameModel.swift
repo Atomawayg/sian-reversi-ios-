@@ -589,7 +589,7 @@ final class GameModel: ObservableObject {
                 view.objPath = PoolEngine.objectPath(b.x, b.y, gx: a.x, gy: a.y, balls: balls, skip: b.id, dir: dir)
                 view.cuePath = PoolEngine.cuePath(cueX: cue.x, cueY: cue.y, gx: a.x, gy: a.y, bx: b.x, by: b.y, balls: balls, dir: dir)
             }
-            let good = v.ball >= 0 && v.pocket >= 0 && !v.foul && !v.scratch && v.off < 0.45
+            let good = v.ball >= 0 && v.pocket >= 0 && !v.foul && !v.scratch && v.off < 0.75   // the game's own line makes the edge of the mouth trustworthy
             view.pots = good
             if good {
                 title = "✓ \(v.ball) → \(PoolEngine.pockets[v.pocket].name)"
