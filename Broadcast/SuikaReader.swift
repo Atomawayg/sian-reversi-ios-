@@ -30,12 +30,12 @@ extension BoardReader {
 
     /// colour groups each fruit type is drawn in (bit mask)
     static let skMask: [UInt16] = [
-        1 << 1,                  // cherry
+        1 << 1 | 1 << 2,         // cherry (reads pinker on some screens)
         1 << 2 | 1 << 1,         // strawberry
         1 << 3,                  // grape
         1 << 4,                  // dekopon
         1 << 5,                  // persimmon
-        1 << 1,                  // apple
+        1 << 1 | 1 << 2,         // apple
         1 << 4,                  // pear
         1 << 6 | 1 << 2 | 1 << 1, // peach
         1 << 4,                  // pineapple
@@ -47,7 +47,8 @@ extension BoardReader {
     static func looksLikeSuika(_ s: Sampler) -> Bool {
         let sx = Double(s.w) / 1179, sy = Double(s.h) / 2556
         func at(_ x: Double, _ y: Double) -> (Double, Double, Double) { s.avg(x * sx, y * sy, 3 * sx) }
-        func sky(_ p: (Double, Double, Double)) -> Bool { p.2 > 225 && p.1 > 165 && p.1 < 215 && p.0 > 85 && p.0 < 140 }
+        // the sky's blue varies between recordings and screenshots: (111,190,249) on one, (69,189,255) on another
+        func sky(_ p: (Double, Double, Double)) -> Bool { p.2 > 215 && p.1 > 155 && p.1 < 220 && p.0 > 40 && p.0 < 150 && p.2 - p.0 > 80 }
         func white(_ p: (Double, Double, Double)) -> Bool { min(p.0, p.1, p.2) > 232 }
         guard sky(at(30, 1300)), sky(at(1150, 1300)), sky(at(30, 1900)), sky(at(1150, 1900)) else { return false }
         guard white(at(70, 1500)), white(at(1108, 1500)), white(at(70, 2000)), white(at(1108, 2000)) else { return false }

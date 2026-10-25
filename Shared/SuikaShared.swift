@@ -23,7 +23,7 @@ enum SK {
     static let top = 800.0       // top of the area that is read
 
     /// radius of each fruit type (cherry … watermelon), measured on the game screen
-    static let radius: [Double] = [35, 50, 63, 75, 92, 121, 138, 168, 200, 235, 280]
+    static let radius: [Double] = [35, 48, 63, 75, 92, 121, 138, 168, 200, 235, 280]
     static let names = ["เชอร์รี่", "สตรอว์เบอร์รี่", "องุ่น", "ส้มเหลือง", "ส้มจิ้งจอก", "แอปเปิ้ล", "สาลี่", "พีช", "สับปะรด", "เมลอน", "แตงโม"]
     static let types = 11
 

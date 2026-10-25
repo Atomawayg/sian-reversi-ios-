@@ -39,6 +39,11 @@ func load(_ name: String) -> BoardReader.Sampler {
     }
 }
 
+do {
+    let m2 = BoardReader.readSuika(load("IMG_new1"))
+    let s2 = SK.decode(m2.cells)!
+    note("new1: suika \(BoardReader.looksLikeSuika(load("IMG_new1"))) · held \(s2.held >= 0 ? SK.names[s2.held] : "-") at \(Int(s2.heldX)) · next \(s2.next >= 0 ? SK.names[s2.next] : "-") · jar " + s2.fruits.map { "\(SK.names[$0.t]) (\(Int($0.x)),\(Int($0.y)))" }.joined(separator: " · "))
+}
 for n in ["IMG_8763", "IMG_8735", "IMG_8758"] {
     note("\(n) looksLikeSuika = \(BoardReader.looksLikeSuika(load(n)))")
 }
