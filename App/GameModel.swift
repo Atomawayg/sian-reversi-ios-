@@ -618,6 +618,18 @@ final class GameModel: ObservableObject {
                 view.objPath = PoolEngine.objectPath(b.x, b.y, gx: a.x, gy: a.y, balls: balls, skip: b.id, dir: dir)
                 view.cuePath = PoolEngine.cuePath(cueX: cue.x, cueY: cue.y, gx: a.x, gy: a.y, bx: b.x, by: b.y, balls: balls, dir: dir)
             }
+            // how far the cue may turn and still pot (the meter and the pocket close-up), and which way to turn
+            var turnHint = ""
+            if v.ball >= 0, !v.foul, let b = others.first(where: { $0.id == v.ball }),
+               let w = PoolEngine.potWindow(cueX: cue.x, cueY: cue.y, aimX: a.x, aimY: a.y, target: b, balls: balls, dir: dir) {
+                view.win = w; view.target = b.id
+                let mid = (w.lo + w.hi) / 2, half = (w.hi - w.lo) / 2
+                if abs(mid) > max(0.05, half * 0.35) {
+                    turnHint = (mid > 0 ? "หมุนไม้ ↻ ตามเข็ม" : "หมุนไม้ ↺ ทวนเข็ม") + (abs(mid) - half > 0 ? "" : " นิดเดียว")
+                } else if w.lo <= 0 && w.hi >= 0 {
+                    turnHint = "กลางหลุมแล้ว"
+                }
+            }
             let good = v.ball >= 0 && v.pocket >= 0 && !v.foul && !v.scratch && v.off < 0.75   // the game's own line makes the edge of the mouth trustworthy
             view.pots = good
             view.risky = !good && v.ball >= 0 && v.pocket >= 0 && !v.foul && !v.scratch
@@ -629,7 +641,7 @@ final class GameModel: ObservableObject {
             }
             if good {
                 title = "✓ \(v.ball) → \(PoolEngine.pockets[v.pocket].name)"
-                line = (v.bank ? bankText : "") + "แรง \(v.powerPct)" + "\n" + mineText
+                line = (v.bank ? bankText : "") + "แรง \(v.powerPct)" + (turnHint.isEmpty ? "" : " · " + turnHint) + "\n" + mineText
                 if pulling {
                     // pulling the power bar: tone off, one blip when it reaches the strength
                     poolSound.set(.off)
@@ -644,7 +656,13 @@ final class GameModel: ObservableObject {
                 }
             } else {
                 poolSound.set(.off); poolInZone = false
-                if v.ball >= 0 && v.pocket >= 0 { line = v.foul ? "ลูกนี้ไม่ใช่ของคุณ (ฟาวล์)" : (v.scratch ? "ลูกขาวจะตกตาม" : "เสี่ยง: เฉียดจมูกหลุม ขยับนิดเดียว") }
+                if v.ball >= 0 && (v.foul || v.scratch) {
+                    line = v.foul ? "ลูกนี้ไม่ใช่ของคุณ (ฟาวล์)" : "ลูกขาวจะตกตาม"
+                } else if let w = view.win {
+                    // your line misses or only just drops: which pocket it is near and which way to turn
+                    title = "\(v.ball) → \(PoolEngine.pockets[w.pocket].name)" + (v.pocket >= 0 ? " เสี่ยง" : "?")
+                    line = (turnHint.isEmpty ? (v.pocket >= 0 ? "เฉียดจมูกหลุม" : "") : turnHint) + "\n" + mineText
+                }
             }
         } else {
             poolSound.set(.off)
@@ -657,6 +675,7 @@ final class GameModel: ObservableObject {
             var t = "P turn=\(m.myTurn ? 1 : 0) bar=\(m.me) mine=\(c[PoolCodec.myLeft]) group=\(group) balls=" + balls.map { "\($0.id):\(f($0.x)),\(f($0.y))" }.joined(separator: " ")
             if let a = view.aimX, let b = view.aimY { t += " aim=\(f(a)),\(f(b))" }
             if let d = PoolCodec.dir(c) { t += String(format: " dir=%.1f", d * 180 / Double.pi) }
+            if let w = view.win { t += String(format: " win=%d:%.2f..%.2f", w.pocket, w.lo, w.hi) }
             if pulling { t += " power=\(c[PoolCodec.power] * 14 + c[PoolCodec.power + 1])" }
             if let s = poolBest { t += " best=\(s.ball)>\(s.pocket)@\(s.powerPct)" + (poolNext.map { " next=\($0.ball)" } ?? "") }
             t += " says=\(title)|" + line.replacingOccurrences(of: "\n", with: " / ")

@@ -64,6 +64,7 @@ enum PoolReader {
     static var cache: (balls: [Ball], clean: Bool, spots: [(x: Double, y: Double, r: Double, g: Double, b: Double)], at: Double)? = nil
     static var lastAim: (Double, Double)? = nil
     static var barCache: (group: Int, mine: Int, opp: Int, at: Double)? = nil
+    static var lastTurnSeen = 0.0
     static var lastReuse = false   // the last frame's table matched the one before (nothing moving)
     static var lastDir: (ball: Int, angle: Double)? = nil
 
@@ -74,14 +75,20 @@ enum PoolReader {
         }
         var cells = [Int](repeating: 0, count: PoolCodec.count)
 
-        // turn: green ring around your avatar (top-left)
-        var green = 0
-        for k in 0..<36 {
-            let a = Double(k) * Double.pi / 18
-            let p = at(98 + 64 * cos(a), 365 + 64 * sin(a))
-            if p.1 > 153 && p.1 - p.0 > 76 && p.1 - p.2 > 25 { green += 1 }
+        // turn: the timer ring around your avatar (top-left). It runs down as your time goes and may change colour,
+        // so any bit of coloured ring counts (on the other player's turn it is a plain white border); a short hold
+        // bridges the last moment before it is empty
+        var ring = 0
+        for k in 0..<72 {
+            let a = Double(k) * Double.pi / 36
+            for r in [64.0, 66] {
+                let c = hsv(at(98 + r * cos(a), 365 + r * sin(a)))
+                if c.s > 0.45 && c.v > 0.5 && !(c.h > 180 && c.h < 260) { ring += 1; break }
+            }
         }
-        let myTurn = green >= 8
+        let tNow = Date().timeIntervalSince1970
+        if ring >= 2 { lastTurnSeen = tNow }
+        let myTurn = ring >= 2 || tNow - lastTurnSeen < 0.6
 
         // group: the bars show the balls each player still has to pot (they only change after a shot, so while
         // the table stands still the last reading of them is reused)
@@ -190,9 +197,26 @@ enum PoolReader {
         cache = (balls, clean, balls.map { b in let p = s.avg(b.x * sx, b.y * sy, 4 * sx); return (b.x, b.y, p.0, p.1, p.2) }, now)
         }
 
-        // 4) the game's aim circle (hollow white ring of ball size) while you aim: near where it was first
+        // power bar (right edge): a coloured fill runs down from y 878 as you pull; full at y 1689
+        var fillBottom = -1.0
+        var yy = 875.0
+        while yy <= 1692 {
+            let p = at(1080, yy)
+            if max(p.0, p.1) - p.2 > 80 && max(p.0, p.1, p.2) > 150 { fillBottom = yy }
+            yy += 3
+        }
+        var pulling = false
+        if fillBottom > 890 {
+            let pct = max(0, min(100, Int(((fillBottom - 878) / (1689 - 878) * 100).rounded())))
+            cells[PoolCodec.power] = pct / 14; cells[PoolCodec.power + 1] = pct % 14
+            pulling = true
+        }
+        // 4) the game's aim circle (hollow white ring of ball size) while you aim: near where it was first.
+        // While the power bar is pulled the cue can't turn and the game dims its lines: keep the last aim.
         var aim: (Double, Double)? = nil
-        if myTurn {
+        var held = false
+        if myTurn && pulling, let l = lastAim { aim = l; held = true }
+        else if myTurn {
             let centres = balls.map { ($0.x, $0.y) }
             let cue = balls.first(where: { $0.id == 0 }).map { ($0.x, $0.y) }
             if let l = lastAim { aim = findAimCircle(at, around: l, balls: centres, cue: cue) }
@@ -202,7 +226,9 @@ enum PoolReader {
 
         // 5) the game's own line for where the hit ball goes (more exact than working it out from positions)
         var objDir: Double? = nil
-        if let a = aim, let t = balls.filter({ $0.id != 0 }).min(by: { hypot($0.x - a.0, $0.y - a.1) < hypot($1.x - a.0, $1.y - a.1) }),
+        if held, let ld = lastDir {
+            objDir = ld.angle
+        } else if let a = aim, let t = balls.filter({ $0.id != 0 }).min(by: { hypot($0.x - a.0, $0.y - a.1) < hypot($1.x - a.0, $1.y - a.1) }),
            hypot(t.x - a.0, t.y - a.1) < 2 * R + 12 {
             let u0 = atan2(t.y - a.1, t.x - a.0)
             // count white along each direction from the ball; near the last direction first (it moves little per frame)
@@ -240,20 +266,6 @@ enum PoolReader {
 
         if clean { for b in balls where b.id >= 0 && b.id <= 15 { cells[PoolCodec.balls + 7 * b.id] = 1; PoolCodec.put(&cells, PoolCodec.balls + 7 * b.id + 1, b.x, b.y) } }
         if let a = aim { PoolCodec.put(&cells, PoolCodec.aim, a.0, a.1) }
-        // power bar (right edge): a coloured fill runs down from y 878 as you pull; full at y 1689
-        var fillBottom = -1.0
-        var yy = 875.0
-        while yy <= 1692 {
-            let p = at(1080, yy)
-            if max(p.0, p.1) - p.2 > 80 && max(p.0, p.1, p.2) > 150 { fillBottom = yy }
-            yy += 3
-        }
-        var pulling = false
-        if fillBottom > 890 {
-            let pct = max(0, min(100, Int(((fillBottom - 878) / (1689 - 878) * 100).rounded())))
-            cells[PoolCodec.power] = pct / 14; cells[PoolCodec.power + 1] = pct % 14
-            pulling = true
-        }
         cells[PoolCodec.flags] = (clean ? 1 : 0) | (aim != nil ? 2 : 0) | (pulling ? 4 : 0) | (objDir != nil ? 8 : 0)
         return BoardMessage(valid: true, game: .pool, cells: cells, me: group, myTurn: myTurn)
     }
