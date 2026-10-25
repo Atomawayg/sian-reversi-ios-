@@ -96,7 +96,7 @@ note("encode/decode: \(dec.fruits.count) fruits, held \(dec.held), next \(dec.ne
 do {
     var base = st.fruits.map { SuikaEngine.Body(t: $0.t, x: $0.x, y: $0.y) }
     var none: [Int] = []
-    SuikaEngine.simulate(&base, created: &none, merge: false, maxT: 1.5)
+    SuikaEngine.simulate(&base, created: &none, merge: false, maxT: 1.5, damp: 0.6)
     var moved = 0.0
     for (a, c) in zip(st.fruits, base) { moved = max(moved, hypot(a.x - c.x, a.y - c.y)) }
     var out = "settle moved ≤\(Int(moved))px"

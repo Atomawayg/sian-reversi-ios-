@@ -41,12 +41,13 @@ final class SuikaEngine {
 
     /// Runs the jar until everything stops (or maxT seconds). Merged kinds are appended to `created`.
     /// `tagX` ends as the x where the dropped fruit (tag 1) came to rest or merged.
-    static func simulate(_ b: inout [Body], created: inout [Int], merge: Bool = true, maxT: Double = 3.0) {
+    static func simulate(_ b: inout [Body], created: inout [Int], merge: Bool = true, maxT: Double = 3.0, damp: Double = 1) {
         var tagX = 0.0
-        simulate(&b, created: &created, tagX: &tagX, merge: merge, maxT: maxT)
+        simulate(&b, created: &created, tagX: &tagX, merge: merge, maxT: maxT, damp: damp)
     }
 
-    static func simulate(_ b: inout [Body], created: inout [Int], tagX: inout Double, merge: Bool = true, maxT: Double = 3.0) {
+    /// `damp` < 1 slows everything down (used to let the jar as read settle in place instead of rolling away)
+    static func simulate(_ b: inout [Body], created: inout [Int], tagX: inout Double, merge: Bool = true, maxT: Double = 3.0, damp: Double = 1) {
         var t = 0.0, quiet = 0
         var order: [Int] = Array(b.indices)
         while t < maxT {
@@ -107,7 +108,7 @@ final class SuikaEngine {
                 let sp = (vx * vx + vy * vy).squareRoot()
                 if sp > 1500 { vx *= 1500 / sp; vy *= 1500 / sp }
                 let onFloor = b[i].y >= SK.floor - b[i].r - 0.5
-                vx *= onFloor ? 0.96 : 0.985; vy *= 0.985
+                vx *= (onFloor ? 0.96 : 0.985) * damp; vy *= 0.985 * damp
                 b[i].vx = vx; b[i].vy = vy
                 fastest = max(fastest, vx * vx + vy * vy)
             }
@@ -199,7 +200,7 @@ final class SuikaEngine {
         // the jar as read, settled (small reading errors would otherwise make fruits jump on the first drop)
         var base = st.fruits.map { Body(t: $0.t, x: $0.x, y: $0.y) }
         var none: [Int] = []
-        SuikaEngine.simulate(&base, created: &none, merge: false, maxT: 1.5)
+        SuikaEngine.simulate(&base, created: &none, merge: false, maxT: 1.5, damp: 0.6)
         for i in base.indices { base[i].vx = 0; base[i].vy = 0 }
 
         // 1. this drop alone, across the jar
