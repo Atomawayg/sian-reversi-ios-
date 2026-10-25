@@ -173,21 +173,30 @@ extension BoardReader {
     private static func readNext(_ s: Sampler) -> Int {
         let sx = Double(s.w) / 1179, sy = Double(s.h) / 2556
         var votes = [Int](repeating: 0, count: 8)
+        var total = 0, redV = 0.0, redN = 0.0
         var y = 485.0
         while y <= 545 {
             var x = 935.0
             while x <= 995 {
-                if (x - 965) * (x - 965) + (y - 515) * (y - 515) <= 900 { votes[Int(skGroup(s.get(Int(x * sx), Int(y * sy))))] += 1 }
+                if (x - 965) * (x - 965) + (y - 515) * (y - 515) <= 900 {
+                    let p = s.get(Int(x * sx), Int(y * sy))
+                    let g = Int(skGroup(p))
+                    votes[g] += 1; total += 1
+                    if g == 1 || g == 2 { redV += max(p.0, p.1, p.2); redN += 1 }
+                }
                 x += 3
             }
             y += 3
         }
-        // group → type: 1 cherry, 2 strawberry, 3 grape, 4 dekopon, 5 persimmon
-        let map: [Int: Int] = [1: 0, 2: 1, 3: 2, 4: 3, 5: 4]
-        let best = (1...5).max { votes[$0] < votes[$1] } ?? 1
-        if votes[best] < 25 { return -1 }
-        // red and pink-red sit close together: count both towards red, then decide by which is larger
-        if best == 1 || best == 2 { return votes[2] > votes[1] ? 1 : 0 }
-        return map[best] ?? -1
+        // the icons are drawn pinker than the fruits in the jar, so red and pink-red count together here
+        let red = votes[1] + votes[2]
+        let pick = [(red, 0), (votes[3], 2), (votes[4], 3), (votes[5], 4)].max { $0.0 < $1.0 }!
+        if pick.0 < 25 { return -1 }
+        if pick.1 != 0 { return pick.1 }
+        // cherry has a yellow diamond beak; strawberry has pale seeds and a lighter skin
+        let f = Double(max(1, total))
+        if Double(votes[4]) / f >= 0.05 { return 0 }
+        if Double(votes[6]) / f >= 0.1 { return 1 }
+        return redN > 0 && redV / redN > 0.88 * 255 ? 1 : 0
     }
 }

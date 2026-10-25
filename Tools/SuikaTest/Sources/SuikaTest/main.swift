@@ -76,13 +76,13 @@ if let r = e.think(one, ms: 800, cancel: { false }) { note("cherry on floor at x
 let two = SK.State(held: 2, heldX: 589, next: 0, fruits: [SK.Fruit(t: 2, x: 200, y: SK.floor - 63), SK.Fruit(t: 5, x: 900, y: SK.floor - 121)])
 if let r = e.think(two, ms: 800, cancel: { false }) { note("grape at 200 + apple at 900, holding grape → drop x \(Int(r.x)), merges \(r.merges)") }
 
-// a stack of eight fruits merging in a chain
+// a row that merges in a chain: pear, apple, persimmon, dekopon, grape — holding a grape
 var chain: [SK.Fruit] = []
 var x = SK.left
-for t in [7, 6, 5, 4, 3, 2, 1] { x += SK.radius[t]; chain.append(SK.Fruit(t: t, x: x, y: SK.floor - SK.radius[t])); x += SK.radius[t] + 2 }
-let ch = SK.State(held: 1, heldX: 589, next: 0, fruits: chain)
+for t in [6, 5, 4, 3, 2] { x += SK.radius[t]; chain.append(SK.Fruit(t: t, x: x, y: SK.floor - SK.radius[t])); x += SK.radius[t] + 2 }
+let ch = SK.State(held: 2, heldX: 589, next: 0, fruits: chain)
 t0 = DispatchTime.now().uptimeNanoseconds
-if let r = e.think(ch, ms: 1500, cancel: { false }) { note("descending row, holding strawberry → drop x \(Int(r.x)), merges \(r.merges.map { SK.names[min($0, 10)] }) in \(ms(t0)) ms") }
+if let r = e.think(ch, ms: 1500, cancel: { false }) { note("row pear…grape, holding grape → drop x \(Int(r.x)) (grape at \(Int(chain[4].x))), merges \(r.merges.map { SK.names[min($0, 10)] }) in \(ms(t0)) ms") }
 
 // round trip of the message encoding
 let enc = SK.encode(held: 3, heldX: 444, next: 1, fruits: st.fruits)

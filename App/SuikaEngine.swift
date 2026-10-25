@@ -183,7 +183,7 @@ final class SuikaEngine {
         for i in base.indices { base[i].vx = 0; base[i].vy = 0 }
 
         // 1. this drop alone, across the jar
-        let pos = SuikaEngine.xs(st.held, 31)
+        let pos = SuikaEngine.xs(st.held, 41)
         var tries: [Try] = []
         for x in pos {
             if cancel() { return nil }
@@ -204,9 +204,9 @@ final class SuikaEngine {
         // 2. look one fruit ahead for the most promising spots
         if st.next >= 0 && !late() {
             let order = tries.indices.sorted { tries[$0].v1 > tries[$1].v1 }
-            let pos2 = SuikaEngine.xs(st.next, 15)
+            let pos2 = SuikaEngine.xs(st.next, 21)
             var done = Set<Int>()
-            for k in order.prefix(8) {
+            for k in order.prefix(10) {
                 if late() { break }
                 var b2 = tries[k].jar
                 for i in b2.indices { b2[i].tag = 0 }
@@ -220,7 +220,7 @@ final class SuikaEngine {
                 nextX[k] = bestX
                 done.insert(k)
             }
-            if done.count == min(8, tries.count) { depth = 2 }
+            if done.count == min(10, tries.count) { depth = 2 }
             // only spots looked at twice compete, so the second look decides
             if let b = done.max(by: { robust($0, total[$0]) < robust($1, total[$1]) }) { best = b }
         }
