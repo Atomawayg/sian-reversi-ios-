@@ -159,8 +159,10 @@ enum PoolReader {
         // 4) the game's aim circle (hollow white ring of ball size) while you aim: near where it was first
         var aim: (Double, Double)? = nil
         if myTurn {
-            if let l = lastAim { aim = findAimCircle(at, around: l) }
-            if aim == nil { aim = findAimCircle(at) }
+            let centres = balls.map { ($0.x, $0.y) }
+            let cue = balls.first(where: { $0.id == 0 }).map { ($0.x, $0.y) }
+            if let l = lastAim { aim = findAimCircle(at, around: l, balls: centres, cue: cue) }
+            if aim == nil { aim = findAimCircle(at, balls: centres, cue: cue) }
         }
         lastAim = aim
 
@@ -292,8 +294,28 @@ enum PoolReader {
         return out
     }
 
+    /// Share of points on the straight path cue ball → ring that are white (the game's aim line); 1 when they're too close for a line.
+    static func lineSupport(_ at: (Double, Double) -> (Double, Double, Double), from c: (Double, Double), to p: (Double, Double)) -> Double {
+        let dx = p.0 - c.0, dy = p.1 - c.1, l = hypot(dx, dy)
+        if l < 3 * R + 12 { return 1 }
+        let ux = dx / l, uy = dy / l
+        var hit = 0, n = 0
+        var t = R + 6
+        while t < l - R - 6 {
+            n += 1
+            let px = c.0 + ux * t, py = c.1 + uy * t
+            for o in [-2.0, -1, 0, 1, 2] {
+                let q = hsv(at(px - uy * o, py + ux * o))
+                if q.s < 0.22 && q.v > 0.85 { hit += 1; break }
+            }
+            t += 6
+        }
+        return n == 0 ? 1 : Double(hit) / Double(n)
+    }
+
     /// Centre of the hollow white ball-sized ring the game draws where the cue ball will hit.
-    static func findAimCircle(_ at: (Double, Double) -> (Double, Double, Double), around: (Double, Double)? = nil) -> (Double, Double)? {
+    static func findAimCircle(_ at: (Double, Double) -> (Double, Double, Double), around: (Double, Double)? = nil,
+                               balls: [(Double, Double)] = [], cue: (Double, Double)? = nil) -> (Double, Double)? {
         let g = 2.0
         let nx = Int((X1 - X0) / g) + 1, ny = Int((Y1 - Y0) / g) + 1
         // search the whole table, or only a window around the last spot (fast while you turn the cue)
@@ -312,7 +334,7 @@ enum PoolReader {
         for k in 0..<40 { let a = Double(k) * Double.pi / 20; ring.append((Int(((R - 1.5) * cos(a) / g).rounded()), Int(((R - 1.5) * sin(a) / g).rounded()))) }
         for dj in stride(from: -8, through: 8, by: 2) { for di in stride(from: -8, through: 8, by: 2) where di * di + dj * dj <= 64 { core.append((di, dj)) } }   // inside, ≤ 16 px (grid units of 2 px)
         let m = Int(R / g) + 2   // ring reach; the core (≤ 8) is inside it
-        var best = 0.0, bi = 0, bj = 0
+        var cands: [(Double, Int, Int)] = []
         let si0 = max(m, wi0 + m), si1 = min(nx - m - 1, wi1 - m), sj0 = max(m, wj0 + m), sj1 = min(ny - m - 1, wj1 - m)
         if si0 > si1 || sj0 > sj1 { return nil }
         for j in sj0...sj1 { for i in si0...si1 {
@@ -322,8 +344,23 @@ enum PoolReader {
             var cc = 0
             for o in core where white[(j + o.1) * nx + i + o.0] == 1 { cc += 1 }
             let sc = Double(rc) / Double(ring.count) - Double(cc) / Double(core.count)
-            if sc > best { best = sc; bi = i; bj = j }
+            if sc > 0.32 { cands.append((sc, i, j)) }
         } }
+        // The white of a striped ball, the glow round a ball you may hit, or the cue ball itself can look like the ring.
+        // The real ring is never on a ball, and the game draws a white line to it from the cue ball.
+        cands.sort { $0.0 > $1.0 }
+        var tried: [(Double, Double)] = []
+        var best = 0.0, bi = 0, bj = 0
+        for c in cands {
+            let x = X0 + Double(c.1) * g, y = Y0 + Double(c.2) * g
+            if balls.contains(where: { hypot($0.0 - x, $0.1 - y) < R + 8 }) { continue }
+            if tried.contains(where: { hypot($0.0 - x, $0.1 - y) < 20 }) { continue }
+            tried.append((x, y))
+            var line = 1.0
+            if let q = cue { line = lineSupport(at, from: q, to: (x, y)); if line < 0.6 { if tried.count >= 10 { break }; continue } }
+            if c.0 + line > best { best = c.0 + line; bi = c.1; bj = c.2 }
+            if tried.count >= 10 { break }
+        }
         guard best > 0.32 else { return nil }
         // refine to a pixel
         var bx = X0 + Double(bi) * g, by = Y0 + Double(bj) * g, bs = -1.0
