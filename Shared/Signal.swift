@@ -40,12 +40,12 @@ enum RawUDP {
 /// (a broken burst is ignored; the extension re-sends the board at least once a second).
 enum DarwinBoard {
     static let prefix = "com.atomawayg.sian.b."
-    static let maxCells = max(JK.count, SK.count)
+    static let maxCells = max(JK.count, SK.count, PoolCodec.count)
     static let values = 14
     static func names() -> [String] {
         var n: [String] = []
         for i in 0..<maxCells { for v in 0..<values { n.append(prefix + "c\(i)v\(v)") } }
-        for g in 0..<8 { n.append(prefix + "g\(g)") }
+        for g in 0..<9 { n.append(prefix + "g\(g)") }
         for v in 0..<5 { n.append(prefix + "me\(v)") }
         for v in 0..<16 { n.append(prefix + "ha\(v)"); n.append(prefix + "hb\(v)") }
         n += [prefix + "turn0", prefix + "turn1", prefix + "valid0", prefix + "valid1", prefix + "begin", prefix + "commit"]

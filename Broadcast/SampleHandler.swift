@@ -32,6 +32,9 @@ class SampleHandler: RPBroadcastSampleHandler {
         Signal.post(Signal.frame)
         guard var msg = BoardReader.read(pb) else { return }
         if msg.game == .suika && msg.valid { suika(msg, t); return }
+        // pool: the aim and the power bar move all the time and the app keeps the last clean table itself,
+        // so pass every reading on at once (the sound has to follow your finger)
+        if msg.game == .pool && msg.valid { prev = msg; if msg != sent || t - lastSent > 1.0 { send(msg); sent = msg; lastSent = t }; return }
         skStableSince = 0; skPrev = nil
         // only trust cells that stayed the same across two frames (discs animate when flipping)
         let stable = prev.map { $0.valid == msg.valid && $0.game == msg.game && $0.cells == msg.cells && $0.me == msg.me } ?? false

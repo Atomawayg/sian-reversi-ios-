@@ -97,7 +97,7 @@ enum Renderer {
             case .chess: drawChess(o, cells, CGRect(x: pad, y: pad, width: side, height: side))
             case .connect4, .connect5: drawConnect(o, cells, CGRect(x: pad, y: pad, width: side, height: side))
             case .suika: drawSuika(o, cells, CGRect(x: pad, y: pad, width: side, height: side))
-            case .jackaroo: break
+            case .jackaroo, .pool: break
             }
             textX = pad + side + 24
         }
