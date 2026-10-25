@@ -634,4 +634,49 @@ enum PoolEngine {
         func score(_ f: Found) -> Double { f.width * pow(0.75, Double(f.objRails)) * pow(0.6, Double(f.cueRails)) * (f.power > 80 ? 0.8 : 1) }
         return out.sorted { score($0) > score($1) }
     }
+
+    // MARK: clearing the table in one visit
+
+    /// chance a shot drops, from how much the cue may turn (± degrees) and still pot it
+    static func dropChance(_ halfWindow: Double) -> Double { min(0.97, halfWindow / (halfWindow + 0.12)) }
+
+    /// Look ahead through the whole rack: from each sure first shot, where the cue ball stops, then the best few
+    /// straight shots from there (and where it stops after each), down to the 8 — a beam of the likeliest runs.
+    /// Returns the first shot of the run that clears the most (or is likeliest to), how many balls that run pots,
+    /// and whether it ends with the 8.
+    static func runOut(balls: [Ball], legal: Set<Int>, firsts: [Found]) -> (pick: Found, count: Int, wins: Bool, chance: Double)? {
+        struct State { var cue: (Double, Double); var left: [Ball]; var legal: Set<Int>; var p: Double; var n: Int; var first: Int; var done: Bool }
+        func value(_ s: State) -> Double { s.p * (Double(s.n) + (s.done ? 4 : 0)) }
+        var beam: [State] = []
+        for (i, f) in firsts.prefix(8).enumerated() {
+            guard f.cueStop.count >= 2 else { continue }
+            var nl = legal.subtracting([f.ball])
+            if nl.isEmpty && f.ball != 8 { nl = [8] }
+            beam.append(State(cue: (f.cueStop[f.cueStop.count - 2], f.cueStop[f.cueStop.count - 1]),
+                              left: balls.filter { $0.id != f.ball }, legal: nl,
+                              p: dropChance(f.width / 2), n: 1, first: i, done: f.ball == 8))
+        }
+        if beam.isEmpty { return nil }
+        for _ in 0..<8 {
+            var next: [State] = []
+            var grew = false
+            for st in beam {
+                if st.done { next.append(st); continue }
+                let options = shots(cueX: st.cue.0, cueY: st.cue.1, balls: st.left, legal: st.legal, banks: false).filter { !$0.scratch }.prefix(3)
+                if options.isEmpty { next.append(st); continue }   // stuck: the run ends here
+                for o in options {
+                    grew = true
+                    let end = cueEnd(o, balls: st.left)
+                    var nl = st.legal.subtracting([o.ball])
+                    if nl.isEmpty && o.ball != 8 { nl = [8] }
+                    next.append(State(cue: end, left: st.left.filter { $0.id != o.ball }, legal: nl,
+                                      p: st.p * dropChance(o.tolerance), n: st.n + 1, first: st.first, done: o.ball == 8))
+                }
+            }
+            beam = Array(next.sorted { value($0) > value($1) }.prefix(12))
+            if !grew { break }
+        }
+        guard let best = beam.max(by: { value($0) < value($1) }) else { return nil }
+        return (firsts[best.first], best.n, best.done, best.p)
+    }
 }
