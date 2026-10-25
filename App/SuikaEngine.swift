@@ -15,7 +15,7 @@ final class SuikaEngine {
         var alive = true
         init(t: Int, x: Double, y: Double, tag: Int = 0) {
             self.t = t; self.x = x; self.y = y; self.tag = tag
-            r = SK.radius[t]; im = 1 / (r * r)
+            r = SK.radius[t] * SuikaEngine.hitScale; im = 1 / (r * r)
         }
     }
 
@@ -31,10 +31,13 @@ final class SuikaEngine {
     }
 
     // physics
-    static let g = 3200.0
+    // measured on two screen recordings (129 drops replayed): gravity from a falling fruit's path at 60 fps,
+    // the rest fitted so replayed drops land and merge where the game's did
+    static let g = 3490.0
+    static let hitScale = 1.03      // fruits collide a little outside their drawn edge
     static let dt = 1.0 / 120
-    static let iters = 6
-    static let mu = 0.4
+    static let iters = 10
+    static let mu = 0.1             // fruits are slippery: piles slide more than they stick
     static let maxR = SK.radius.max()!
 
     /// value of making a fruit of kind k (the game scores roughly like this)
@@ -127,7 +130,7 @@ final class SuikaEngine {
                 let sp = (vx * vx + vy * vy).squareRoot()
                 if sp > 1500 { vx *= 1500 / sp; vy *= 1500 / sp }
                 let onFloor = b[i].y >= SK.floor - b[i].r - 0.5
-                vx *= (onFloor ? 0.96 : 0.985) * damp; vy *= 0.985 * damp
+                vx *= (onFloor ? 1.0 : 0.995) * damp; vy *= 0.995 * damp   // no air drag to speak of (the fall is a clean parabola)
                 b[i].vx = vx; b[i].vy = vy
                 fastest = max(fastest, vx * vx + vy * vy)
             }
