@@ -119,7 +119,7 @@ do {
     note(out)
 }
 // pool frames from the Oct 25 recording
-for n in ["pool_20", "pool_1_5", "pool_12_6"] {
+for n in ["pool_20", "pool_1_5", "pool_12_6", "pool_120"] {
     let sm = load(n)
     let t0p = DispatchTime.now().uptimeNanoseconds
     guard PoolReader.looksLikePool(sm) else { note("\(n): looksLikePool = false"); continue }
