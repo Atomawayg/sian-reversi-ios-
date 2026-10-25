@@ -52,6 +52,16 @@ enum PoolEngine {
         return true
     }
 
+    /// Off a cushion: measured on the Oct 25 bank recording, a ball comes off flatter than it went in
+    /// (tan of the angle from the cushion's normal grows by about 1.28), and keeps about half its speed.
+    static let bounceFlatten = 1.28
+    static func bounce(_ x: Double, _ ux: Double, _ uy: Double) -> (Double, Double) {
+        var nx = ux, ny = uy
+        if abs(x - xMin) < 0.5 || abs(x - xMax) < 0.5 { nx = -ux; ny = uy * bounceFlatten } else { ny = -uy; nx = ux * bounceFlatten }
+        let l = (nx * nx + ny * ny).squareRoot()
+        return (nx / l, ny / l)
+    }
+
     // MARK: rolling and power
 
     /// how far a ball rolls from speed v before it stops
@@ -108,7 +118,7 @@ enum PoolEngine {
             if !clear(x, y, hx, hy, balls, skip: skip, gap: 2 * R - 3) { return nil }
             len += tw
             x = hx; y = hy
-            if abs(x - xMin) < 0.5 || abs(x - xMax) < 0.5 { ux = -ux } else { uy = -uy }
+            (ux, uy) = bounce(x, ux, uy)
         }
         return nil
     }
@@ -139,6 +149,18 @@ enum PoolEngine {
                     var ux = ax - t.x, uy = ay - t.y
                     let dd = (ux * ux + uy * uy).squareRoot(); if dd < 1 { continue }
                     ux /= dd; uy /= dd
+                    if bank {
+                        // cushions don't reflect like a mirror (the ball comes off flatter): search around the
+                        // mirror line for the direction that really ends in this pocket
+                        let a0 = atan2(uy, ux)
+                        var bestA: Double? = nil, bestOff = 1.0
+                        for k in -60...60 {
+                            let a = a0 + Double(k) * 0.2 * Double.pi / 180
+                            if let tr = trace(t.x, t.y, cos(a), sin(a), balls: balls, skip: t.id), tr.pocket == pi, tr.bank, tr.off < bestOff { bestOff = tr.off; bestA = a }
+                        }
+                        guard let a = bestA else { continue }
+                        ux = cos(a); uy = sin(a)
+                    }
                     guard let tr = trace(t.x, t.y, ux, uy, balls: balls, skip: t.id), tr.pocket == pi, tr.bank == bank, tr.off < 0.8 else { continue }
                     let gx = t.x - ux * 2 * R, gy = t.y - uy * 2 * R
                     if gx < xMin - 2 || gx > xMax + 2 || gy < yMin - 2 || gy > yMax + 2 { continue }
@@ -205,7 +227,7 @@ enum PoolEngine {
         var foul = false              // first ball hit is not yours (or the 8 too early)
         var powerPct = 0
     }
-    static func judge(cueX: Double, cueY: Double, aimX: Double, aimY: Double, balls: [Ball], legal: Set<Int>) -> Verdict {
+    static func judge(cueX: Double, cueY: Double, aimX: Double, aimY: Double, balls: [Ball], legal: Set<Int>, dir: Double? = nil) -> Verdict {
         // the aim circle sits where the cue ball touches the first ball: that ball is 2R from it
         guard let t = balls.filter({ $0.id != 0 }).min(by: { hypot($0.x - aimX, $0.y - aimY) < hypot($1.x - aimX, $1.y - aimY) }),
               hypot(t.x - aimX, t.y - aimY) < 2 * R + 8 else { return Verdict(ball: -1) }
@@ -213,6 +235,7 @@ enum PoolEngine {
         v.foul = !legal.contains(t.id)
         var ux = t.x - aimX, uy = t.y - aimY
         let d = (ux * ux + uy * uy).squareRoot(); ux /= max(d, 1e-6); uy /= max(d, 1e-6)
+        if let a = dir { ux = cos(a); uy = sin(a) }    // the game's own line beats our estimate from positions
         if let tr = trace(t.x, t.y, ux, uy, balls: balls, skip: t.id) {
             v.pocket = tr.pocket; v.bank = tr.bank; v.off = tr.off
             let vx = aimX - cueX, vy = aimY - cueY, d1 = (vx * vx + vy * vy).squareRoot()
@@ -250,22 +273,24 @@ enum PoolEngine {
             x += ux * stop; y += uy * stop; left -= stop
             out += [x, y]
             if stop < tw - 0.5 || left <= 0 { return out }
-            if abs(x - xMin) < 0.5 || abs(x - xMax) < 0.5 { ux = -ux } else { uy = -uy }
+            (ux, uy) = bounce(x, ux, uy)
         }
         return out
     }
 
     /// The object ball's path for a hit from ghost position (gx,gy).
-    static func objectPath(_ bx: Double, _ by: Double, gx: Double, gy: Double, balls: [Ball], skip: Int, pocket: Pocket? = nil) -> [Double] {
+    static func objectPath(_ bx: Double, _ by: Double, gx: Double, gy: Double, balls: [Ball], skip: Int, pocket: Pocket? = nil, dir: Double? = nil) -> [Double] {
         var ux = bx - gx, uy = by - gy
         let d = (ux * ux + uy * uy).squareRoot(); ux /= max(d, 1e-6); uy /= max(d, 1e-6)
+        if let a = dir { ux = cos(a); uy = sin(a) }
         return path(bx, by, ux, uy, balls: balls, skip: skip)
     }
 
     /// Where the cue ball runs after a centre-ball hit: along the tangent line (a dead-straight hit stops it).
-    static func cuePath(cueX: Double, cueY: Double, gx: Double, gy: Double, bx: Double, by: Double, balls: [Ball]) -> [Double] {
+    static func cuePath(cueX: Double, cueY: Double, gx: Double, gy: Double, bx: Double, by: Double, balls: [Ball], dir: Double? = nil) -> [Double] {
         var ux = bx - gx, uy = by - gy
         let d = (ux * ux + uy * uy).squareRoot(); ux /= max(d, 1e-6); uy /= max(d, 1e-6)
+        if let a = dir { ux = cos(a); uy = sin(a) }
         let vx = gx - cueX, vy = gy - cueY
         let dv = (vx * vx + vy * vy).squareRoot()
         let along = (vx * ux + vy * uy) / max(dv, 1e-6)          // cos of the cut

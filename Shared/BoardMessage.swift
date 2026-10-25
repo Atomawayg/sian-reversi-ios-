@@ -61,7 +61,13 @@ enum PoolCodec {
     static let myLeft = 119       // balls left in your group (from the bar)
     static let oppLeft = 120
     static let power = 121        // 2 digits: how far the power bar is pulled, 0…100 %
-    static let count = 123
+    static let objDir = 123       // 3 digits: direction of the game's line from the hit ball, degrees × 7 (flag bit3)
+    static let count = 126
+    static func dir(_ cells: [Int]) -> Double? {
+        guard cells[flags] & 8 == 8 else { return nil }
+        let q = cells[objDir] * 196 + cells[objDir + 1] * 14 + cells[objDir + 2]
+        return Double(q) / 7 * Double.pi / 180
+    }
     static let originX = 207.5, originY = 584.0, width = 759.0, height = 1551.0
 
     static func put(_ cells: inout [Int], _ at: Int, _ x: Double, _ y: Double) {

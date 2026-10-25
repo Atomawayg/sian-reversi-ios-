@@ -36,6 +36,9 @@ enum PoolReader {
     }
 
     struct Ball { var x: Double; var y: Double; var id: Int; var rimWhite: Double }
+    /// the last full reading (balls and a colour sample at each centre), and where the aim circle was
+    static var cache: (balls: [Ball], clean: Bool, spots: [(x: Double, y: Double, r: Double, g: Double, b: Double)], at: Double)? = nil
+    static var lastAim: (Double, Double)? = nil
 
     static func read(_ s: BoardReader.Sampler) -> BoardMessage {
         let sx = Double(s.w) / 1180, sy = Double(s.h) / 2556
@@ -61,12 +64,24 @@ enum PoolReader {
         var group = 0
         func avg(_ a: [Double]) -> Double { a.reduce(0, +) / Double(max(1, a.count)) }
         let mineC = mine.filter { !$0.black }.map { $0.ratio }, oppC = opp.filter { !$0.black }.map { $0.ratio }
+        // your own bar decides (the opponent's bar is usually under the floating window): stripes show white caps
         if !mine.isEmpty && mineC.isEmpty { group = 3 }
-        else if !mineC.isEmpty && !oppC.isEmpty { group = avg(mineC) < avg(oppC) ? 2 : 1 }   // the bar with white caps is stripes
         else if !mineC.isEmpty { group = avg(mineC) < 0.63 ? 2 : 1 }
-        else if mine.isEmpty && !opp.isEmpty { group = 3 }   // opponent still has balls, you have none left: play the 8
         cells[PoolCodec.myLeft] = min(13, mineC.count); cells[PoolCodec.oppLeft] = min(13, oppC.count)
 
+        // fast path while you aim: nothing on the table moves, so only check every ball is still where it was
+        let now = Date().timeIntervalSince1970
+        var balls: [Ball] = []
+        var clean = false
+        var reuse = false
+        if let c = cache, now - c.at < 1.0, !c.spots.isEmpty {
+            reuse = c.spots.allSatisfy { sp in
+                let p = s.avg(sp.x * sx, sp.y * sy, 4 * sx)
+                return !isFelt(hsv(p)) && abs(p.0 - sp.r) + abs(p.1 - sp.g) + abs(p.2 - sp.b) < 90
+            }
+            if reuse { balls = c.balls; clean = c.clean }
+        }
+        if !reuse {
         // 1) coarse felt grid → candidate ball centres
         let g = 3.0
         let nx = Int((X1 - X0) / g) + 1, ny = Int((Y1 - Y0) / g) + 1
@@ -102,7 +117,6 @@ enum PoolReader {
         }
 
         // 2) refine each centre at full resolution and identify the ball
-        var balls: [Ball] = []
         for p in picked {
             var cx = X0 + p.0 * g, cy = Y0 + p.1 * g
             for _ in 0..<3 {
@@ -132,17 +146,52 @@ enum PoolReader {
         }
 
         // 3) consistency: one cue ball (the whitest), every number at most once, at most 16 balls
-        var clean = balls.count <= 16
+        clean = balls.count <= 16
         if !balls.contains(where: { $0.id == 0 }), let k = balls.indices.filter({ balls[$0].id >= 9 || balls[$0].id == 0 }).max(by: { balls[$0].rimWhite < balls[$1].rimWhite }),
            balls[k].rimWhite > 0.85 {
             balls[k].id = 0
         }
         var seen = Set<Int>()
         for b in balls { if !seen.insert(b.id).inserted { clean = false } }
+        cache = (balls, clean, balls.map { b in let p = s.avg(b.x * sx, b.y * sy, 4 * sx); return (b.x, b.y, p.0, p.1, p.2) }, now)
+        }
 
-        // 4) the game's aim circle (hollow white ring of ball size) while you aim
+        // 4) the game's aim circle (hollow white ring of ball size) while you aim: near where it was first
         var aim: (Double, Double)? = nil
-        if myTurn { aim = findAimCircle(at) }
+        if myTurn {
+            if let l = lastAim { aim = findAimCircle(at, around: l) }
+            if aim == nil { aim = findAimCircle(at) }
+        }
+        lastAim = aim
+
+        // 5) the game's own line for where the hit ball goes (more exact than working it out from positions)
+        var objDir: Double? = nil
+        if let a = aim, let t = balls.filter({ $0.id != 0 }).min(by: { hypot($0.x - a.0, $0.y - a.1) < hypot($1.x - a.0, $1.y - a.1) }),
+           hypot(t.x - a.0, t.y - a.1) < 2 * R + 12 {
+            let u0 = atan2(t.y - a.1, t.x - a.0)
+            var counts: [(Int, Double)] = []
+            var best = 0
+            for k in -120...120 {
+                let th = u0 + Double(k) * 0.25 * Double.pi / 180
+                var c = 0
+                var r = R + 4
+                while r <= R + 150 {
+                    let q = hsv(at(t.x + r * cos(th), t.y + r * sin(th)))
+                    if q.s < 0.25 && q.v > 0.85 { c += 1 }
+                    r += 2
+                }
+                counts.append((c, th)); best = max(best, c)
+            }
+            if best >= 8 {
+                let top = counts.filter { $0.0 >= best - 1 }.map { $0.1 }
+                objDir = top.reduce(0, +) / Double(top.count)
+            }
+        }
+        if let d = objDir {
+            var deg = d * 180 / Double.pi; while deg < 0 { deg += 360 }; while deg >= 360 { deg -= 360 }
+            let q = min(2519, Int((deg * 7).rounded()))
+            cells[PoolCodec.objDir] = q / 196; cells[PoolCodec.objDir + 1] = (q / 14) % 14; cells[PoolCodec.objDir + 2] = q % 14
+        }
 
         if clean { for b in balls where b.id >= 0 && b.id <= 15 { cells[PoolCodec.balls + 7 * b.id] = 1; PoolCodec.put(&cells, PoolCodec.balls + 7 * b.id + 1, b.x, b.y) } }
         if let a = aim { PoolCodec.put(&cells, PoolCodec.aim, a.0, a.1) }
@@ -160,7 +209,7 @@ enum PoolReader {
             cells[PoolCodec.power] = pct / 14; cells[PoolCodec.power + 1] = pct % 14
             pulling = true
         }
-        cells[PoolCodec.flags] = (clean ? 1 : 0) | (aim != nil ? 2 : 0) | (pulling ? 4 : 0)
+        cells[PoolCodec.flags] = (clean ? 1 : 0) | (aim != nil ? 2 : 0) | (pulling ? 4 : 0) | (objDir != nil ? 8 : 0)
         return BoardMessage(valid: true, game: .pool, cells: cells, me: group, myTurn: myTurn)
     }
 
@@ -244,11 +293,18 @@ enum PoolReader {
     }
 
     /// Centre of the hollow white ball-sized ring the game draws where the cue ball will hit.
-    static func findAimCircle(_ at: (Double, Double) -> (Double, Double, Double)) -> (Double, Double)? {
+    static func findAimCircle(_ at: (Double, Double) -> (Double, Double, Double), around: (Double, Double)? = nil) -> (Double, Double)? {
         let g = 2.0
         let nx = Int((X1 - X0) / g) + 1, ny = Int((Y1 - Y0) / g) + 1
+        // search the whole table, or only a window around the last spot (fast while you turn the cue)
+        var wi0 = 0, wi1 = nx - 1, wj0 = 0, wj1 = ny - 1
+        if let c = around {
+            let w = 140.0 / g
+            wi0 = max(0, Int((c.0 - X0) / g - w)); wi1 = min(nx - 1, Int((c.0 - X0) / g + w))
+            wj0 = max(0, Int((c.1 - Y0) / g - w)); wj1 = min(ny - 1, Int((c.1 - Y0) / g + w))
+        }
         var white = [UInt8](repeating: 0, count: nx * ny)
-        for j in 0..<ny { for i in 0..<nx {
+        for j in wj0...wj1 { for i in wi0...wi1 {
             let c = hsv(at(X0 + Double(i) * g, Y0 + Double(j) * g))
             if c.s < 0.22 && c.v > 0.85 { white[j * nx + i] = 1 }
         } }
@@ -257,7 +313,9 @@ enum PoolReader {
         for dj in stride(from: -8, through: 8, by: 2) { for di in stride(from: -8, through: 8, by: 2) where di * di + dj * dj <= 64 { core.append((di, dj)) } }   // inside, ≤ 16 px (grid units of 2 px)
         let m = Int(R / g) + 2   // ring reach; the core (≤ 8) is inside it
         var best = 0.0, bi = 0, bj = 0
-        for j in m..<(ny - m) { for i in m..<(nx - m) {
+        let si0 = max(m, wi0 + m), si1 = min(nx - m - 1, wi1 - m), sj0 = max(m, wj0 + m), sj1 = min(ny - m - 1, wj1 - m)
+        if si0 > si1 || sj0 > sj1 { return nil }
+        for j in sj0...sj1 { for i in si0...si1 {
             var rc = 0
             for o in ring where white[(j + o.1) * nx + i + o.0] == 1 { rc += 1 }
             if rc < 16 { continue }

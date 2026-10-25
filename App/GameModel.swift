@@ -575,23 +575,24 @@ final class GameModel: ObservableObject {
         view.shot = poolBest
         var title = "เซฟ", line = poolNote.isEmpty ? groupName : poolNote
         if let s = poolBest {
-            title = "ลูก \(s.ball) → \(PoolEngine.pockets[s.pocket].name)"
-            line = (s.bank ? "ชิ่ง · " : "") + (s.placed ? "วางลูกขาวตรงวงทอง · " : "") + "แรง \(s.powerPct)" + (s.scratch ? " · ระวังลูกขาวตก" : "")
+            title = "\(s.ball) → \(PoolEngine.pockets[s.pocket].name)"
+            line = (s.bank ? "ชิ่ง · " : "") + (s.placed ? "วางลูกขาวตรงวงทอง · " : "") + "แรง \(s.powerPct)"
         }
         if poolNote == "break" { title = "เบรก"; line = "ยิงตรงกลางลูกหน้าสุด แรงสุด" }
         // your aim: draw where the balls go; one long tone when it pots one of your balls cleanly
         if hasAim, let cue {
             let a = PoolCodec.get(c, PoolCodec.aim)
             view.aimX = a.x; view.aimY = a.y
-            let v = PoolEngine.judge(cueX: cue.x, cueY: cue.y, aimX: a.x, aimY: a.y, balls: others, legal: legal)
+            let dir = PoolCodec.dir(c)
+            let v = PoolEngine.judge(cueX: cue.x, cueY: cue.y, aimX: a.x, aimY: a.y, balls: others, legal: legal, dir: dir)
             if v.ball >= 0, let b = others.first(where: { $0.id == v.ball }) {
-                view.objPath = PoolEngine.objectPath(b.x, b.y, gx: a.x, gy: a.y, balls: balls, skip: b.id)
-                view.cuePath = PoolEngine.cuePath(cueX: cue.x, cueY: cue.y, gx: a.x, gy: a.y, bx: b.x, by: b.y, balls: balls)
+                view.objPath = PoolEngine.objectPath(b.x, b.y, gx: a.x, gy: a.y, balls: balls, skip: b.id, dir: dir)
+                view.cuePath = PoolEngine.cuePath(cueX: cue.x, cueY: cue.y, gx: a.x, gy: a.y, bx: b.x, by: b.y, balls: balls, dir: dir)
             }
             let good = v.ball >= 0 && v.pocket >= 0 && !v.foul && !v.scratch && v.off < 0.45
             view.pots = good
             if good {
-                title = "✓ ลูก \(v.ball) → \(PoolEngine.pockets[v.pocket].name)"
+                title = "✓ \(v.ball) → \(PoolEngine.pockets[v.pocket].name)"
                 line = (v.bank ? "ชิ่ง · " : "") + "แรง \(v.powerPct)"
                 if pulling {
                     // pulling the power bar: tone off, one blip when it reaches the strength
