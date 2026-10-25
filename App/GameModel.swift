@@ -721,7 +721,7 @@ final class GameModel: ObservableObject {
                 poolSound.set(.off); poolInZone = false
                 if v.ball >= 0 && (v.foul || v.scratch) {
                     if v.foul { title = "\(v.ball) ไม่ใช่ของคุณ" } else { title = "ลูกขาวจะตกตาม" }
-                    line = 
+                    line = ""
                 } else if let w = view.win {
                     // your line misses or only just drops: which pocket it is near and which way to turn
                     title = "\(v.ball) → \(PoolEngine.pockets[w.pocket].name)" + (v.pocket >= 0 ? " เสี่ยง" : "?")
