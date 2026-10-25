@@ -186,11 +186,11 @@ enum PoolReader {
             balls.append(Ball(x: cx, y: cy, id: id.id, rimWhite: id.rim))
         }
 
-        // 3) a ball that hasn't moved keeps its number: the glow the game draws round the ball you aim at, or a
-        // cushion's shadow, can make a solid read as its striped twin (a 7 on the rail read as the 15, a 5 as the 13)
+        // 3) a ball that hasn't moved (or only a few px, as a ball by the cushion can read) keeps its number: the glow the game draws round the ball you aim at, or a
+        // cushion's shadow, can make a solid read as its striped twin (a 7 on the rail read as the 15, a 5 as the 13, an 11 by the top cushion as the 7)
         if let old = cache, old.clean {
             for k in balls.indices {
-                if let o = old.balls.first(where: { abs($0.x - balls[k].x) < 5 && abs($0.y - balls[k].y) < 5 }), o.id != balls[k].id,
+                if let o = old.balls.first(where: { abs($0.x - balls[k].x) < 9 && abs($0.y - balls[k].y) < 9 }), o.id != balls[k].id,
                    !balls.contains(where: { $0.id == o.id }) {
                     balls[k].id = o.id
                 }

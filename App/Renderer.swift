@@ -535,6 +535,7 @@ struct PoolView: Equatable {
     var risky = false                          // it reaches a pocket but only just (off the jaw / a hair from missing)
     var bankX: Double? = nil, bankY: Double? = nil   // where the bank shot meets the cushion
     var win: PoolEngine.Window? = nil          // how far the cue may turn and still pot (for the zoom and the meter)
+    var zoomPocket: Int? = nil                 // no turn pots, but your line ends by this pocket: close-up only
     var target: Int? = nil                     // the ball your aim hits
     var legal: [Int] = []
 }
@@ -553,12 +554,13 @@ extension Renderer {
         // table on the left: playing surface 759 × 1551 px on screen
         let area = CGRect(x: 18, y: 16, width: (rect.height - 32) * 759 / 1551, height: rect.height - 32)
         // text on the right
-        let zoom = v.win != nil && v.aimX != nil
-        let zs: CGFloat = 170   // the pocket close-up, bottom right
+        let zoomAt = v.win?.pocket ?? v.zoomPocket
+        let zoom = zoomAt != nil && v.aimX != nil
+        let zs: CGFloat = min(250, rect.height - 24)   // the pocket close-up, big on the right while your line nears a pocket
         let tx = area.maxX + 30, tw = rect.width - tx - 16 - (zoom ? zs + 10 : 0)
-        let tAttr: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: zoom ? 34 : 44, weight: .heavy), .foregroundColor: o.mine ? gold : UIColor.white]
+        let tAttr: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: zoom ? 26 : 44, weight: .heavy), .foregroundColor: o.mine ? gold : UIColor.white]
         let tH = (o.title as NSString).boundingRect(with: CGSize(width: tw, height: 200), options: .usesLineFragmentOrigin, attributes: tAttr, context: nil).height
-        let lAttr: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: zoom ? 24 : 28, weight: .semibold), .foregroundColor: UIColor(white: 0.8, alpha: 1)]
+        let lAttr: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: zoom ? 18 : 28, weight: .semibold), .foregroundColor: UIColor(white: 0.8, alpha: 1)]
         let lH = (o.line as NSString).boundingRect(with: CGSize(width: tw, height: 200), options: .usesLineFragmentOrigin, attributes: lAttr, context: nil).height
         let ty = max(8, (rect.height - tH - 10 - lH - (zoom ? 40 : 0)) / 2)
         (o.title as NSString).draw(with: CGRect(x: tx, y: ty, width: tw, height: tH), options: .usesLineFragmentOrigin, attributes: tAttr, context: nil)
@@ -653,18 +655,21 @@ extension Renderer {
             (v.pots ? green : UIColor.white).setStroke()
             let c = UIBezierPath(ovalIn: CGRect(x: a.x - br, y: a.y - br, width: br * 2, height: br * 2)); c.lineWidth = 2.5; c.stroke()
         }
-        if zoom, let w = v.win { drawPoolZoom(v, w, CGRect(x: rect.width - zs - 12, y: rect.height - zs - 12, width: zs, height: zs), pots: v.pots, risky: v.risky)
-            drawPoolMeter(w, CGRect(x: tx, y: rect.height - 44, width: tw, height: 26)) }
+        if zoom, let k = zoomAt {
+            drawPoolZoom(v, k, v.win, CGRect(x: rect.width - zs - 12, y: (rect.height - zs) / 2, width: zs, height: zs), pots: v.pots, risky: v.risky)
+            if let w = v.win { drawPoolMeter(w, CGRect(x: tx, y: rect.height - 44, width: tw, height: 26)) }
+        }
     }
 
     /// Close-up of the pocket your line goes to: cushion noses, jaws, the hole, the balls, your line, and (gold, dashed)
     /// the line through the middle of what drops.
-    static func drawPoolZoom(_ v: PoolView, _ w: PoolEngine.Window, _ r: CGRect, pots: Bool, risky: Bool) {
+    static func drawPoolZoom(_ v: PoolView, _ pocket: Int, _ win: PoolEngine.Window?, _ r: CGRect, pots: Bool, risky: Bool) {
         guard let ctx = UIGraphicsGetCurrentContext() else { return }
-        let h = PoolEngine.holes[w.pocket]
+        let h = PoolEngine.holes[pocket]
         // look from the hole a little into the table
-        let cx = h.x + (PoolEngine.midX - h.x) * (w.pocket == 2 || w.pocket == 3 ? 0.17 : 0.12)
-        let cy = h.y + (PoolEngine.midY - h.y) * (w.pocket == 2 || w.pocket == 3 ? 0 : 0.06)
+        let side = pocket == 2 || pocket == 3
+        let cx = h.x + (PoolEngine.midX - h.x) * (side ? 0.17 : 0.12)
+        let cy = h.y + (PoolEngine.midY - h.y) * (side ? 0 : 0.06)
         let span = 230.0, sc = CGFloat(Double(r.width) / span)
         func p(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: r.midX + CGFloat(x - cx) * sc, y: r.midY + CGFloat(y - cy) * sc) }
         ctx.saveGState()
@@ -686,7 +691,7 @@ extension Renderer {
             ch.addLine(to: p(jaws[1].x2, jaws[1].y2)); ch.addLine(to: p(jaws[1].x1, jaws[1].y1)); ch.close(); ch.fill()
         }
         UIColor.black.setFill()
-        let hr = CGFloat(w.pocket == 2 || w.pocket == 3 ? 39 : 45) * sc, hc = p(h.x, h.y)
+        let hr = CGFloat(side ? 39 : 45) * sc, hc = p(h.x, h.y)
         UIBezierPath(ovalIn: CGRect(x: hc.x - hr, y: hc.y - hr, width: hr * 2, height: hr * 2)).fill()
         felt.stroke()
         let noses = UIBezierPath()
@@ -694,7 +699,7 @@ extension Renderer {
         noses.lineWidth = 3; noses.stroke()
         let br = CGFloat(PoolEngine.R) * sc
         // where the middle of the pocket is from the ball (gold dashed), and your line
-        if let t = v.target, let b = v.balls.first(where: { $0.id == t }) {
+        if let w = win, let t = v.target, let b = v.balls.first(where: { $0.id == t }) {
             let mid = PoolEngine.path(b.x, b.y, cos(w.centreDir), sin(w.centreDir), balls: v.balls, skip: b.id)
             let g = UIBezierPath(); g.move(to: p(mid[0], mid[1])); var i = 2; while i + 1 < mid.count { g.addLine(to: p(mid[i], mid[i + 1])); i += 2 }
             g.lineWidth = 2; g.setLineDash([6, 5], count: 2, phase: 0); UIColor(red: 0.95, green: 0.76, blue: 0.31, alpha: 1).setStroke(); g.stroke()
