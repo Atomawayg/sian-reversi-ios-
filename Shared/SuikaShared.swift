@@ -13,8 +13,10 @@ enum SK {
     static let count = fruits + 5 * maxFruits
 
     // jar geometry
-    static let left = 82.0       // inside of the left wall
-    static let right = 1096.0    // inside of the right wall
+    // the glass is drawn 26 px thick inside its white outline: fruits rest 26 px in from the drawn edge
+    // (a pear sits at y 2323 over a drawn floor at 2349; a dekopon leans on the left wall at x 108)
+    static let left = 108.0      // physics wall, left
+    static let right = 1070.0    // physics wall, right
     static let floor = 2323.0    // where fruits rest
     static let dead = 1002.0     // dashed line at the top of the jar
     static let dropY = 905.0     // centre of the fruit Will holds
