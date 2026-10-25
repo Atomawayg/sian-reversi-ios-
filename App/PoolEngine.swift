@@ -16,11 +16,15 @@ enum PoolEngine {
     // Measured on the Oct 25 recording (cue ball tracked at 60 fps over five of your shots):
     // the cue ball leaves at about 4150 px/s × power (51 % → 2070, 54 % → 2230, 63 % → 2700 px/s),
     // and slows by (100 + 1.4·v) px/s every second (fast balls lose speed quickly, slow ones roll on).
-    static let fullSpeed = 4150.0
+    // Refit Oct 26 on where 24 cue balls really came to rest (positions only, no clock): 6000 px/s at full power
+    static let fullSpeed = 6000.0
     // Oct 25 logs (rolling balls, 36 shots): slow balls coast much further than (100 + 1.4·v) allowed, and full-power
     // runs went ~2300 px with two cushions; the low-speed part is eased to 30 (only total distances, not times, could be
     // trusted from the log)
-    static let decel0 = 30.0, decelV = 1.3
+    static let decel0 = 100.0, decelV = 0.8
+    /// the cue ball rolls into the hit (a centre hit in this game is a rolling ball): afterwards it keeps this share of
+    /// the pace along the hit ball's line on top of the tangent pace (2/7, as for a rolling ball; a full hit follows through)
+    static let follow = 2.0 / 7.0
 
     struct Ball: Equatable { var id: Int; var x: Double; var y: Double }
     struct Shot: Equatable {
@@ -200,6 +204,18 @@ enum PoolEngine {
         return hi
     }
 
+    /// The cue ball after the hit at `vHit`, coming in along (ix,iy), the hit ball leaving along (ox,oy): the tangent pace
+    /// plus `follow` of the hit pace along the ball's line.
+    static func cueAfter(_ gx: Double, _ gy: Double, ix: Double, iy: Double, ox: Double, oy: Double, vHit: Double, balls: [Ball], skip: Int) -> Run {
+        let along = max(0, min(1, ix * ox + iy * oy)), sn = (1 - along * along).squareRoot()
+        let side = ix * -oy + iy * ox > 0
+        let tx = side ? -oy : oy, ty = side ? ox : -ox
+        let vx = tx * vHit * sn + ox * follow * vHit * along, vy = ty * vHit * sn + oy * follow * vHit * along
+        let sp = (vx * vx + vy * vy).squareRoot()
+        if sp < 1 { return Run(pts: [gx, gy]) }
+        return run(gx, gy, vx / sp, vy / sp, balls: balls, skip: skip, maxRails: 4, speed: sp)
+    }
+
     /// Where both balls go for your aim at a given power (%): the hit ball off up to four cushions until it drops or
     /// stops, and the cue ball along the tangent line (a stun hit; a straight hit stops it) until it stops.
     /// With no ball hit, the cue ball's own run. `cueStop` is where the cue ball comes to rest.
@@ -218,10 +234,7 @@ enum PoolEngine {
         if let a = dir { ux = cos(a); uy = sin(a) }
         let along = max(0, min(1, ax * ux + ay * uy))
         let o = run(b.x, b.y, ux, uy, balls: others, skip: b.id, maxRails: 4, speed: vHit * along)
-        if along > 0.995 { return (o.pts, [], (aimX, aimY), o.pocket >= 0, false) }
-        let side = ax * -uy + ay * ux > 0
-        let tx = side ? -uy : uy, ty = side ? ux : -ux
-        let c = run(aimX, aimY, tx, ty, balls: others, skip: b.id, maxRails: 4, speed: vHit * (1 - along * along).squareRoot())
+        let c = cueAfter(aimX, aimY, ix: ax, iy: ay, ox: ux, oy: uy, vHit: vHit, balls: others, skip: b.id)
         return (o.pts, c.pts, (c.pts[c.pts.count - 2], c.pts[c.pts.count - 1]), o.pocket >= 0, c.pocket >= 0)
     }
 
@@ -504,23 +517,11 @@ enum PoolEngine {
         guard let b = balls.first(where: { $0.id == s.ball }) else { return (s.cueX, s.cueY) }
         let d1 = hypot(s.ghostX - s.cueX, s.ghostY - s.cueY)
         let v0 = Double(s.powerPct) / 100 * fullSpeed
-        // speed left when it reaches the ghost spot: roll d1 from v0
-        let left = max(0, rollDistance(v0) - d1)
-        var lo = 0.0, hi = v0
-        for _ in 0..<40 { let m = (lo + hi) / 2; if rollDistance(m) < left { lo = m } else { hi = m } }
-        let vHit = lo
-        let vAfter = vHit * sin(s.cut * Double.pi / 180)
-        let run = rollDistance(vAfter)
-        let p = cuePath(cueX: s.cueX, cueY: s.cueY, gx: s.ghostX, gy: s.ghostY, bx: b.x, by: b.y, balls: balls.filter { $0.id != s.ball })
-        if p.count < 4 || run < 1 { return (s.ghostX, s.ghostY) }
-        // walk the path until `run` is used up
-        var rem = run, x = p[0], y = p[1], i = 2
-        while i + 1 < p.count {
-            let seg = hypot(p[i] - x, p[i + 1] - y)
-            if seg >= rem { let f = rem / max(seg, 1e-6); return (x + (p[i] - x) * f, y + (p[i + 1] - y) * f) }
-            rem -= seg; x = p[i]; y = p[i + 1]; i += 2
-        }
-        return (x, y)
+        let vHit = speedFor(distance: max(0, rollDistance(v0) - d1))
+        let ix = (s.ghostX - s.cueX) / max(d1, 1e-6), iy = (s.ghostY - s.cueY) / max(d1, 1e-6)
+        let od = max(1e-6, hypot(b.x - s.ghostX, b.y - s.ghostY))
+        let r = cueAfter(s.ghostX, s.ghostY, ix: ix, iy: iy, ox: (b.x - s.ghostX) / od, oy: (b.y - s.ghostY) / od, vHit: vHit, balls: balls.filter { $0.id != s.ball }, skip: s.ball)
+        return (r.pts[r.pts.count - 2], r.pts[r.pts.count - 1])
     }
 
     struct Plan { var first: Shot; var next: Shot?; var cueEnd: (Double, Double) }
@@ -624,10 +625,8 @@ enum PoolEngine {
                     let vHit = speedFor(distance: cr.left)
                     let o = run(b.x, b.y, ox, oy, balls: others, skip: h.ball, maxLen: 4000, maxRails: 4, gap: 2 * R - 3, pad: safePad, speed: vHit * along)
                     if o.pocket == h.pocket {
-                        // the cue ball after the hit (a stun hit runs along the tangent; a full hit stops)
-                        let side = (lx / ll) * -oy + (ly / ll) * ox > 0
-                        let tx = side ? -oy : oy, ty = side ? ox : -ox
-                        let cAfter = along > 0.995 ? Run(pts: [gx, gy]) : run(gx, gy, tx, ty, balls: others, skip: h.ball, maxRails: 4, speed: vHit * (1 - along * along).squareRoot())
+                        // the cue ball after the hit: tangent pace plus the roll-through
+                        let cAfter = cueAfter(gx, gy, ix: lx / ll, iy: ly / ll, ox: ox, oy: oy, vHit: vHit, balls: others, skip: h.ball)
                         if cAfter.pocket >= 0 { need = nil; break }   // the cue ball follows it in
                         need = p; objPts = o.pts; stop = cAfter.pts
                         break
