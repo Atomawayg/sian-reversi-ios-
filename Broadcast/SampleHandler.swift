@@ -31,6 +31,8 @@ class SampleHandler: RPBroadcastSampleHandler {
         defer { busy = false }
         Signal.post(Signal.frame)
         guard var msg = BoardReader.read(pb) else { return }
+        if msg.game == .suika && msg.valid { suika(msg, t); return }
+        skStableSince = 0; skPrev = nil
         // only trust cells that stayed the same across two frames (discs animate when flipping)
         let stable = prev.map { $0.valid == msg.valid && $0.game == msg.game && $0.cells == msg.cells && $0.me == msg.me } ?? false
         // the legal-move glow pulses, so remember a glow seen in the last second on the same board
@@ -41,6 +43,29 @@ class SampleHandler: RPBroadcastSampleHandler {
         prev = msg
         if !stable { return }
         if msg != sent || t - lastSent > 1.0 {
+            send(msg); sent = msg; lastSent = t
+        }
+    }
+
+    // Fruit game: only send the jar once every fruit has stopped rolling (same reading for about half a second).
+    // Small reading jitter and the held fruit following your finger don't count as movement.
+    private var skPrev: BoardMessage?      // the reading the jar has matched since skStableSince
+    private var skStableSince: CFTimeInterval = 0
+    private func suika(_ msg: BoardMessage, _ t: CFTimeInterval) {
+        // compare with the first reading of the quiet spell, so a slow roll can't creep past the tolerance
+        if let p = skPrev, SK.same(p.cells, msg.cells) {} else { skPrev = msg; skStableSince = t }
+        prev = msg
+        guard t - skStableSince >= 0.45 else {
+            // still settling: tell the app (myTurn off) so it doesn't keep showing an old answer as current
+            if t - lastSent > 1.0, let s = sent, s.game == .suika {
+                var w = s; w.myTurn = false
+                send(w); lastSent = t
+            }
+            return
+        }
+        // the held fruit follows your finger: pass its new spot on a few times a second so the window can say "drop now"
+        let moved = sent.map { $0.cells.count == SK.count && abs(($0.cells[SK.heldX] * 14 + $0.cells[SK.heldX + 1]) - (msg.cells[SK.heldX] * 14 + msg.cells[SK.heldX + 1])) >= 2 } ?? true
+        if sent == nil || sent!.game != .suika || !SK.same(sent!.cells, msg.cells) || sent!.myTurn != msg.myTurn || t - lastSent > 1.0 || (moved && t - lastSent > 0.3) {
             send(msg); sent = msg; lastSent = t
         }
     }

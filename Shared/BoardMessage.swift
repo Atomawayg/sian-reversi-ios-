@@ -9,9 +9,10 @@ enum GameKind: Int, Codable {
     case jackaroo = 4     // WePlay Jackaroo (see JK layout)
     case chess = 5        // Plato chess: 64 cells from the top-left of the screen, 0 empty, 1…6 white P N B R Q K, 7…12 black; me 1 white / 2 black
     case draughts = 6     // Plato checkers (English rules): 64 cells, 0 empty, 1 red, 2 white, 3 red king, 4 white king
+    case suika = 7        // WePlay Frog Watermelon (fruit merge): see SK layout
 
     var size: (w: Int, h: Int) {
-        switch self { case .reversi, .checkers, .chess, .draughts: return (8, 8); case .connect4: return (7, 6); case .connect5: return (9, 7); case .jackaroo: return (JK.count, 1) }
+        switch self { case .reversi, .checkers, .chess, .draughts: return (8, 8); case .connect4: return (7, 6); case .connect5: return (9, 7); case .jackaroo: return (JK.count, 1); case .suika: return (SK.count, 1) }
     }
 }
 

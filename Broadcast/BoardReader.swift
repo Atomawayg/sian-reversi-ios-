@@ -68,7 +68,9 @@ enum BoardReader {
         let W = Double(s.w), H = Double(s.h)
         // Portrait only. A landscape frame is not the game screen we expect.
         if W > H { return BoardMessage(valid: false, cells: [], me: 0, myTurn: false) }
-        // Which game? Plato chess / checkers: wooden frame on both sides of the board.
+        // Which game? The fruit game first: sky on both sides of a white-walled jar.
+        if looksLikeSuika(s) { return readSuika(s) }
+        // Plato chess / checkers: wooden frame on both sides of the board.
         if PlatoBoardReader.looksLikeBoard(s), let m = PlatoBoardReader.read(s) { return m }
         // Jackaroo has a green table under the board; the others differ in the top-left corner.
         let jg = s.avg(W * 590 / 1180, H * 1650 / 2556, W * 6 / 1180)
