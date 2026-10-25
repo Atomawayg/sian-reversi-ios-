@@ -1,4 +1,4 @@
-# เซียน · Pool helper: บันทึกส่งต่อ (ถึง v3.17.0)
+# เซียน · Pool helper: บันทึกส่งต่อ (ถึง v3.17.1)
 
 ใช้ไฟล์นี้เริ่มแชทใหม่เพื่อทำต่อเฉพาะ **WePlay 8-ball Pool** ส่วนเกมอื่นในแอพเสร็จแล้วและอยู่ในโค้ดของ repo นี้
 
@@ -12,7 +12,8 @@
 ## ปล่อยเวอร์ชันอย่างไร
 - push ขึ้น `main` แล้ว GitHub Actions (`build.yml`) จะสร้าง IPA และออก release `build-N` ให้เอง ลิงก์โหลดคือ `https://github.com/Atomawayg/sian-reversi-ios-/releases/download/build-N/SianReversi.ipa`
 - push ขึ้นกิ่ง `dev/**` จะแค่ compile เช็ก ไม่ออก release ใช้ลองว่า build ผ่านก่อน merge
-- ขึ้นเลขเวอร์ชันที่ `project.yml` → `MARKETING_VERSION` (ตอนนี้ 3.17.0)
+- ขึ้นเลขเวอร์ชันที่ `project.yml` → `MARKETING_VERSION` (ตอนนี้ 3.17.1)
+- **ระวัง:** ก่อน 3.17.1 CI ผ่านแม้ Swift คอมไพล์ไม่ผ่าน (ได้ IPA เปล่า ~245 KB เช่น build-105) ตอนนี้เช็กว่ามีไฟล์โปรแกรมจริง; error อ่านได้จาก `gh api repos/.../check-runs/<id>/annotations` (log ของ job โหลดไม่ได้จากที่นี่) IPA ปกติ ~970 KB
 - เช็กสถานะ build ด้วย `gh api repos/Atomawayg/sian-reversi-ios-/actions/runs/<id>` เพราะ GraphQL ใช้ไม่ได้
 
 ## โครงสร้าง (ไฟล์ของพูล)
