@@ -45,8 +45,17 @@ enum PoolReader {
         guard let k = cs.indices.max(by: { agree(cs[$0]).count < agree(cs[$1]).count }) else { return false }
         let inl = agree(cs[k])
         if Double(inl.count) < Double(cs.count) * 0.7 { return false }
-        // the felt reaches both the top row (y 700) and the bottom row (y 2050): a square board can't be that tall
-        if inl.filter({ $0 < 4 }).count < 3 || inl.filter({ $0 >= 20 }).count < 3 { return false }
+        // the felt reaches both the top row (y 700) and the bottom row (y 2050): a square board can't be that tall.
+        // Ten points a row, half must be felt (balls or the aim line can sit on a few: 2 of 4 once read as Reversi)
+        func feltRow(_ y: Double) -> Int {
+            var n = 0
+            for i in 0..<10 {
+                let c = hsv(px(260 + Double(i) * 660 / 9, y))
+                if hueGap(c.h, cs[k].h) < 12 && c.s > 0.2 && c.v > 0.3 { n += 1 }
+            }
+            return n
+        }
+        if feltRow(700) < 5 || feltRow(2050) < 5 { return false }
         var sn = 0.0, cn = 0.0
         for i in inl { sn += sin(cs[i].h * Double.pi / 180); cn += cos(cs[i].h * Double.pi / 180) }
         var h0 = atan2(sn, cn) * 180 / Double.pi; if h0 < 0 { h0 += 360 }
@@ -282,8 +291,15 @@ enum PoolReader {
         else if myTurn {
             let centres = balls.map { ($0.x, $0.y) }
             let cue = balls.first(where: { $0.id == 0 }).map { ($0.x, $0.y) }
-            if let l = lastAim { aim = findAimCircle(at, around: l, balls: centres, cue: cue) }
-            if aim == nil { aim = findAimCircle(at, balls: centres, cue: cue) }
+            // the break: the ring sits on the front ball of the rack; the hand's ring round the cue ball (ball in hand)
+            // looked like an aim ring, so look only by the rack
+            let rack = balls.filter { $0.id != 0 && $0.y > 880 && $0.y < 1100 }
+            if rack.count >= 12, let apex = rack.max(by: { $0.y < $1.y }) {
+                aim = findAimCircle(at, around: (apex.x, apex.y + 2 * R), balls: centres, cue: cue)
+            } else {
+                if let l = lastAim { aim = findAimCircle(at, around: l, balls: centres, cue: cue) }
+                if aim == nil { aim = findAimCircle(at, balls: centres, cue: cue) }
+            }
         }
         if !held { lastAim = aim }
         // the cue ball unseen (the hand of ball-in-hand lies on it) but the aim ring is up: the game's white line

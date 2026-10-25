@@ -614,8 +614,9 @@ final class GameModel: ObservableObject {
         _ = mineText
         // what to play (worked out once per resting table): every sure way to pot one of your balls — straight,
         // off cushions, or the cue ball off a cushion first — and the one that also leaves an easy next ball
-        let moved = poolPlannedGroup != group || balls.count != poolPlanned.count
-            || !balls.allSatisfy { b in poolPlanned.contains { $0.id == b.id && abs($0.x - b.x) < 6 && abs($0.y - b.y) < 6 } }
+        // (only with the table at rest: after you let go, the power bar slides back while the balls already roll)
+        let moved = still && (poolPlannedGroup != group || balls.count != poolPlanned.count
+            || !balls.allSatisfy { b in poolPlanned.contains { $0.id == b.id && abs($0.x - b.x) < 6 && abs($0.y - b.y) < 6 } })
         if moved {
             poolPlanned = balls; poolPlannedGroup = group
             poolFound = []; poolPick = nil; poolNextBall = nil; poolRunWins = false
