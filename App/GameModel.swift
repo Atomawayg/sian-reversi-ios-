@@ -649,10 +649,13 @@ final class GameModel: ObservableObject {
             poolAims.append((a.x, a.y)); if poolAims.count > 3 { poolAims.removeFirst() }
             let steady = pulling || (poolAims.count == 3 && poolAims.allSatisfy { abs($0.0 - a.x) <= 4 && abs($0.1 - a.y) <= 4 })
             let v = PoolEngine.judge(cueX: cue.x, cueY: cue.y, aimX: a.x, aimY: a.y, balls: others, legal: legal, dir: dir)
-            if v.ball >= 0, let b = others.first(where: { $0.id == v.ball }) {
-                view.objPath = PoolEngine.objectPath(b.x, b.y, gx: a.x, gy: a.y, balls: balls, skip: b.id, dir: dir)
-                view.cuePath = PoolEngine.cuePath(cueX: cue.x, cueY: cue.y, gx: a.x, gy: a.y, bx: b.x, by: b.y, balls: balls, dir: dir)
-            }
+            // where both balls go at the power you pull (before you pull: the power the pot needs, or 50): banks as
+            // far as the pace carries them, and the ring where the cue ball stops (to plan the next shot)
+            let pullPct = c[PoolCodec.power] * 14 + c[PoolCodec.power + 1]
+            let pathPct = pulling ? pullPct : (v.powerPct > 0 ? v.powerPct : 50)
+            let pp = PoolEngine.powerPaths(cueX: cue.x, cueY: cue.y, aimX: a.x, aimY: a.y, target: others.first(where: { $0.id == v.ball }),
+                                           balls: balls, dir: dir, power: pathPct)
+            view.objPath = pp.obj; view.cuePath = pp.cue; view.cueStopX = pp.cueStop.0; view.cueStopY = pp.cueStop.1; view.pathPct = pathPct
             // how far the cue may turn and still pot (the meter and the pocket close-up), and which way to turn
             var turnHint = ""
             if v.ball >= 0, let b = others.first(where: { $0.id == v.ball }),

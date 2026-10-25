@@ -536,6 +536,8 @@ struct PoolView: Equatable {
     var bankX: Double? = nil, bankY: Double? = nil   // where the bank shot meets the cushion
     var win: PoolEngine.Window? = nil          // how far the cue may turn and still pot (for the zoom and the meter)
     var zoomPocket: Int? = nil
+    var cueStopX: Double? = nil, cueStopY: Double? = nil   // where the cue ball comes to rest for your aim at `pathPct` power
+    var pathPct = 0
     var options: [PoolEngine.Shot] = []        // every ball that pots straight from here: a thin line to its pocket                 // no turn pots, but your line ends by this pocket: close-up only
     var target: Int? = nil                     // the ball your aim hits
     var legal: [Int] = []
@@ -627,6 +629,13 @@ extension Renderer {
             gold.setFill(); UIBezierPath(ovalIn: CGRect(x: m.x - 5, y: m.y - 5, width: 10, height: 10)).fill()
         }
         poly(v.cuePath, UIColor.white.withAlphaComponent(0.85), 3, dash: true)
+        if let sx = v.cueStopX, let sy = v.cueStopY {   // the cue ball at rest: a white ring with the power it is for
+            let e = pt(sx, sy)
+            UIColor.white.setStroke()
+            let r = UIBezierPath(ovalIn: CGRect(x: e.x - br, y: e.y - br, width: br * 2, height: br * 2)); r.lineWidth = 2.5; r.stroke()
+            let at: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 13, weight: .heavy), .foregroundColor: UIColor.white]
+            ("\(v.pathPct)" as NSString).draw(at: CGPoint(x: e.x + br + 2, y: e.y - 8), withAttributes: at)
+        }
         for b in v.balls {
             let c = pt(b.x, b.y), rr = CGRect(x: c.x - br, y: c.y - br, width: br * 2, height: br * 2)
             poolColours[b.id == 0 ? 0 : (b.id == 8 ? 8 : (b.id - 1) % 8 + 1)].setFill()

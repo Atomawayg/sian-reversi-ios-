@@ -141,10 +141,12 @@ enum PoolEngine {
     /// `pad`: make the pocket jaws and the cushion ends that much fatter. The game's own jaws sit a few px off
     /// where they are drawn (a ball read as going in rattled out), so "sure" pots are worked out with pad 4.
     static let safePad = 4.0
-    static func run(_ x0: Double, _ y0: Double, _ ux0: Double, _ uy0: Double, balls: [Ball], skip: Int, maxLen: Double = 3000, maxRails: Int = 2, gap: Double = 2 * R, pad: Double = 0) -> Run {
+    /// `speed` (px/s): roll only as far as that pace carries the ball, losing half of it at each cushion.
+    static func run(_ x0: Double, _ y0: Double, _ ux0: Double, _ uy0: Double, balls: [Ball], skip: Int, maxLen: Double = 3000, maxRails: Int = 2, gap: Double = 2 * R, pad: Double = 0, speed: Double? = nil) -> Run {
         var r = Run(pts: [x0, y0])
-        var x = x0, y = y0, ux = ux0, uy = uy0, left = maxLen
-        for _ in 0..<8 {
+        let start = speed.map { rollDistance($0) } ?? maxLen
+        var x = x0, y = y0, ux = ux0, uy = uy0, left = start
+        for _ in 0..<10 {
             var best = left, kind = 0, which = -1, nx = 0.0, ny = 0.0, isJaw = false
             for (k, h) in holes.enumerated() { if let t = rayCircle(x, y, ux, uy, h.x, h.y, h.r), t < best { best = t; kind = 1; which = k } }
             for sg in segs { if let c = rayCapsule(x, y, ux, uy, sg, face: sg.jaw ? R + pad : R, end: R + pad), c.0 < best { best = c.0; kind = 2; nx = c.1; ny = c.2; isJaw = sg.jaw } }
@@ -169,12 +171,47 @@ enum PoolEngine {
                 r.rails += 1   // a ball grazing the cushion it rolls along is no bank
             }
             if r.rails > maxRails { break }
+            if speed != nil && (isJaw || abs(vn) >= sin(12 * Double.pi / 180)) { left = rollDistance(railKeep * speedFor(distance: left)) }
             ux = tx * bounceFlatten - vn * nx; uy = ty * bounceFlatten - vn * ny
             let l = (ux * ux + uy * uy).squareRoot(); ux /= l; uy /= l
             x += nx * 0.01; y += ny * 0.01
         }
-        r.len = maxLen - left
+        r.len = start - left
         return r
+    }
+    /// share of its pace a ball keeps off a cushion (measured on two banks; rough)
+    static let railKeep = 0.5
+    /// the pace that rolls exactly d before stopping (inverse of rollDistance)
+    static func speedFor(distance d: Double) -> Double {
+        if d <= 0 { return 0 }
+        var lo = 0.0, hi = 30000.0
+        for _ in 0..<40 { let m = (lo + hi) / 2; if rollDistance(m) < d { lo = m } else { hi = m } }
+        return hi
+    }
+
+    /// Where both balls go for your aim at a given power (%): the hit ball off up to four cushions until it drops or
+    /// stops, and the cue ball along the tangent line (a stun hit; a straight hit stops it) until it stops.
+    /// With no ball hit, the cue ball's own run. `cueStop` is where the cue ball comes to rest.
+    static func powerPaths(cueX: Double, cueY: Double, aimX: Double, aimY: Double, target: Ball?, balls: [Ball], dir: Double?, power: Int) -> (obj: [Double], cue: [Double], cueStop: (Double, Double)) {
+        let others = balls.filter { $0.id != 0 }
+        let v0 = Double(max(1, power)) / 100 * fullSpeed
+        var ax = aimX - cueX, ay = aimY - cueY
+        let d1 = (ax * ax + ay * ay).squareRoot(); ax /= max(d1, 1e-6); ay /= max(d1, 1e-6)
+        guard let b = target else {
+            let c = run(cueX, cueY, ax, ay, balls: others, skip: 0, maxRails: 4, speed: v0)
+            return ([], c.pts, (c.pts[c.pts.count - 2], c.pts[c.pts.count - 1]))
+        }
+        let vHit = speedFor(distance: max(0, rollDistance(v0) - d1))
+        var ux = b.x - aimX, uy = b.y - aimY
+        let d = (ux * ux + uy * uy).squareRoot(); ux /= max(d, 1e-6); uy /= max(d, 1e-6)
+        if let a = dir { ux = cos(a); uy = sin(a) }
+        let along = max(0, min(1, ax * ux + ay * uy))
+        let o = run(b.x, b.y, ux, uy, balls: others, skip: b.id, maxRails: 4, speed: vHit * along)
+        if along > 0.995 { return (o.pts, [], (aimX, aimY)) }
+        let side = ax * -uy + ay * ux > 0
+        let tx = side ? -uy : uy, ty = side ? ux : -ux
+        let c = run(aimX, aimY, tx, ty, balls: others, skip: b.id, maxRails: 4, speed: vHit * (1 - along * along).squareRoot())
+        return (o.pts, c.pts, (c.pts[c.pts.count - 2], c.pts[c.pts.count - 1]))
     }
 
     // MARK: diamonds (the light dots on the rails)

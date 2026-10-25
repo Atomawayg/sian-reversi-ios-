@@ -473,6 +473,10 @@ enum PoolReader {
         for c in cands {
             let x = X0 + Double(c.1) * g, y = Y0 + Double(c.2) * g
             if balls.contains(where: { hypot($0.0 - x, $0.1 - y) < R + 8 }) { continue }
+            // overlapping the cue ball: its own white edge (seen held there for whole aims, with no line drawn).
+            // Only real when a ball sits right against the cue ball, so the ring touches that ball too
+            if let q = cue, hypot(q.0 - x, q.1 - y) < 2 * R + 4,
+               !balls.contains(where: { hypot($0.0 - q.0, $0.1 - q.1) > 4 && abs(hypot($0.0 - x, $0.1 - y) - 2 * R) < 8 }) { continue }
             if tried.contains(where: { hypot($0.0 - x, $0.1 - y) < 20 }) { continue }
             tried.append((x, y))
             var line = 1.0
