@@ -61,14 +61,16 @@ enum PoolCodec {
     static let myLeft = 119       // balls left in your group (from the bar)
     static let oppLeft = 120
     static let power = 121        // 2 digits: how far the power bar is pulled, 0…100 %
-    static let objDir = 123       // 3 digits: direction of the game's line from the hit ball, degrees × 7 (flag bit3)
+    static let objDir = 123       // 3 digits: direction of the game's line from the hit ball, degrees × 7; 13,13,13 = none
+                                  // (it was flag bit3, but a cell holds 0…13: all four flags made 15 and lost the aim bit
+                                  // exactly while you pulled with the line seen)
     static let readMs = 126       // 2 digits: how long one screen reading takes (ms, averaged; set once a second)
     static let readRate = 128     // 2 digits: readings per second
     static let count = 130
     static func two(_ cells: [Int], _ at: Int) -> Int { cells[at] * 14 + cells[at + 1] }
     static func dir(_ cells: [Int]) -> Double? {
-        guard cells[flags] & 8 == 8 else { return nil }
         let q = cells[objDir] * 196 + cells[objDir + 1] * 14 + cells[objDir + 2]
+        guard q < 2520 else { return nil }
         return Double(q) / 7 * Double.pi / 180
     }
     static let originX = 207.5, originY = 584.0, width = 759.0, height = 1551.0

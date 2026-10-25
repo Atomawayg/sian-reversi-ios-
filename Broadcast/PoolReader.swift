@@ -295,6 +295,7 @@ enum PoolReader {
             lastDir = nil
         }
         if !held, let a = aim { seenAim = (a, objDir != nil ? lastDir : nil, now) }
+        cells[PoolCodec.objDir] = 13; cells[PoolCodec.objDir + 1] = 13; cells[PoolCodec.objDir + 2] = 13
         if let d = objDir {
             var deg = d * 180 / Double.pi; while deg < 0 { deg += 360 }; while deg >= 360 { deg -= 360 }
             let q = min(2519, Int((deg * 7).rounded()))
@@ -303,7 +304,7 @@ enum PoolReader {
 
         if clean { for b in balls where b.id >= 0 && b.id <= 15 { cells[PoolCodec.balls + 7 * b.id] = 1; PoolCodec.put(&cells, PoolCodec.balls + 7 * b.id + 1, b.x, b.y) } }
         if let a = aim { PoolCodec.put(&cells, PoolCodec.aim, a.0, a.1) }
-        cells[PoolCodec.flags] = (clean ? 1 : 0) | (aim != nil ? 2 : 0) | (pulling ? 4 : 0) | (objDir != nil ? 8 : 0)
+        cells[PoolCodec.flags] = (clean ? 1 : 0) | (aim != nil ? 2 : 0) | (pulling ? 4 : 0)
         return BoardMessage(valid: true, game: .pool, cells: cells, me: group, myTurn: myTurn)
     }
 

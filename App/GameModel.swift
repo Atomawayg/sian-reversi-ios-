@@ -596,7 +596,12 @@ final class GameModel: ObservableObject {
         // balls still rolling: nothing to work out yet (it used to change its mind every frame)
         guard still || pulling else {
             poolSound.set(.off); poolAims = []
-            var o = Overlay(game: .pool, title: "รอลูกหยุด", line: groupName, mine: true); o.pool = view; show(o); return
+            var o = Overlay(game: .pool, title: "รอลูกหยุด", line: groupName, mine: true); o.pool = view; show(o)
+            if logOn {   // the balls while they roll: to measure cushions and pace from real shots
+                let t = "M balls=" + balls.map { "\($0.id):\(Int($0.x.rounded())),\(Int($0.y.rounded()))" }.joined(separator: " ")
+                if t != poolLastLog { poolLastLog = t; log(t) }
+            }
+            return
         }
         // you choose the ball; the app judges your aim (the game's own line makes that exact) and gives the power
         let mineLeft = others.filter { legal.contains($0.id) }.map { $0.id }.sorted()
