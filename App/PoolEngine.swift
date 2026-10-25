@@ -192,14 +192,14 @@ enum PoolEngine {
     /// Where both balls go for your aim at a given power (%): the hit ball off up to four cushions until it drops or
     /// stops, and the cue ball along the tangent line (a stun hit; a straight hit stops it) until it stops.
     /// With no ball hit, the cue ball's own run. `cueStop` is where the cue ball comes to rest.
-    static func powerPaths(cueX: Double, cueY: Double, aimX: Double, aimY: Double, target: Ball?, balls: [Ball], dir: Double?, power: Int) -> (obj: [Double], cue: [Double], cueStop: (Double, Double)) {
+    static func powerPaths(cueX: Double, cueY: Double, aimX: Double, aimY: Double, target: Ball?, balls: [Ball], dir: Double?, power: Int) -> (obj: [Double], cue: [Double], cueStop: (Double, Double), objDrops: Bool, cueDrops: Bool) {
         let others = balls.filter { $0.id != 0 }
         let v0 = Double(max(1, power)) / 100 * fullSpeed
         var ax = aimX - cueX, ay = aimY - cueY
         let d1 = (ax * ax + ay * ay).squareRoot(); ax /= max(d1, 1e-6); ay /= max(d1, 1e-6)
         guard let b = target else {
             let c = run(cueX, cueY, ax, ay, balls: others, skip: 0, maxRails: 4, speed: v0)
-            return ([], c.pts, (c.pts[c.pts.count - 2], c.pts[c.pts.count - 1]))
+            return ([], c.pts, (c.pts[c.pts.count - 2], c.pts[c.pts.count - 1]), false, c.pocket >= 0)
         }
         let vHit = speedFor(distance: max(0, rollDistance(v0) - d1))
         var ux = b.x - aimX, uy = b.y - aimY
@@ -207,11 +207,11 @@ enum PoolEngine {
         if let a = dir { ux = cos(a); uy = sin(a) }
         let along = max(0, min(1, ax * ux + ay * uy))
         let o = run(b.x, b.y, ux, uy, balls: others, skip: b.id, maxRails: 4, speed: vHit * along)
-        if along > 0.995 { return (o.pts, [], (aimX, aimY)) }
+        if along > 0.995 { return (o.pts, [], (aimX, aimY), o.pocket >= 0, false) }
         let side = ax * -uy + ay * ux > 0
         let tx = side ? -uy : uy, ty = side ? ux : -ux
         let c = run(aimX, aimY, tx, ty, balls: others, skip: b.id, maxRails: 4, speed: vHit * (1 - along * along).squareRoot())
-        return (o.pts, c.pts, (c.pts[c.pts.count - 2], c.pts[c.pts.count - 1]))
+        return (o.pts, c.pts, (c.pts[c.pts.count - 2], c.pts[c.pts.count - 1]), o.pocket >= 0, c.pocket >= 0)
     }
 
     // MARK: diamonds (the light dots on the rails)

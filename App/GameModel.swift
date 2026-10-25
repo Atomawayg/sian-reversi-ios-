@@ -649,13 +649,21 @@ final class GameModel: ObservableObject {
             poolAims.append((a.x, a.y)); if poolAims.count > 3 { poolAims.removeFirst() }
             let steady = pulling || (poolAims.count == 3 && poolAims.allSatisfy { abs($0.0 - a.x) <= 4 && abs($0.1 - a.y) <= 4 })
             let v = PoolEngine.judge(cueX: cue.x, cueY: cue.y, aimX: a.x, aimY: a.y, balls: others, legal: legal, dir: dir)
-            // where both balls go at the power you pull (before you pull: the power the pot needs, or 50): banks as
-            // far as the pace carries them, and the ring where the cue ball stops (to plan the next shot)
+            // where both balls go, every cushion included, as far as the pace carries them. Before you pull: the
+            // whole run at full power with marks where each ball stops at 25 / 50 / 75 / 100; while you pull: the run
+            // at your power and where they really stop
             let pullPct = c[PoolCodec.power] * 14 + c[PoolCodec.power + 1]
-            let pathPct = pulling ? pullPct : (v.powerPct > 0 ? v.powerPct : 50)
-            let pp = PoolEngine.powerPaths(cueX: cue.x, cueY: cue.y, aimX: a.x, aimY: a.y, target: others.first(where: { $0.id == v.ball }),
-                                           balls: balls, dir: dir, power: pathPct)
-            view.objPath = pp.obj; view.cuePath = pp.cue; view.cueStopX = pp.cueStop.0; view.cueStopY = pp.cueStop.1; view.pathPct = pathPct
+            let tgt = others.first(where: { $0.id == v.ball })
+            func paths(_ p: Int) -> (obj: [Double], cue: [Double], cueStop: (Double, Double), objDrops: Bool, cueDrops: Bool) {
+                PoolEngine.powerPaths(cueX: cue.x, cueY: cue.y, aimX: a.x, aimY: a.y, target: tgt, balls: balls, dir: dir, power: p)
+            }
+            let full = paths(pulling ? max(1, pullPct) : 100)
+            view.objPath = full.obj; view.cuePath = full.cue; view.stopsLive = pulling
+            for p in (pulling ? [max(1, pullPct)] : [25, 50, 75, 100]) {
+                let r = p == (pulling ? max(1, pullPct) : 100) ? full : paths(p)
+                if !r.cueDrops { view.cueStops.append(PoolStop(x: r.cueStop.0, y: r.cueStop.1, pct: p)) }
+                if !r.objDrops, r.obj.count >= 4 { view.objStops.append(PoolStop(x: r.obj[r.obj.count - 2], y: r.obj[r.obj.count - 1], pct: p)) }
+            }
             // how far the cue may turn and still pot (the meter and the pocket close-up), and which way to turn
             var turnHint = ""
             if v.ball >= 0, let b = others.first(where: { $0.id == v.ball }),

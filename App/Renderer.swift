@@ -523,6 +523,7 @@ enum Renderer {
 }
 
 /// Pool drawing data (screen pixels of a 1180×2556 screen).
+struct PoolStop: Equatable { var x: Double; var y: Double; var pct: Int }
 struct PoolView: Equatable {
     var balls: [PoolEngine.Ball]
     var shot: PoolEngine.Shot?                 // the suggested shot
@@ -536,8 +537,9 @@ struct PoolView: Equatable {
     var bankX: Double? = nil, bankY: Double? = nil   // where the bank shot meets the cushion
     var win: PoolEngine.Window? = nil          // how far the cue may turn and still pot (for the zoom and the meter)
     var zoomPocket: Int? = nil
-    var cueStopX: Double? = nil, cueStopY: Double? = nil   // where the cue ball comes to rest for your aim at `pathPct` power
-    var pathPct = 0
+    var cueStops: [PoolStop] = []              // where the cue ball comes to rest for your aim (by power %)
+    var objStops: [PoolStop] = []              // where the hit ball comes to rest (when it doesn't drop)
+    var stopsLive = false                      // pulling: the one stop for your power (else marks for 25/50/75/100)
     var options: [PoolEngine.Shot] = []        // every ball that pots straight from here: a thin line to its pocket                 // no turn pots, but your line ends by this pocket: close-up only
     var target: Int? = nil                     // the ball your aim hits
     var legal: [Int] = []
@@ -620,6 +622,9 @@ extension Renderer {
         }
         // your aim now: where the ball goes (green = drops, red = doesn't) and where the cue ball runs
         let orange = UIColor(red: 1.0, green: 0.62, blue: 0.15, alpha: 1)
+        // a dark edge under your lines so they stand out on the small table
+        poly(v.objPath, UIColor.black.withAlphaComponent(0.55), 8)
+        poly(v.cuePath, UIColor.black.withAlphaComponent(0.55), 6)
         poly(v.objPath, v.pots ? green : (v.risky ? orange : red), 5)
         if let bx = v.bankX, let by = v.bankY {   // where to hit the cushion: a gold mark on the rail by the diamonds
             let c = pt(bx, by)
@@ -628,14 +633,23 @@ extension Renderer {
             else if by < PoolEngine.midY { m.y = box.minY - 3 } else { m.y = box.maxY + 3 }
             gold.setFill(); UIBezierPath(ovalIn: CGRect(x: m.x - 5, y: m.y - 5, width: 10, height: 10)).fill()
         }
-        poly(v.cuePath, UIColor.white.withAlphaComponent(0.85), 3, dash: true)
-        if let sx = v.cueStopX, let sy = v.cueStopY {   // the cue ball at rest: a white ring with the power it is for
-            let e = pt(sx, sy)
-            UIColor.white.setStroke()
-            let r = UIBezierPath(ovalIn: CGRect(x: e.x - br, y: e.y - br, width: br * 2, height: br * 2)); r.lineWidth = 2.5; r.stroke()
-            let at: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 13, weight: .heavy), .foregroundColor: UIColor.white]
-            ("\(v.pathPct)" as NSString).draw(at: CGPoint(x: e.x + br + 2, y: e.y - 8), withAttributes: at)
+        poly(v.cuePath, UIColor.white, 3.5)
+        // where the balls stop: while pulling a full ring for your power; before, small marks for 25/50/75/100
+        func stop(_ s: PoolStop, _ col: UIColor) {
+            let e = pt(s.x, s.y)
+            let at: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: v.stopsLive ? 14 : 11, weight: .heavy), .foregroundColor: col,
+                                                     .strokeColor: UIColor.black, .strokeWidth: -3]
+            if v.stopsLive {
+                col.setStroke(); let r = UIBezierPath(ovalIn: CGRect(x: e.x - br, y: e.y - br, width: br * 2, height: br * 2)); r.lineWidth = 3; r.stroke()
+                ("\(s.pct)" as NSString).draw(at: CGPoint(x: e.x + br + 2, y: e.y - 9), withAttributes: at)
+            } else {
+                UIColor.black.setFill(); UIBezierPath(ovalIn: CGRect(x: e.x - 4.5, y: e.y - 4.5, width: 9, height: 9)).fill()
+                col.setFill(); UIBezierPath(ovalIn: CGRect(x: e.x - 3, y: e.y - 3, width: 6, height: 6)).fill()
+                ("\(s.pct)" as NSString).draw(at: CGPoint(x: e.x + 5, y: e.y - 7), withAttributes: at)
+            }
         }
+        for s in v.objStops { stop(s, v.pots ? green : (v.risky ? orange : red)) }
+        for s in v.cueStops { stop(s, .white) }
         for b in v.balls {
             let c = pt(b.x, b.y), rr = CGRect(x: c.x - br, y: c.y - br, width: br * 2, height: br * 2)
             poolColours[b.id == 0 ? 0 : (b.id == 8 ? 8 : (b.id - 1) % 8 + 1)].setFill()

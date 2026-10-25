@@ -72,6 +72,10 @@ enum PoolReader {
     static var lastTurnSeen = 0.0
     static var lastReuse = false   // the last frame's table matched the one before (nothing moving)
     static var lastDir: (ball: Int, angle: Double)? = nil
+    /// the last aim actually seen (ring + the game's line) and when: kept through the moment the game dims its
+    /// lines as you touch the power bar, before the bar shows any fill (that gap lost the aim for ~70% of pulls)
+    static var seenAim: (aim: (Double, Double), dir: (ball: Int, angle: Double)?, at: Double)? = nil
+    static var pullHold: (aim: (Double, Double), dir: (ball: Int, angle: Double)?)? = nil   // the aim held for this pull
 
     static func read(_ s: BoardReader.Sampler) -> BoardMessage {
         let sx = Double(s.w) / 1180, sy = Double(s.h) / 2556
@@ -238,14 +242,18 @@ enum PoolReader {
         // While the power bar is pulled the cue can't turn and the game dims its lines: keep the last aim.
         var aim: (Double, Double)? = nil
         var held = false
-        if myTurn && pulling, let l = lastAim { aim = l; held = true }
+        // the aim for the whole pull: the one seen just before it started (within 1 s; an older one may be stale)
+        if pulling {
+            if pullHold == nil, let g = seenAim, now - g.at < 1 { pullHold = (g.aim, g.dir) }
+        } else { pullHold = nil }
+        if myTurn && pulling, let h = pullHold { aim = h.aim; held = true; lastDir = h.dir }
         else if myTurn {
             let centres = balls.map { ($0.x, $0.y) }
             let cue = balls.first(where: { $0.id == 0 }).map { ($0.x, $0.y) }
             if let l = lastAim { aim = findAimCircle(at, around: l, balls: centres, cue: cue) }
             if aim == nil { aim = findAimCircle(at, balls: centres, cue: cue) }
         }
-        lastAim = aim
+        if !held { lastAim = aim }
         // the cue ball unseen (the hand of ball-in-hand lies on it) but the aim ring is up: the game's white line
         // runs from the cue ball to the ring, so follow it back to find the cue ball
         if aim != nil && !balls.contains(where: { $0.id == 0 }), let a = aim, let c = cueFromLine(at, ring: a) {
@@ -286,6 +294,7 @@ enum PoolReader {
         } else {
             lastDir = nil
         }
+        if !held, let a = aim { seenAim = (a, objDir != nil ? lastDir : nil, now) }
         if let d = objDir {
             var deg = d * 180 / Double.pi; while deg < 0 { deg += 360 }; while deg >= 360 { deg -= 360 }
             let q = min(2519, Int((deg * 7).rounded()))
