@@ -28,6 +28,12 @@ func fen(_ f: String) -> ([Int], Bool, Int, Int) {
     return (cells, parts[1] == "w", c, ep)
 }
 
+if CommandLine.arguments.count > 2 && CommandLine.arguments[1] == "dbg" {
+    let (w, h, px) = loadPPM(CommandLine.arguments[2])!
+    let s = BoardReader.Sampler(w: w, h: h) { x, y in let k = (y * w + x) * 3; return (Double(px[k]), Double(px[k + 1]), Double(px[k + 2])) }
+    PlatoBoardReader.dbg = { l in if l.contains(",72") || l.contains(",71") || l.contains(",73") { out(l) } }
+    _ = PlatoBoardReader.read(s); exit(0)
+}
 let mode = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "all"
 if mode == "perft" || mode == "all" {
     let tests: [(String, Int, Int)] = [

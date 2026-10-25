@@ -5,6 +5,7 @@ import Foundation
 /// You are always at the bottom. Your turn: the blue "Your Turn" pill under your avatar.
 enum PlatoBoardReader {
     static let X0 = 34.5, CELL = 138.7
+    static var dbg: ((String) -> Void)? = nil
 
     /// Wooden frame on both sides of the board.
     static func looksLikeBoard(_ s: BoardReader.Sampler) -> Bool {
@@ -134,6 +135,7 @@ enum PlatoBoardReader {
         }
         var centre: Float = 0
         for i in 6..<18 { for j in 6..<18 { centre += M[i * G + j] } }
+        PlatoBoardReader.dbg?("cell \(x),\(y) bg \(Int(br)),\(Int(bg)),\(Int(bb)) centre \(centre / 144)")
         if centre / 144 < 0.35 { return 0 }
         let S = PlatoChessData.shapes
         var best = 0; var bd = Float.greatestFiniteMagnitude
