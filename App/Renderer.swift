@@ -40,9 +40,8 @@ struct Overlay: Equatable {
 
 enum Renderer {
     static let size = CGSize(width: 640, height: 360)
-    /// pool is drawn upright like the game, so its window is tall
-    static let poolSize = CGSize(width: 400, height: 870)
-    static func frameSize(_ o: Overlay) -> CGSize { o.game == .pool && o.pool != nil ? poolSize : size }
+    /// every game uses the same wide window (a tall one covered the table)
+    static func frameSize(_ o: Overlay) -> CGSize { size }
     /// flips twice a second so the stones to tap blink
     static var pulse = false
 
@@ -541,25 +540,29 @@ extension Renderer {
         UIColor(red: 1.0, green: 0.50, blue: 0.10, alpha: 1), UIColor(red: 0.10, green: 0.65, blue: 0.20, alpha: 1),
         UIColor(red: 0.50, green: 0.12, blue: 0.10, alpha: 1), .black]
 
-    /// The table upright, as in the game, with a line of text on top.
+    /// The table upright on the left (as in the game), the shot in words on the right.
     static func drawPool(_ o: Overlay, _ v: PoolView, _ rect: CGRect) {
         let gold = UIColor(red: 0.949, green: 0.757, blue: 0.306, alpha: 1)
         let green = UIColor(red: 0.30, green: 0.95, blue: 0.45, alpha: 1), red = UIColor(red: 1.0, green: 0.35, blue: 0.30, alpha: 1)
-        // text
-        let tAttr: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 30, weight: .heavy), .foregroundColor: o.mine ? gold : UIColor.white]
-        (o.title as NSString).draw(with: CGRect(x: 12, y: 6, width: rect.width - 24, height: 38), options: .usesLineFragmentOrigin, attributes: tAttr, context: nil)
-        let lAttr: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 21, weight: .semibold), .foregroundColor: UIColor(white: 0.8, alpha: 1)]
-        (o.line as NSString).draw(with: CGRect(x: 12, y: 42, width: rect.width - 24, height: 28), options: .usesLineFragmentOrigin, attributes: lAttr, context: nil)
-        // table: playing surface 759 × 1551 px on screen
-        let area = CGRect(x: 14, y: 80, width: rect.width - 28, height: rect.height - 92)
+        // table on the left: playing surface 759 × 1551 px on screen
+        let area = CGRect(x: 18, y: 16, width: (rect.height - 32) * 759 / 1551, height: rect.height - 32)
+        // text on the right
+        let tx = area.maxX + 30, tw = rect.width - tx - 16
+        let tAttr: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 44, weight: .heavy), .foregroundColor: o.mine ? gold : UIColor.white]
+        let tH = (o.title as NSString).boundingRect(with: CGSize(width: tw, height: 200), options: .usesLineFragmentOrigin, attributes: tAttr, context: nil).height
+        let lAttr: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 28, weight: .semibold), .foregroundColor: UIColor(white: 0.8, alpha: 1)]
+        let lH = (o.line as NSString).boundingRect(with: CGSize(width: tw, height: 200), options: .usesLineFragmentOrigin, attributes: lAttr, context: nil).height
+        let ty = (rect.height - tH - 10 - lH) / 2
+        (o.title as NSString).draw(with: CGRect(x: tx, y: ty, width: tw, height: tH), options: .usesLineFragmentOrigin, attributes: tAttr, context: nil)
+        (o.line as NSString).draw(with: CGRect(x: tx, y: ty + tH + 10, width: tw, height: lH), options: .usesLineFragmentOrigin, attributes: lAttr, context: nil)
         let sc = min(area.width / 759, area.height / 1551)
         let w = 759 * sc, h = 1551 * sc
         let box = CGRect(x: area.midX - w / 2, y: area.minY + (area.height - h) / 2, width: w, height: h)
         func pt(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: box.minX + CGFloat(x - 207.5) * sc, y: box.minY + CGFloat(y - 584) * sc) }
-        UIColor(red: 0.36, green: 0.22, blue: 0.12, alpha: 1).setFill(); UIBezierPath(roundedRect: box.insetBy(dx: -9, dy: -9), cornerRadius: 9).fill()
+        UIColor(red: 0.36, green: 0.22, blue: 0.12, alpha: 1).setFill(); UIBezierPath(roundedRect: box.insetBy(dx: -6, dy: -6), cornerRadius: 6).fill()
         UIColor(red: 0.13, green: 0.47, blue: 0.68, alpha: 1).setFill(); UIRectFill(box)
         UIColor.black.setFill()
-        for p in PoolEngine.pockets { let c = pt(p.x, p.y); UIBezierPath(ovalIn: CGRect(x: c.x - 11, y: c.y - 11, width: 22, height: 22)).fill() }
+        for p in PoolEngine.pockets { let c = pt(p.x, p.y); UIBezierPath(ovalIn: CGRect(x: c.x - 7, y: c.y - 7, width: 14, height: 14)).fill() }
         let br = CGFloat(PoolEngine.R) * sc
         func poly(_ xy: [Double], _ col: UIColor, _ width: CGFloat, dash: Bool = false) {
             guard xy.count >= 4 else { return }
