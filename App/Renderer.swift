@@ -26,6 +26,9 @@ struct Overlay: Equatable {
     var swap = false             // J: the two marked stones trade places
     var stage = 0                // 1 = tap the card, 2 = card confirmed, tap the stone
     var action = ""              // one word: เดิน 7, ออกลูก, สลับ…
+    // fruit game
+    var drop: Int? = nil         // x (screen px) to drop the held fruit at
+    var land: [Int] = []         // x, y where it comes to rest (empty when it merges)
 
     init(game: GameKind = .reversi, cells: [Int]? = nil, rec: Int? = nil, path: [Int] = [], caps: [Int] = [],
          title: String, line: String, mine: Bool = false, meColor: Int = 1) {
@@ -93,6 +96,7 @@ enum Renderer {
             case .checkers, .draughts: drawCheckers(o, cells, CGRect(x: pad, y: pad, width: side, height: side))
             case .chess: drawChess(o, cells, CGRect(x: pad, y: pad, width: side, height: side))
             case .connect4, .connect5: drawConnect(o, cells, CGRect(x: pad, y: pad, width: side, height: side))
+            case .suika: drawSuika(o, cells, CGRect(x: pad, y: pad, width: side, height: side))
             case .jackaroo: break
             }
             textX = pad + side + 24
@@ -216,6 +220,78 @@ enum Renderer {
                 ring(cell(row, col), cs)
             }
         } }
+    }
+
+    // MARK: Fruit game
+    static let skColours: [UIColor] = [
+        UIColor(red: 0.86, green: 0.18, blue: 0.20, alpha: 1),   // cherry
+        UIColor(red: 0.97, green: 0.40, blue: 0.52, alpha: 1),   // strawberry
+        UIColor(red: 0.58, green: 0.38, blue: 0.90, alpha: 1),   // grape
+        UIColor(red: 0.98, green: 0.74, blue: 0.22, alpha: 1),   // dekopon
+        UIColor(red: 0.95, green: 0.50, blue: 0.14, alpha: 1),   // persimmon
+        UIColor(red: 0.84, green: 0.26, blue: 0.22, alpha: 1),   // apple
+        UIColor(red: 0.95, green: 0.86, blue: 0.32, alpha: 1),   // pear
+        UIColor(red: 0.98, green: 0.72, blue: 0.74, alpha: 1),   // peach
+        UIColor(red: 1.00, green: 0.90, blue: 0.10, alpha: 1),   // pineapple
+        UIColor(red: 0.45, green: 0.76, blue: 0.42, alpha: 1),   // melon
+        UIColor(red: 0.34, green: 0.66, blue: 0.14, alpha: 1),   // watermelon
+    ]
+
+    private static func drawSuika(_ o: Overlay, _ cells: [Int], _ r: CGRect) {
+        guard let st = SK.decode(cells) else { return }
+        // the jar from the read area's top (above the jar, where Will holds the fruit) down to the floor
+        let wx0 = SK.left - 8, wx1 = SK.right + 8, wy0 = SK.top + 20, wy1 = SK.floor + 10
+        let k = min(r.width / CGFloat(wx1 - wx0), r.height / CGFloat(wy1 - wy0))
+        let ox = r.midX - CGFloat(wx1 - wx0) * k / 2, oy = r.minY
+        func P(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: ox + CGFloat(x - wx0) * k, y: oy + CGFloat(y - wy0) * k) }
+        let jarRect = CGRect(origin: P(SK.left, SK.dead), size: CGSize(width: CGFloat(SK.right - SK.left) * k, height: CGFloat(SK.floor - SK.dead) * k))
+        UIColor(red: 0.55, green: 0.78, blue: 0.97, alpha: 1).setFill()
+        UIBezierPath(roundedRect: jarRect, cornerRadius: 6).fill()
+        UIColor.white.setStroke()
+        let wall = UIBezierPath(roundedRect: jarRect.insetBy(dx: -2, dy: -2), cornerRadius: 7); wall.lineWidth = 3; wall.stroke()
+        // dashed line in the middle (the game draws it too) and scale 0…10 above the jar
+        let mid = UIBezierPath(); mid.move(to: P((SK.left + SK.right) / 2, SK.dead)); mid.addLine(to: P((SK.left + SK.right) / 2, SK.floor))
+        mid.lineWidth = 1.5; mid.setLineDash([5, 5], count: 2, phase: 0); UIColor.white.withAlphaComponent(0.7).setStroke(); mid.stroke()
+        for i in 0...10 {
+            let x = SK.left + (SK.right - SK.left) * Double(i) / 10
+            let a = P(x, SK.dead), h: CGFloat = i % 5 == 0 ? 10 : 5
+            let t = UIBezierPath(); t.move(to: CGPoint(x: a.x, y: a.y - 2)); t.addLine(to: CGPoint(x: a.x, y: a.y - 2 - h))
+            t.lineWidth = 2; muted.setStroke(); t.stroke()
+        }
+        for f in st.fruits {
+            let c = P(f.x, f.y), rr = CGFloat(SK.radius[f.t]) * k
+            skColours[f.t].setFill()
+            UIBezierPath(ovalIn: CGRect(x: c.x - rr, y: c.y - rr, width: rr * 2, height: rr * 2)).fill()
+        }
+        // suggestion: gold line from the drop spot down to where the fruit lands
+        if let dx = o.drop, st.held >= 0 {
+            let x = Double(dx)
+            let endY = o.land.count == 2 ? Double(o.land[1]) : SK.floor
+            let line = UIBezierPath(); line.move(to: P(x, SK.dropY)); line.addLine(to: P(x, endY))
+            line.lineWidth = 3; line.setLineDash([7, 5], count: 2, phase: 0); gold.setStroke(); line.stroke()
+            let rr = CGFloat(SK.radius[st.held]) * k
+            if o.land.count == 2 {
+                let c = P(Double(o.land[0]), Double(o.land[1]))
+                let g = UIBezierPath(ovalIn: CGRect(x: c.x - rr, y: c.y - rr, width: rr * 2, height: rr * 2)); g.lineWidth = 3; g.stroke()
+            }
+            let c = P(x, SK.dropY)
+            gold.setFill()
+            let a = UIBezierPath()
+            a.move(to: CGPoint(x: c.x - 10, y: oy)); a.addLine(to: CGPoint(x: c.x + 10, y: oy)); a.addLine(to: CGPoint(x: c.x, y: oy + 14)); a.close(); a.fill()
+        }
+        // the fruit Will holds, where it is now
+        if st.held >= 0 {
+            let c = P(st.heldX, SK.dropY), rr = CGFloat(SK.radius[st.held]) * k
+            skColours[st.held].setFill()
+            UIBezierPath(ovalIn: CGRect(x: c.x - rr, y: c.y - rr, width: rr * 2, height: rr * 2)).fill()
+            UIColor.white.setStroke()
+            let e = UIBezierPath(ovalIn: CGRect(x: c.x - rr, y: c.y - rr, width: rr * 2, height: rr * 2)); e.lineWidth = 2; e.stroke()
+        }
+        // next fruit: small badge in the top-right corner
+        if st.next >= 0 {
+            let c = CGPoint(x: r.maxX - 14, y: r.minY + 14)
+            skColours[st.next].setFill(); UIBezierPath(ovalIn: CGRect(x: c.x - 10, y: c.y - 10, width: 20, height: 20)).fill()
+        }
     }
 
     // MARK: Jackaroo

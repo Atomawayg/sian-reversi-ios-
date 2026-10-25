@@ -64,7 +64,7 @@ final class GameModel: ObservableObject {
     static weak var shared: GameModel?
 
     // -1 marks anything that has not arrived yet
-    private var dCells = [Int](repeating: -1, count: JK.count), dMe = -1, dTurn: Bool? = nil, dValid: Bool? = nil, dGame: GameKind? = nil
+    private var dCells = [Int](repeating: -1, count: DarwinBoard.maxCells), dMe = -1, dTurn: Bool? = nil, dValid: Bool? = nil, dGame: GameKind? = nil
     private var dHa = -1, dHb = -1
     private var lastDarwinCommit = Date.distantPast, lastSocketMsg = Date.distantPast
     private var darwinMsgs = 0, darwinBroken = 0
@@ -96,7 +96,7 @@ final class GameModel: ObservableObject {
             } else if k.hasPrefix("ha"), let v = Int(k.dropFirst(2)) { dHa = v }
             else if k.hasPrefix("hb"), let v = Int(k.dropFirst(2)) { dHb = v }
             else if k.hasPrefix("c"), let vi = k.firstIndex(of: "v"),
-                      let i = Int(k[k.index(after: k.startIndex)..<vi]), let v = Int(k[k.index(after: vi)...]), i < JK.count {
+                      let i = Int(k[k.index(after: k.startIndex)..<vi]), let v = Int(k[k.index(after: vi)...]), i < DarwinBoard.maxCells {
                 dCells[i] = v
             } else if k.hasPrefix("me"), let v = Int(k.dropFirst(2)) { dMe = v }
             else if k.hasPrefix("g"), let v = Int(k.dropFirst(1)), let g = GameKind(rawValue: v) { dGame = g }
@@ -138,6 +138,7 @@ final class GameModel: ObservableObject {
         case .jackaroo: handleJackaroo(m); return
         case .chess: handleChess(m); return
         case .draughts: handleDraughts(m); return
+        case .suika: handleSuika(m); return
         case .reversi: break
         }
         let rv = rvTrack.check(m.cells) { b, p in ReversiRules.successors(b, colour: p + 1) }
@@ -492,6 +493,57 @@ final class GameModel: ObservableObject {
                 }
             }
             DispatchQueue.main.async { present(r, true) }
+        }
+    }
+
+    // MARK: Fruit game (WePlay Frog Watermelon)
+    private let suika = SuikaEngine()
+    private var skComputed: [Int] = []
+    private var skAnswer: (x: Double, line: String, land: [Int])? = nil
+
+    /// The answer for this jar, with a title that follows the held fruit: which way to move it, or "drop now".
+    private func skOverlay(_ cells: [Int]) -> Overlay {
+        guard let a = skAnswer, let st = SK.decode(cells) else { return Overlay(game: .suika, cells: cells, title: "คิด…", line: "", mine: true) }
+        let pos = (a.x - SK.left) / (SK.right - SK.left) * 10
+        let off = a.x - st.heldX
+        let title = abs(off) <= 14 ? "ปล่อย!" : (off < 0 ? "◀ " : "") + String(format: "%.1f", pos) + (off > 0 ? " ▶" : "")
+        var o = Overlay(game: .suika, cells: cells, title: title, line: a.line, mine: true)
+        o.drop = Int(a.x); o.land = a.land
+        return o
+    }
+
+    private func handleSuika(_ m: BoardMessage) {
+        guard let st = SK.decode(m.cells) else { return }
+        guard m.myTurn, st.held >= 0 else {
+            computedFor = []; skComputed = []; skAnswer = nil; gen += 1
+            show(Overlay(game: .suika, cells: m.cells, title: "รอ…", line: "รอผลไม้หยุดกลิ้ง"))
+            return
+        }
+        if !skComputed.isEmpty && SK.same(skComputed, m.cells) {
+            // same jar: keep the answer, only the held fruit moved
+            if skAnswer != nil { let o = skOverlay(m.cells); if o != overlay { show(o) } }
+            return
+        }
+        skComputed = m.cells; skAnswer = nil
+        gen += 1
+        let g = gen, live = liveGen, ms = thinkMs
+        show(Overlay(game: .suika, cells: m.cells, title: "คิด…", line: "AI กำลังลองปล่อยทุกจุด", mine: true))
+        work.async { [weak self] in
+            guard let self else { return }
+            let r = self.suika.think(st, ms: ms, cancel: { live.get() != g })
+            DispatchQueue.main.async {
+                guard g == self.gen, let r else { return }
+                var line: String
+                if let top = r.merges.max() {
+                    line = "รวมได้ → " + SK.names[min(top, SK.types - 1)] + (r.merges.count > 1 ? " (\(r.merges.count) ครั้ง)" : "")
+                } else {
+                    line = "วางรอคู่"
+                }
+                if r.fill > 0.85 { line += "\nระวัง ใกล้เส้นแล้ว" }
+                else if st.next >= 0 { line += "\nลูกต่อไป: " + SK.names[st.next] }
+                self.skAnswer = (r.x, line, r.land.map { [Int($0.x), Int($0.y)] } ?? [])
+                self.show(self.skOverlay(self.skComputed))
+            }
         }
     }
 

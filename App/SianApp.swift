@@ -46,6 +46,7 @@ struct ContentView: View {
         GameInfo(kind: .jackaroo, name: "Jackaroo", place: "WePlay", icon: "suit.club.fill"),
         GameInfo(kind: .chess, name: "หมากรุก", place: "Plato", icon: "checkerboard.rectangle"),
         GameInfo(kind: .draughts, name: "Checkers", place: "Plato", icon: "circle.grid.2x2.fill"),
+        GameInfo(kind: .suika, name: "รวมผลไม้", place: "WePlay", icon: "leaf.fill"),
     ]
 
     var body: some View {
@@ -140,6 +141,7 @@ struct ContentView: View {
                 Label("บีบหน้าต่างลอยให้เล็ก แล้ววางใต้กระดาน อย่าบังกระดานหรือรูปโปรไฟล์", systemImage: "2.circle")
                 Label("ฮอส: เส้นเขียวคือทางเดิน กากบาทคือตัวที่กิน · เรียง 4/5: ลูกศรทองชี้ช่องที่หยอด", systemImage: "3.circle")
                 Label("Jackaroo: ลงไพ่ขอบทอง → กดลูกที่วงทองกะพริบ → ไปเป้าสีขาว · ถ่างสองนิ้วที่จอลอยเพื่อขยาย", systemImage: "4.circle")
+                Label("รวมผลไม้: วางจอลอยทับกรอบ Best Ranking · เลื่อนผลไม้ตามลูกศร จนขึ้นว่า ปล่อย! (เลข 0–10 คือตำแหน่งในโถ, 5 = เส้นประกลาง)", systemImage: "5.circle")
             }
             .font(.footnote)
         }
