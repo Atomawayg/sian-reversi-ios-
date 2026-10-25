@@ -110,7 +110,7 @@ final class GameModel: ObservableObject {
         refreshDebug()
     }
     private func refreshDebug() {
-        debug = "อ่านจอ: \(started ? "ทำงาน" : "ไม่ทำงาน") · ภาพ \(frames) · ข้อมูล \(darwinMsgs) · ตกหล่น \(darwinBroken)"
+        debug = "v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?") · อ่านจอ: \(started ? "ทำงาน" : "ไม่ทำงาน") · ภาพ \(frames) · ข้อมูล \(darwinMsgs) · ตกหล่น \(darwinBroken)"
     }
 
     private func show(_ o: Overlay) { var x = o; x.footer = debug; overlay = x; pip.show(x) }
