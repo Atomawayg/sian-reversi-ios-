@@ -29,6 +29,26 @@ func fen(_ f: String) -> ([Int], Bool, Int, Int) {
 }
 
 let mode = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "all"
+if mode == "hos" {
+    let e = CheckersEngine()
+    e.loadTB(FileManager.default.contents(atPath: "App/Resources/hos-tb.bin")!)
+    var dark: [Int] = []; for i in 0..<64 where (i / 8 + i % 8) % 2 == 1 { dark.append(i) }
+    var rng: UInt64 = 12345
+    func r(_ n: Int) -> Int { rng = rng &* 6364136223846793005 &+ 1442695040888963407; return Int((rng >> 33) % UInt64(n)) }
+    var shown = 0, draws = 0, trapped = 0
+    for _ in 0..<400 {
+        var b = [Int](repeating: 0, count: 64)
+        let a = dark[r(32)], c = dark[r(32)], d = dark[r(32)]
+        if a == c || a == d || c == d { continue }
+        b[a] = 2; b[c] = 2; b[d] = -2
+        let res = e.search(b, side: 1, maxMs: 500)
+        guard res.instant == "tb", res.score == 0, let m = res.best else { continue }
+        draws += 1; if res.trap > 0 { trapped += 1 }
+        if shown < 6 { shown += 1; out("2K v K draw: kings \(a),\(c) vs \(d) → move \(m.from)->\(m.to) trap \(res.trap)") }
+    }
+    out("2K v K drawn positions \(draws), with a trap move \(trapped)")
+    exit(0)
+}
 if mode == "perft" || mode == "all" {
     let tests: [(String, Int, Int)] = [
         ("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -", 4, 197281),

@@ -13,8 +13,13 @@ jobs:
       - name: Build
         run: |
           S=Tools/PlatoTest/Sources/PlatoTest
-          cp App/ChessEngine.swift App/DraughtsEngine.swift Broadcast/PlatoBoardReader.swift Broadcast/PlatoChessData.swift Shared/BoardMessage.swift $S/
+          cp App/CheckersEngine.swift App/ChessEngine.swift App/DraughtsEngine.swift Broadcast/PlatoBoardReader.swift Broadcast/PlatoChessData.swift Shared/BoardMessage.swift $S/
           swift build -c release --package-path Tools/PlatoTest 2>&1 | grep -vE "^\[[0-9]+/[0-9]+\]" | tail -40
+      - name: Hos
+        run: |
+          B=$(swift build -c release --package-path Tools/PlatoTest --show-bin-path)/PlatoTest
+          $B hos | tee h.txt
+          while read -r l; do echo "::notice title=hos::$l"; done < h.txt
       - name: Read frames
         run: |
           B=$(swift build -c release --package-path Tools/PlatoTest --show-bin-path)/PlatoTest
