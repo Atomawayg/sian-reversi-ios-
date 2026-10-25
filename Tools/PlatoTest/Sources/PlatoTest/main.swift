@@ -35,25 +35,50 @@ if mode == "hos" {
     var dark: [Int] = []; for i in 0..<64 where (i / 8 + i % 8) % 2 == 1 { dark.append(i) }
     var rng: UInt64 = 12345
     func r(_ n: Int) -> Int { rng = rng &* 6364136223846793005 &+ 1442695040888963407; return Int((rng >> 33) % UInt64(n)) }
-    for (label, mine, theirs) in [("K+man v K", [2, 1], [-2]), ("2K v K", [2, 2], [-2]), ("2K+man v K", [2, 2, 1], [-2]), ("3K v K", [2, 2, 2], [-2]), ("2K v K+man", [2, 2], [-2, -1])] {
-        var draws = 0, trapped = 0, wins = 0, total = 0, unknown = 0, sumDepth = 0
-        for _ in 0..<300 {
-            var b = [Int](repeating: 0, count: 64)
-            var used = Set<Int>(); var ok = true
-            for v in mine + theirs {
-                var sq = dark[r(32)]; var tries = 0
-                while used.contains(sq) || (v == 1 && sq / 8 == 0) || (v == -1 && sq / 8 == 7) { sq = dark[r(32)]; tries += 1; if tries > 50 { ok = false; break } }
-                used.insert(sq); b[sq] = v
-            }
-            if !ok { continue }
-            let res = e.search(b, side: 1, maxMs: 300)
-            guard res.best != nil else { continue }
-            total += 1
-            if res.instant == "tb" { if res.score == 0 { draws += 1; if res.trap > 0 { trapped += 1 } } else if res.score > 0 { wins += 1 } }
-            else { unknown += 1; if res.score > CheckersEngine.MATE - 1000 { wins += 1; sumDepth += CheckersEngine.MATE - res.score } }
-        }
-        out("\(label): \(total) positions, tb-win/found-win \(wins), tb-draw \(draws) (trap move \(trapped)), searched \(unknown)")
+    func apply(_ b: [Int], _ m: CheckersMove, _ side: Int) -> [Int] {
+        var n = b
+        let p = e.path(of: m, board: b, side: side)
+        let f = p[0], t = p[p.count - 1]
+        for c in e.capsSquares(m) { n[c] = 0 }
+        var v = n[f]; n[f] = 0
+        if v == 1 && t / 8 == 0 { v = 2 }; if v == -1 && t / 8 == 7 { v = -2 }
+        n[t] = v
+        return n
     }
+    var starts: [[Int]] = []
+    while starts.count < 150 {
+        var b = [Int](repeating: 0, count: 64)
+        var used = Set<Int>(); var ok = true
+        for v in [2, 1, -2] {
+            var sq = dark[r(32)]; var tries = 0
+            while used.contains(sq) || (v == 1 && sq / 8 <= 1) { sq = dark[r(32)]; tries += 1; if tries > 50 { ok = false; break } }
+            used.insert(sq); b[sq] = v
+        }
+        if !ok { continue }
+        let res = e.search(b, side: 1, maxMs: 100)
+        if res.instant == "tb" && res.score > 0 { starts.append(b) }
+    }
+    for random in [false, true] { for tie in [false, true] {
+        e.humanTieBreak = tie
+        var wins = 0, plies = 0
+        var seed: UInt64 = 777
+        for st in starts {
+            var b = st, won = false
+            for mv in 0..<8 {
+                guard let m = e.search(b, side: 1, maxMs: 100).best else { break }
+                b = apply(b, m, 1)
+                let ms = e.moves(b, side: -1)
+                if !b.contains(where: { $0 < 0 }) || ms.isEmpty { won = true; plies += mv + 1; break }
+                var om: CheckersMove
+                if random { seed = seed &* 6364136223846793005 &+ 1442695040888963407; om = ms[Int((seed >> 33) % UInt64(ms.count))] }
+                else { om = e.search(b, side: -1, maxMs: 100).best ?? ms[0] }
+                b = apply(b, om, -1)
+                if !b.contains(where: { $0 > 0 }) { break }
+            }
+            if won { wins += 1 }
+        }
+        out("K+man v K, opponent \(random ? "random" : "perfect"), average-tiebreak \(tie): won within 8 moves \(wins)/\(starts.count), avg moves \(wins > 0 ? Double(plies) / Double(wins) : 0)")
+    } }
     exit(0)
 }
 if mode == "perft" || mode == "all" {
