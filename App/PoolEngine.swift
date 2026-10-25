@@ -58,9 +58,14 @@ enum PoolEngine {
     /// Oct 25 log, nine cushion hits read off rolling balls: the ball keeps ~85 % of its pace along the cushion and
     /// about 1/1.45 of that into it (tan of the angle from the normal grows ×1.45; fast hits 1.36–1.55, slow up to 2).
     /// "Sure" shots must still drop with this anywhere in `flatRange`.
-    static let bounceFlatten = 1.45
-    static let flatRange = [1.35, 1.6]
+    /// Refit on 21 object-ball cushion hits (Oct 26 logs): fast balls come off much flatter than slow ones and
+    /// shallow hits flatten most: tan(out) = 1.14·tan(in) + 0.40·sin(2·in) (±6° scatter per cushion). `flat` scales it;
+    /// "sure" shots must drop across `flatRange`.
+    static let bounceFlatten = 1.0
+    static let flatRange = [0.9, 1.1]
     static let keepAlong = 0.85
+    /// a cushion hit this close to a pocket's centre is where the game's jaws behave unlike the model: never "sure"
+    static let mouthNear = 90.0
 
     // MARK: table edges with the pocket jaws
     // Measured on the 1180×2556 screen (same on every table theme), then checked against shots in the logs:
@@ -128,7 +133,7 @@ enum PoolEngine {
         return best
     }
 
-    struct Run { var pts: [Double]; var pocket = -1; var ball: Int? = nil; var rails = 0; var jaws = 0; var railJaws = 0; var len = 0.0; var off = 1.0; var left = 0.0 }
+    struct Run { var pts: [Double]; var pocket = -1; var ball: Int? = nil; var rails = 0; var jaws = 0; var railJaws = 0; var len = 0.0; var off = 1.0; var left = 0.0; var nearMouth = false }
     /// A ball rolling along a cushion (within 12° of it, centre at most 16 px off touching it): it slides past the
     /// corner jaw into the pocket. Seen in the logs: 5 px off the left cushion up into the top-left corner, 13 px off
     /// it down into the bottom-left one; both nudged the jaw and dropped.
@@ -173,9 +178,13 @@ enum PoolEngine {
                 r.rails += 1   // a ball grazing the cushion it rolls along is no bank
             }
             if r.rails > maxRails { break }
-            // off the cushion: along it × keepAlong, into it × keepAlong / flat
-            let e = keepAlong / flat
-            ux = tx * keepAlong - vn * nx * e; uy = ty * keepAlong - vn * ny * e
+            if !isJaw && abs(vn) >= sin(12 * Double.pi / 180) && holes.contains(where: { hypot($0.x - x, $0.y - y) < mouthNear }) { r.nearMouth = true }
+            // off the cushion: the pace along it × keepAlong; the way out from the fitted angle law
+            let tm = (tx * tx + ty * ty).squareRoot(), an = abs(vn)
+            let tin = tm / max(an, 1e-6), th = atan(tin)
+            let tout = flat * (1.14 * tin + 0.40 * sin(2 * th))
+            let vt2 = keepAlong * tm, vn2 = tout > 1e-4 ? vt2 / tout : 0.5 * an
+            ux = (tm > 1e-9 ? tx / tm : 0) * vt2 + nx * vn2; uy = (tm > 1e-9 ? ty / tm : 0) * vt2 + ny * vn2
             let l = (ux * ux + uy * uy).squareRoot(); ux /= l; uy /= l
             if speed != nil && (isJaw || abs(vn) >= sin(12 * Double.pi / 180)) { left = rollDistance(l * speedFor(distance: left)) }
             x += nx * 0.01; y += ny * 0.01
@@ -396,6 +405,7 @@ enum PoolEngine {
             if trace(t.x, t.y, ux, uy, balls: balls, skip: t.id, pad: safePad)?.pocket != tr.pocket { v.off = max(v.off, 0.8) }
             // a bank is sure only if it drops however lively the cushions turn out (within what was measured)
             if tr.bank {
+                if run(t.x, t.y, ux, uy, balls: balls.filter { $0.id != 0 }, skip: t.id, maxRails: 4, gap: 2 * R - 3, pad: safePad).nearMouth { v.off = max(v.off, 0.8) }
                 for f in flatRange where run(t.x, t.y, ux, uy, balls: balls.filter { $0.id != 0 }, skip: t.id, maxRails: 4, gap: 2 * R - 3, pad: safePad, flat: f).pocket != tr.pocket { v.off = max(v.off, 0.8) }
             }
             let vx = aimX - cueX, vy = aimY - cueY, d1 = (vx * vx + vy * vy).squareRoot()
@@ -563,7 +573,7 @@ enum PoolEngine {
         var ox = b.x - gx, oy = b.y - gy
         let d = (ox * ox + oy * oy).squareRoot(); ox /= max(d, 1e-6); oy /= max(d, 1e-6)
         let o = run(b.x, b.y, ox, oy, balls: others, skip: id, maxLen: 4000, maxRails: 4, gap: 2 * R - 3, pad: safePad, flat: flat)
-        guard o.pocket >= 0 else { return nil }
+        guard o.pocket >= 0, !o.nearMouth, !c.nearMouth else { return nil }
         return (Hit(ball: id, pocket: o.pocket, objRails: o.rails, cueRails: c.rails), c, o)
     }
 
