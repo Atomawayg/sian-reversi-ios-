@@ -11,6 +11,7 @@ final class SuikaEngine {
         var vx = 0.0, vy = 0.0
         var r: Double, im: Double  // radius, 1 / mass
         var tag = 0                // 1 = the fruit we dropped
+        var fresh = false          // dropped or made by a merge (fruits read off the screen are not)
         var alive = true
         init(t: Int, x: Double, y: Double, tag: Int = 0) {
             self.t = t; self.x = x; self.y = y; self.tag = tag
@@ -74,7 +75,9 @@ final class SuikaEngine {
                         if !b[j].alive { continue }
                         let dx = b[j].x - b[i].x, dy = b[j].y - b[i].y
                         var rs = b[i].r + b[j].r
-                        let same = b[i].t == b[j].t
+                        // two fruits read off the screen never merge with each other: the game would already have merged
+                        // them if they touched, so if they do here it's only our reading being a few pixels off
+                        let same = b[i].t == b[j].t && (b[i].fresh || b[j].fresh || !merge)
                         if same && !merge { rs += 1 }   // the jar as read: two of a kind are apart, keep them apart
                         let d2 = dx * dx + dy * dy
                         if d2 >= rs * rs { continue }
@@ -100,6 +103,9 @@ final class SuikaEngine {
             for i in b.indices {
                 // velocity from how far it actually moved; a little damping stands in for friction
                 var vx = (b[i].x - b[i].px) / dt, vy = (b[i].y - b[i].py) / dt
+                // a fruit pops out of a merge, it doesn't fly off: cap the speed a big push gives
+                let sp = (vx * vx + vy * vy).squareRoot()
+                if sp > 1500 { vx *= 1500 / sp; vy *= 1500 / sp }
                 let onFloor = b[i].y >= SK.floor - b[i].r - 0.5
                 vx *= onFloor ? 0.96 : 0.985; vy *= 0.985
                 b[i].vx = vx; b[i].vy = vy
@@ -114,6 +120,7 @@ final class SuikaEngine {
                     if k < SK.types {
                         var n = Body(t: k, x: (b[i].x + b[j].x) / 2, y: (b[i].y + b[j].y) / 2)
                         n.vx = (b[i].vx + b[j].vx) / 2; n.vy = (b[i].vy + b[j].vy) / 2
+                        n.fresh = true
                         b.append(n)
                     }
                 }
@@ -170,16 +177,18 @@ final class SuikaEngine {
 
     static func drop(_ base: [Body], _ t: Int, _ x: Double) -> Try {
         var b = base
-        b.append(Body(t: t, x: x, y: SK.dropY, tag: 1))
+        var me = Body(t: t, x: x, y: SK.dropY, tag: 1)
+        me.fresh = true
+        b.append(me)
         var created: [Int] = []
         var end = x
         simulate(&b, created: &created, tagX: &end)
         let e = eval(b)
         let gain = created.reduce(0.0) { $0 + made($1) }
-        let me = b.first { $0.tag == 1 }
+        let landed = b.first { $0.tag == 1 }
         // a long roll is where the game's physics and ours part ways: prefer drops that land where they fall
         let travel = abs(end - x)
-        return Try(x: x, jar: b, created: created, v1: gain + e.v - 1.5 * travel / 100, fill: e.fill, land: me.map { ($0.x, $0.y) }, travel: travel)
+        return Try(x: x, jar: b, created: created, v1: gain + e.v - 1.5 * travel / 100, fill: e.fill, land: landed.map { ($0.x, $0.y) }, travel: travel)
     }
 
     /// Best drop for the held fruit. `cancel` is checked between simulations.
