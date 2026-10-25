@@ -302,6 +302,57 @@ enum PoolEngine {
         return path(gx, gy, tx, ty, balls: balls, skip: 0, maxLen: len)
     }
 
+
+    // MARK: planning a run (which ball first, where the cue ball ends up, what is next)
+
+    /// Where the cue ball comes to rest after a centre-ball shot at the given power: it leaves the hit along
+    /// the tangent line with the share of pace a cut gives it, and rolls (off a cushion if it gets there).
+    static func cueEnd(_ s: Shot, balls: [Ball]) -> (Double, Double) {
+        guard let b = balls.first(where: { $0.id == s.ball }) else { return (s.cueX, s.cueY) }
+        let d1 = hypot(s.ghostX - s.cueX, s.ghostY - s.cueY)
+        let v0 = Double(s.powerPct) / 100 * fullSpeed
+        // speed left when it reaches the ghost spot: roll d1 from v0
+        let left = max(0, rollDistance(v0) - d1)
+        var lo = 0.0, hi = v0
+        for _ in 0..<40 { let m = (lo + hi) / 2; if rollDistance(m) < left { lo = m } else { hi = m } }
+        let vHit = lo
+        let vAfter = vHit * sin(s.cut * Double.pi / 180)
+        let run = rollDistance(vAfter)
+        let p = cuePath(cueX: s.cueX, cueY: s.cueY, gx: s.ghostX, gy: s.ghostY, bx: b.x, by: b.y, balls: balls.filter { $0.id != s.ball })
+        if p.count < 4 || run < 1 { return (s.ghostX, s.ghostY) }
+        // walk the path until `run` is used up
+        var rem = run, x = p[0], y = p[1], i = 2
+        while i + 1 < p.count {
+            let seg = hypot(p[i] - x, p[i + 1] - y)
+            if seg >= rem { let f = rem / max(seg, 1e-6); return (x + (p[i] - x) * f, y + (p[i + 1] - y) * f) }
+            rem -= seg; x = p[i]; y = p[i + 1]; i += 2
+        }
+        return (x, y)
+    }
+
+    struct Plan { var first: Shot; var next: Shot?; var cueEnd: (Double, Double) }
+
+    /// Try the best few shots; for each, where the cue ball stops and how good the next shot is from there.
+    /// group: 1 solids, 2 stripes, 0 open (the 8 follows once your group is gone).
+    static func plan(cueX: Double, cueY: Double, balls: [Ball], legal: Set<Int>, group: Int) -> Plan? {
+        let firsts = shots(cueX: cueX, cueY: cueY, balls: balls, legal: legal, banks: false)
+        guard !firsts.isEmpty else { return nil }
+        var best: (Double, Plan)? = nil
+        for s in firsts.prefix(6) {
+            let rest = balls.filter { $0.id != s.ball }
+            let end = cueEnd(s, balls: balls)
+            var nextLegal = legal.subtracting([s.ball])
+            if nextLegal.isEmpty && s.ball != 8 { nextLegal = [8] }
+            let n = s.ball == 8 ? nil : shots(cueX: end.0, cueY: end.1, balls: rest, legal: nextLegal, banks: false).first
+            // this shot's ease, and most of the next one's (no next shot at all is a real cost)
+            let v = score(s) + (n.map { 0.7 * score($0) } ?? (s.ball == 8 ? 0 : -0.15))
+            if s.scratch { continue }
+            let p = Plan(first: s, next: n, cueEnd: end)
+            if best == nil || v > best!.0 { best = (v, p) }
+        }
+        return best?.1 ?? firsts.first.map { Plan(first: $0, next: nil, cueEnd: cueEnd($0, balls: balls)) }
+    }
+
     /// Opening break: most balls still racked at the top.
     static func isBreak(_ balls: [Ball]) -> Bool {
         balls.filter { $0.id != 0 && $0.y < 1100 && $0.x > 430 && $0.x < 750 }.count >= 9

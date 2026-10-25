@@ -505,6 +505,9 @@ final class GameModel: ObservableObject {
     private var poolBest: PoolEngine.Shot? = nil
     private var poolNote = ""
     private var poolInZone = false
+    private var poolNext: PoolEngine.Shot? = nil
+    private var poolCueEnd: (Double, Double)? = nil
+    private var poolLastLog = ""
 
     private var poolGroup = 0            // your group once it is certain (kept for the whole game)
 
@@ -559,12 +562,16 @@ final class GameModel: ObservableObject {
         // a new table on your turn: choose a shot (straight-in first, a bank if there is none)
         let key = balls.flatMap { [$0.id, Int($0.x / 6), Int($0.y / 6)] } + [group]
         if key != poolKey {
-            poolKey = key; poolBest = nil; poolNote = ""
+            poolKey = key; poolBest = nil; poolNote = ""; poolNext = nil; poolCueEnd = nil
             if PoolEngine.isBreak(others) {
                 poolNote = "break"
             } else if let cue {
-                poolBest = PoolEngine.shots(cueX: cue.x, cueY: cue.y, balls: others, legal: legal, banks: false).first
-                    ?? PoolEngine.shots(cueX: cue.x, cueY: cue.y, balls: others, legal: legal, banks: true).first
+                // plan two shots ahead: the first ball, and where it leaves the cue ball for the next
+                if let pl = PoolEngine.plan(cueX: cue.x, cueY: cue.y, balls: others, legal: legal, group: group) {
+                    poolBest = pl.first; poolNext = pl.next; poolCueEnd = pl.cueEnd
+                } else {
+                    poolBest = PoolEngine.shots(cueX: cue.x, cueY: cue.y, balls: others, legal: legal, banks: true).first
+                }
                 if poolBest == nil, let sb = PoolEngine.safety(cueX: cue.x, cueY: cue.y, balls: others, legal: legal) {
                     poolNote = "ไม่มีลูกลง · แตะลูก \(sb.id) ให้โดนก่อน (เล่นเซฟ)"
                 }
@@ -572,11 +579,15 @@ final class GameModel: ObservableObject {
                 poolBest = PoolEngine.bestPlacement(balls: others, legal: legal)   // ball in hand
             }
         }
-        view.shot = poolBest
-        var title = "เซฟ", line = poolNote.isEmpty ? groupName : poolNote
+        view.shot = poolBest; view.next = poolNext
+        if let e = poolCueEnd { view.cueEndX = e.0; view.cueEndY = e.1 }
+        let mineLeft = others.filter { legal.contains($0.id) }.map { $0.id }.sorted()
+        let mineText = group == 3 ? "ของคุณ: ลูก 8" : (group == 0 ? "โต๊ะเปิด" : "ของคุณ: " + mineLeft.map(String.init).joined(separator: " · "))
+        var title = "เซฟ", line = (poolNote.isEmpty ? "" : poolNote + "\n") + mineText
         if let s = poolBest {
             title = "\(s.ball) → \(PoolEngine.pockets[s.pocket].name)"
             line = (s.bank ? "ชิ่ง · " : "") + (s.placed ? "วางลูกขาวตรงวงทอง · " : "") + "แรง \(s.powerPct)"
+                + (poolNext.map { " · ต่อด้วย \($0.ball)" } ?? "") + "\n" + mineText
         }
         if poolNote == "break" { title = "เบรก"; line = "ยิงตรงกลางลูกหน้าสุด แรงสุด" }
         // your aim: draw where the balls go; one long tone when it pots one of your balls cleanly
@@ -593,7 +604,7 @@ final class GameModel: ObservableObject {
             view.pots = good
             if good {
                 title = "✓ \(v.ball) → \(PoolEngine.pockets[v.pocket].name)"
-                line = (v.bank ? "ชิ่ง · " : "") + "แรง \(v.powerPct)"
+                line = (v.bank ? "ชิ่ง · " : "") + "แรง \(v.powerPct)" + "\n" + mineText
                 if pulling {
                     // pulling the power bar: tone off, one blip when it reaches the strength
                     poolSound.set(.off)
@@ -615,6 +626,18 @@ final class GameModel: ObservableObject {
         }
         var o = Overlay(game: .pool, title: title, line: line, mine: true); o.pool = view
         show(o)
+        if logOn {
+            // one line per change: what was read, what the app made of it, what it suggested
+            func f(_ v: Double) -> String { String(Int(v.rounded())) }
+            var t = "P turn=\(m.myTurn ? 1 : 0) bar=\(m.me) mine=\(c[PoolCodec.myLeft]) group=\(group) balls=" + balls.map { "\($0.id):\(f($0.x)),\(f($0.y))" }.joined(separator: " ")
+            if let a = view.aimX, let b = view.aimY { t += " aim=\(f(a)),\(f(b))" }
+            if let d = PoolCodec.dir(c) { t += String(format: " dir=%.1f", d * 180 / Double.pi) }
+            if pulling { t += " power=\(c[PoolCodec.power] * 14 + c[PoolCodec.power + 1])" }
+            if let s = poolBest { t += " best=\(s.ball)>\(s.pocket)@\(s.powerPct)" + (poolNext.map { " next=\($0.ball)" } ?? "") }
+            t += " says=\(title)|" + line.replacingOccurrences(of: "\n", with: " / ")
+            if !view.objPath.isEmpty { t += " path=" + view.objPath.map(f).joined(separator: ",") }
+            if t != poolLastLog { poolLastLog = t; log(t) }
+        }
     }
 
     // MARK: Fruit game (WePlay Frog Watermelon)
@@ -684,7 +707,7 @@ final class GameModel: ObservableObject {
             let r = cells[JK.hand + k]
             if r > 0 && r < JK.rankNames.count { hand.append(JK.rankNames[r]); playable.append(cells[JK.playable + k] == 1) }
         }
-        if jkLogOn {
+        if false {   // Jackaroo log retired (the log now records pool)
             let rd = cells.prefix(JK.seats).map { String($0) }.joined()
             let line = "B \(rd) s=\(cells[JK.seats..<JK.hand].map(String.init).joined()) h=" + zip(hand, playable).map { $0 + ($1 ? "*" : "") }.joined(separator: ",") + " t=\(m.myTurn ? 1 : 0) d=\(cells[JK.discard])"
             if line != jkLastLog { jkLastLog = line; log(line) }
@@ -807,13 +830,13 @@ final class GameModel: ObservableObject {
 
     private struct JKLock { let board: [Int]; let hand: [String]; let ranks: [String]; let rank: String; let discard: Bool; let overlay: Overlay }
     private var jkLock: JKLock? = nil
-    // MARK: game log (settings → บันทึกเกม)
-    @Published var jkLogOn = UserDefaults.standard.bool(forKey: "jkLog") { didSet { UserDefaults.standard.set(jkLogOn, forKey: "jkLog"); if jkLogOn { log("--- เริ่มบันทึก \(Date())") } } }
+    // MARK: game log (settings → บันทึกเกมพูล): what was read and suggested, to check against the real shots
+    @Published var logOn = UserDefaults.standard.bool(forKey: "poolLog") { didSet { UserDefaults.standard.set(logOn, forKey: "poolLog"); if logOn { log("--- เริ่มบันทึก \(Date())") } } }
     private var jkLastLog = ""
-    static var logURL: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("sian-jackaroo-log.txt") }
+    static var logURL: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("sian-pool-log.txt") }
     private static let logTime: DateFormatter = { let f = DateFormatter(); f.dateFormat = "HH:mm:ss.S"; return f }()
     func log(_ text: String) {
-        guard jkLogOn else { return }
+        guard logOn else { return }
         let line = GameModel.logTime.string(from: Date()) + " " + text + "\n"
         let url = GameModel.logURL
         if let h = try? FileHandle(forWritingTo: url) {
