@@ -102,7 +102,8 @@ enum PoolEngine {
             var best: (Int, Double, Double)? = nil
             for (i, p) in pockets.enumerated() {
                 let wx = p.x - x, wy = p.y - y, along = wx * ux + wy * uy
-                if along <= 0 || along > tw + 60 { continue }
+                // near a pocket the cushion is cut away (the jaws), so a ball can run past the cushion line into it
+                if along <= 0 || along > tw + (p.side ? 70 : 140) { continue }
                 let perp = abs(wx * uy - wy * ux)
                 if perp > mouth(p) { continue }
                 if p.side && abs(uy) > sin(64 * Double.pi / 180) { continue }   // too steep into a side pocket
@@ -170,7 +171,7 @@ enum PoolEngine {
                     if cosCut < cos(82 * Double.pi / 180) { continue }   // thin cuts still count (the game forgives them)
                     if !clear(cueX, cueY, gx, gy, balls, skip: t.id, gap: 2 * R - 3) { continue }
                     var tol = (p.side ? 13.0 : 20.0) * 2 * R * cosCut / (max(d1, 2 * R) * max(tr.len, R))
-                    if bank { tol *= 0.5 }
+                    if bank { tol *= 0.5; if tol * 180 / Double.pi < 0.04 { continue } }   // a bank that needs a perfect hit is no suggestion
                     let cut = acos(max(-1, min(1, cosCut))) * 180 / Double.pi
                     let pct = powerPct(cueToGhost: d1, objLen: tr.len, cut: cut, bank: bank)
                     let power = pct < 35 ? "เบา" : (pct < 70 ? "กลาง" : "แรง")
@@ -262,7 +263,7 @@ enum PoolEngine {
             // a pocket on the way
             for p in pockets {
                 let wx = p.x - x, wy = p.y - y, along = wx * ux + wy * uy
-                if along > 0 && along < stop + 60 && abs(wx * uy - wy * ux) < mouth(p) { out += [p.x, p.y]; return out }
+                if along > 0 && along < stop + (p.side ? 70 : 140) && abs(wx * uy - wy * ux) < mouth(p) { out += [p.x, p.y]; return out }
             }
             // a ball in the way (stop where it touches)
             for b in balls where b.id != skip && b.id != 0 {
