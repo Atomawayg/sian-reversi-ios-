@@ -503,9 +503,27 @@ final class GameModel: ObservableObject {
     private var poolBalls: [PoolEngine.Ball] = []      // last cleanly read table
     private var poolKey: [Int] = []
     private var poolBest: PoolEngine.Shot? = nil
-    private var poolLock: (ball: Int, pocket: Int)? = nil
     private var poolNote = ""
     private var poolInZone = false
+
+    private var poolGroup = 0            // your group once it is certain (kept for the whole game)
+
+    /// Your group: count the balls in your bar and match it to how many solids / stripes are left on the
+    /// table (the colours of the bar icons are only a fallback). Once the counts tell, it is kept all game.
+    private func poolGroupNow(_ m: BoardMessage, _ others: [PoolEngine.Ball]) -> Int {
+        let solids = others.filter { (1...7).contains($0.id) }.count, stripes = others.filter { (9...15).contains($0.id) }.count
+        if solids + stripes >= 14 { poolGroup = 0 }                       // a new game
+        let mine = m.cells[PoolCodec.myLeft]
+        if mine > 0 && solids != stripes {
+            if mine == solids { poolGroup = 1 } else if mine == stripes { poolGroup = 2 }
+        }
+        var g = poolGroup != 0 ? poolGroup : (m.me == 3 ? 0 : m.me)
+        if m.me == 3 && poolGroup == 0 && mine == 0 { g = 3 }
+        // none of your balls left on the table: the 8 is next
+        if g == 1 && solids == 0 { g = 3 }
+        if g == 2 && stripes == 0 { g = 3 }
+        return g
+    }
 
     private func handlePool(_ m: BoardMessage) {
         let c = m.cells
@@ -526,54 +544,51 @@ final class GameModel: ObservableObject {
             poolSound.set(.off); computedFor = []; poolBest = nil
             show(Overlay(game: .pool, title: "⋯", line: "กำลังอ่านโต๊ะ")); return
         }
-        guard m.myTurn else {
-            poolSound.set(.off); computedFor = []; poolBest = nil; poolKey = []; poolLock = nil
-            show(Overlay(game: .pool, title: "รอ…", line: "ตาคู่แข่ง")); return
-        }
         let cue = balls.first { $0.id == 0 }
         let others = balls.filter { $0.id != 0 }
-        // your group, double-checked against the table: none of your balls left on it means the 8 is next
-        var group = m.me
-        if group == 1 && !others.contains(where: { (1...7).contains($0.id) }) { group = 3 }
-        if group == 2 && !others.contains(where: { (9...15).contains($0.id) }) { group = 3 }
+        let group = poolGroupNow(m, others)
         let legal = PoolEngine.legal(group: group)
-        // a new table on your turn: choose a straight-in shot and say it once
+        let groupName = ["โต๊ะเปิด", "คุณ: ลูกเต็ม", "คุณ: ลูกลาย", "คุณ: ลูก 8"][max(0, min(3, group))]
+        var view = PoolView(balls: balls, shot: nil, legal: Array(legal))
+        guard m.myTurn else {
+            poolSound.set(.off); computedFor = []; poolBest = nil; poolKey = []
+            var o = Overlay(game: .pool, title: "รอ…", line: "ตาคู่แข่ง · " + groupName); o.pool = view; show(o); return
+        }
+        // a new table on your turn: choose a shot (straight-in first, a bank if there is none)
         let key = balls.flatMap { [$0.id, Int($0.x / 6), Int($0.y / 6)] } + [group]
         if key != poolKey {
-            poolKey = key; poolBest = nil; poolNote = ""; poolLock = nil
+            poolKey = key; poolBest = nil; poolNote = ""
             if PoolEngine.isBreak(others) {
                 poolNote = "break"
-                poolSound.say("เบรก แรงสุด")
             } else if let cue {
                 poolBest = PoolEngine.shots(cueX: cue.x, cueY: cue.y, balls: others, legal: legal, banks: false).first
-                if let s = poolBest {
-                    poolSound.say("ลูก \(s.ball) หลุม" + PoolEngine.pockets[s.pocket].name + " แรง \(s.powerPct)")
-                    poolLock = (s.ball, s.pocket)   // already said: no need to say its power again
-                } else if let sb = PoolEngine.safety(cueX: cue.x, cueY: cue.y, balls: others, legal: legal) {
-                    poolNote = "ไม่มีลูกลงตรง · แตะลูก \(sb.id) ให้โดนก่อน (เล่นเซฟ)"
-                    poolSound.say("ไม่มีลูกลง เล่นเซฟ")
+                    ?? PoolEngine.shots(cueX: cue.x, cueY: cue.y, balls: others, legal: legal, banks: true).first
+                if poolBest == nil, let sb = PoolEngine.safety(cueX: cue.x, cueY: cue.y, balls: others, legal: legal) {
+                    poolNote = "ไม่มีลูกลง · แตะลูก \(sb.id) ให้โดนก่อน (เล่นเซฟ)"
                 }
             } else {
                 poolBest = PoolEngine.bestPlacement(balls: others, legal: legal)   // ball in hand
-                if let s = poolBest { poolSound.say("วางลูกขาว แล้วแทงลูก \(s.ball)") }
             }
         }
-        var title = "เซฟ", line = poolNote
+        view.shot = poolBest
+        var title = "เซฟ", line = poolNote.isEmpty ? groupName : poolNote
         if let s = poolBest {
             title = "ลูก \(s.ball) → \(PoolEngine.pockets[s.pocket].name)"
-            line = "ตัด \(Int(s.cut.rounded()))° · แรง \(s.powerPct)" + (s.scratch ? " · ระวังลูกขาวตก" : "")
+            line = (s.bank ? "ชิ่ง · " : "") + (s.placed ? "วางลูกขาวตรงวงทอง · " : "") + "แรง \(s.powerPct)" + (s.scratch ? " · ระวังลูกขาวตก" : "")
         }
         if poolNote == "break" { title = "เบรก"; line = "ยิงตรงกลางลูกหน้าสุด แรงสุด" }
-        // silence = not yet · one long tone = this aim pots one of your balls cleanly
+        // your aim: draw where the balls go; one long tone when it pots one of your balls cleanly
         if hasAim, let cue {
             let a = PoolCodec.get(c, PoolCodec.aim)
+            view.aimX = a.x; view.aimY = a.y
             let v = PoolEngine.judge(cueX: cue.x, cueY: cue.y, aimX: a.x, aimY: a.y, balls: others, legal: legal)
+            if v.ball >= 0, let b = others.first(where: { $0.id == v.ball }) {
+                view.objPath = PoolEngine.objectPath(b.x, b.y, gx: a.x, gy: a.y, balls: balls, skip: b.id)
+                view.cuePath = PoolEngine.cuePath(cueX: cue.x, cueY: cue.y, gx: a.x, gy: a.y, bx: b.x, by: b.y, balls: balls)
+            }
             let good = v.ball >= 0 && v.pocket >= 0 && !v.foul && !v.scratch && v.off < 0.45
+            view.pots = good
             if good {
-                if poolLock == nil || poolLock!.ball != v.ball || poolLock!.pocket != v.pocket {
-                    poolLock = (v.ball, v.pocket)
-                    poolSound.say("แรง \(v.powerPct)", again: 3)    // the tone pauses while this is said
-                }
                 title = "✓ ลูก \(v.ball) → \(PoolEngine.pockets[v.pocket].name)"
                 line = (v.bank ? "ชิ่ง · " : "") + "แรง \(v.powerPct)"
                 if pulling {
@@ -595,7 +610,8 @@ final class GameModel: ObservableObject {
         } else {
             poolSound.set(.off)
         }
-        show(Overlay(game: .pool, title: title, line: line, mine: true))
+        var o = Overlay(game: .pool, title: title, line: line, mine: true); o.pool = view
+        show(o)
     }
 
     // MARK: Fruit game (WePlay Frog Watermelon)

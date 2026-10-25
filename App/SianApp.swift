@@ -47,7 +47,7 @@ struct ContentView: View {
         GameInfo(kind: .chess, name: "หมากรุก", place: "Plato", icon: "checkerboard.rectangle"),
         GameInfo(kind: .draughts, name: "Checkers", place: "Plato", icon: "circle.grid.2x2.fill"),
         GameInfo(kind: .suika, name: "รวมผลไม้", place: "WePlay", icon: "leaf.fill"),
-        GameInfo(kind: .pool, name: "พูล (เสียง)", place: "WePlay", icon: "speaker.wave.2.fill"),
+        GameInfo(kind: .pool, name: "พูล", place: "WePlay", icon: "circle.circle.fill"),
     ]
 
     var body: some View {
@@ -143,7 +143,7 @@ struct ContentView: View {
                 Label("ฮอส: เส้นเขียวคือทางเดิน กากบาทคือตัวที่กิน · เรียง 4/5: ลูกศรทองชี้ช่องที่หยอด", systemImage: "3.circle")
                 Label("Jackaroo: ลงไพ่ขอบทอง → กดลูกที่วงทองกะพริบ → ไปเป้าสีขาว · ถ่างสองนิ้วที่จอลอยเพื่อขยาย", systemImage: "4.circle")
                 Label("รวมผลไม้: วางจอลอยทับกรอบ Best Ranking · เลื่อนผลไม้ตามลูกศร จนขึ้นว่า ปล่อย! (เลข 0–10 คือตำแหน่งในโถ, 5 = เส้นประกลาง)", systemImage: "5.circle")
-                Label("พูล: ซ่อนหน้าต่างลอยไว้ขอบจอได้ · ฟังเสียง: ลากยาวเสียงสูง = ลูกที่แนะนำลง, เสียงต่ำ = ลูกอื่นลง, บี๊บถี่ขึ้น = ใกล้แล้ว, ตึ๊ดๆ = ฟาวล์/ลูกขาวตก · ตอนดึงแรง มีติ๊งเมื่อแรงพอดี", systemImage: "6.circle")
+                Label("พูล: วางหน้าต่างลอยมุมขวาบน ทับรูปคู่แข่ง · เส้นทอง = ช็อตแนะนำ · เขียว = ที่เล็งอยู่ลง แดง = ไม่ลง · เส้นประขาว = ทางลูกขาว · เสียงลากยาว = ยิงได้ · ติ๊ง = แรงพอดี", systemImage: "6.circle")
             }
             .font(.footnote)
         }
