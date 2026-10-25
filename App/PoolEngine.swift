@@ -15,10 +15,11 @@ enum PoolEngine {
     /// how far off the pocket centre a ball's line may pass and still drop
     static func mouth(_ p: Pocket) -> Double { p.side ? 20 : 27 }
 
-    // Rolling, measured on the Oct 25 recording (cue ball tracked at 60 fps): speed falls by
-    // (110 + 0.5·v) px/s every second; 51 % power gave ~1450 px/s, 54 % ~1580 px/s.
-    static let fullSpeed = 2900.0
-    static let decel0 = 110.0, decelV = 0.5
+    // Measured on the Oct 25 recording (cue ball tracked at 60 fps over five of your shots):
+    // the cue ball leaves at about 4150 px/s × power (51 % → 2070, 54 % → 2230, 63 % → 2700 px/s),
+    // and slows by (100 + 1.4·v) px/s every second (fast balls lose speed quickly, slow ones roll on).
+    static let fullSpeed = 4150.0
+    static let decel0 = 100.0, decelV = 1.4
 
     struct Ball: Equatable { var id: Int; var x: Double; var y: Double }
     struct Shot: Equatable {
