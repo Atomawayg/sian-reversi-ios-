@@ -511,6 +511,7 @@ final class GameModel: ObservableObject {
     private var poolInZone = false
     private var poolLastLog = ""
     private var poolSpin: (x: Double, y: Double) = (0, 0)
+    private var poolZoom: (pocket: Int?, seen: Date, pending: (pocket: Int, since: Date)?) = (nil, Date(), nil)   // the steady pocket close-up
     private var poolGuide: (key: [Double], lines: [[Double]]) = ([], [])   // lines from the ball you aim at to every pocket   // the spin set on the game's spin icon (-1…1; y +1 = draw)
     private var poolPlanned: [PoolEngine.Ball] = []   // the table the suggestion below was worked out for
     private var poolPlannedGroup = -1
@@ -739,14 +740,32 @@ final class GameModel: ObservableObject {
                     turnHint = "กลางหลุมแล้ว"
                 }
             }
-            // the pocket close-up whenever your line ends by a pocket, even if no turn of the cue pots it
-            if view.win == nil, v.ball >= 0, view.objPath.count >= 4 {
-                let ex = view.objPath[view.objPath.count - 2], ey = view.objPath[view.objPath.count - 1]
-                if let k = PoolEngine.holes.indices.min(by: { hypot(PoolEngine.holes[$0].x - ex, PoolEngine.holes[$0].y - ey) < hypot(PoolEngine.holes[$1].x - ex, PoolEngine.holes[$1].y - ey) }),
-                   hypot(PoolEngine.holes[k].x - ex, PoolEngine.holes[k].y - ey) < 130 {
-                    view.zoomPocket = k; view.target = v.ball
+            // the pocket close-up: the pocket your line ends at (into it, or the nearest within reach of where it ends).
+            // It must not flicker: a new pocket takes over only after 0.3 s, and the last one stays for 1 s after
+            // your line leaves every pocket
+            var want: Int? = nil
+            if v.ball >= 0 {
+                if v.pocket >= 0 { want = v.pocket }
+                else {
+                    let line = view.objPathFull.count >= 4 ? view.objPathFull : view.objPath
+                    if line.count >= 4 {
+                        let ex = line[line.count - 2], ey = line[line.count - 1]
+                        if let k = PoolEngine.holes.indices.min(by: { hypot(PoolEngine.holes[$0].x - ex, PoolEngine.holes[$0].y - ey) < hypot(PoolEngine.holes[$1].x - ex, PoolEngine.holes[$1].y - ey) }),
+                           hypot(PoolEngine.holes[k].x - ex, PoolEngine.holes[k].y - ey) < 160 { want = k }
+                    }
                 }
             }
+            let nowT = Date()
+            if let w = want {
+                if w == poolZoom.pocket { poolZoom.seen = nowT; poolZoom.pending = nil }
+                else if poolZoom.pocket == nil { poolZoom = (w, nowT, nil) }
+                else if let pd = poolZoom.pending, pd.pocket == w {
+                    if nowT.timeIntervalSince(pd.since) >= 0.3 { poolZoom = (w, nowT, nil) }
+                } else { poolZoom.pending = (w, nowT) }
+            } else if poolZoom.pocket != nil && nowT.timeIntervalSince(poolZoom.seen) > 1.0 {
+                poolZoom = (nil, nowT, nil)
+            }
+            if let k = poolZoom.pocket { view.zoomPocket = k; if v.ball >= 0 { view.target = v.ball } }
             let cleanPot = v.ball >= 0 && v.pocket >= 0 && !v.foul && !v.scratch && v.off < 0.75   // the game's own line makes the edge of the mouth trustworthy
             // never a sure pot on a guessed direction: on a thin cut the game's line is too short to read, and a few px
             // of ring error then turn the ball by 10° or more (an 8 shown as dropping went wide by 14°)
@@ -780,6 +799,7 @@ final class GameModel: ObservableObject {
             }
         } else {
             poolSound.set(.off); poolAims = []
+            poolZoom = (nil, Date(), nil)
         }
         var o = Overlay(game: .pool, title: title, line: line, mine: true); o.pool = view
         show(o)
