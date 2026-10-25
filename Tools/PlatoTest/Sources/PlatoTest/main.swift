@@ -58,20 +58,21 @@ if mode == "hos" {
         let res = e.search(b, side: 1, maxMs: 100)
         if res.instant == "tb" && res.score > 0 { starts.append(b) }
     }
-    for random in [false, true] { for tie in [false, true] {
+    for random in [false, true] { for tie in [true] {
         e.humanTieBreak = tie
         var wins = 0, plies = 0
         var seed: UInt64 = 777
         for st in starts {
             var b = st, won = false
             for mv in 0..<8 {
+                e.countLeft = 8 - mv
                 guard let m = e.search(b, side: 1, maxMs: 100).best else { break }
                 b = apply(b, m, 1)
                 let ms = e.moves(b, side: -1)
                 if !b.contains(where: { $0 < 0 }) || ms.isEmpty { won = true; plies += mv + 1; break }
                 var om: CheckersMove
                 if random { seed = seed &* 6364136223846793005 &+ 1442695040888963407; om = ms[Int((seed >> 33) % UInt64(ms.count))] }
-                else { om = e.search(b, side: -1, maxMs: 100).best ?? ms[0] }
+                else { e.countLeft = 0; om = e.search(b, side: -1, maxMs: 100).best ?? ms[0] }
                 b = apply(b, om, -1)
                 if !b.contains(where: { $0 > 0 }) { break }
             }

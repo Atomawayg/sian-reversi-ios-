@@ -314,6 +314,17 @@ final class CheckersEngine {
     }
     private func pieces() -> Int { pc(P[0] | P[1] | P[2] | P[3]) }
 
+    /// WePlay's count: when one side has exactly 1 king + 1 man and the other a lone king, each side gets 8
+    /// more moves, then the game is a draw. Returns the side with the king + man, or 0.
+    static let countMoves = 8
+    private func countSide() -> Int {
+        if pc(P[0]) == 1 && pc(P[1]) == 1 && P[2] == 0 && pc(P[3]) == 1 { return 1 }
+        if pc(P[2]) == 1 && pc(P[3]) == 1 && P[0] == 0 && pc(P[1]) == 1 { return -1 }
+        return 0
+    }
+    /// Our moves still allowed under the count at the root (set by the app; 0 = the count is not running).
+    var countLeft = 0
+
     private func negamax(_ side: Int, _ depth: Int, _ alphaIn: Int, _ betaIn: Int, _ ply: Int) -> Int {
         nodes += 1
         if nodes & 2047 == 0 && now() > deadline { stop = true }
@@ -321,7 +332,17 @@ final class CheckersEngine {
         let MATE = CheckersEngine.MATE
         if !TB.isEmpty && ply > 0 && pieces() <= 4 {
             let v = tbProbe(side)
-            if v >= 0 { if v == 0 { return 0 }; if v < 128 { return MATE - ply - v }; return -(MATE - ply - (v - 128)) }
+            if v >= 0 {
+                if v == 0 { return 0 }
+                // entering the counted ending: a win that needs more than 8 of the winner's moves is a draw
+                let cs = countSide()
+                if cs != 0 {
+                    let winner = v < 128 ? side : -side
+                    let movesNeeded = v < 128 ? (v + 1) / 2 : (v - 128) / 2
+                    if winner == cs && movesNeeded > CheckersEngine.countMoves { return 0 }
+                }
+                if v < 128 { return MATE - ply - v }; return -(MATE - ply - (v - 128))
+            }
         }
         if ply >= CheckersEngine.MAXPLY - 2 { return side * evaluate(side) }
         let n = gen(side, ply)
@@ -420,6 +441,8 @@ final class CheckersEngine {
             let tv = tbProbe(side)
             if tv >= 0 {
                 var trapOf = [Int](repeating: 0, count: root.count), avgOf = [Int](repeating: 0, count: root.count)
+                // our moves left under the count (fresh 8 when the counted ending starts now)
+                let limit = countSide() == side ? (countLeft > 0 ? countLeft : CheckersEngine.countMoves) : 0
                 for k in 0..<root.count {
                     let i = findIndex(root[k].m)
                     if i < 0 { continue }
@@ -429,6 +452,8 @@ final class CheckersEngine {
                     if opp == 0 { sc = MATE - 1 } else {
                         let v = tbProbe(-side)
                         sc = v < 0 ? 0 : (v == 0 ? 0 : (v < 128 ? -(MATE - 1 - v) : (MATE - 1 - (v - 128))))
+                        // the count is running: a win that takes more of our moves than are left is a draw
+                        if limit > 0 && v >= 128 && 1 + (v - 128) / 2 > limit { sc = 0 }
                         // Look at every reply. Won ending: our average remaining distance (a human rarely finds the
                         // longest defence, and WePlay ends the game as a draw after a few moves). Drawn ending: how
                         // many replies lose, so the AI keeps setting the trap that is easiest to fall into.
@@ -440,7 +465,10 @@ final class CheckersEngine {
                                 let theirs = side == 1 ? (P[2] | P[3]) : (P[0] | P[1]), mine = side == 1 ? (P[0] | P[1]) : (P[2] | P[3])
                                 if theirs == 0 { bad += 1 }
                                 else if mine == 0 { tot += 200 }
-                                else { let w = tbProbe(side); if w > 0 && w < 128 { tot += w; bad += 1 } else { tot += 200 } }
+                                else {
+                                    let w = tbProbe(side)
+                                    if w > 0 && w < 128 && (limit == 0 || (w + 1) / 2 <= limit - 1) { tot += w; bad += 1 } else { tot += 200 }
+                                }
                                 unmake(1)
                             }
                             if n2 > 0 { avgOf[k] = tot * 10 / n2; trapOf[k] = bad * 1000 / n2 + bad }
@@ -460,7 +488,7 @@ final class CheckersEngine {
                     for k in root.indices where root[k].score == 0 && trapOf[k] > trapOf[bestK] { bestK = k }
                     if trapOf[bestK] > 0 { res.trap = trapOf[bestK] % 1000 }
                 }
-                res.best = root[bestK].m; res.score = top; res.tb = tv; res.depth = 99; res.instant = "tb"
+                res.best = root[bestK].m; res.score = top; res.tb = top == 0 ? 0 : tv; res.depth = 99; res.instant = "tb"
                 return res
             }
         }

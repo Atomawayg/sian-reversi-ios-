@@ -224,6 +224,8 @@ final class GameModel: ObservableObject {
 
     private static func ckName(_ s: Int) -> String { "\(8 - s / 8)·\(s % 8 + 1)" }
 
+    private var ckCount = 0                 // your moves so far in the counted ending
+    private var ckCountBoard: [Int]? = nil
     private func handleCheckers(_ m: BoardMessage) {
         let (board, meC) = checkersBoard(m)
         let draw = board.map { $0 == 1 ? 1 : ($0 == 2 ? 2 : ($0 == -1 ? 3 : ($0 == -2 ? 4 : 0))) }
@@ -237,6 +239,13 @@ final class GameModel: ObservableObject {
         let key = [100] + board
         if key == computedFor { return }
         computedFor = key; gen += 1
+        // WePlay's count: once it is your king + man against a lone king, each side has 8 more moves
+        let mineK = board.filter { $0 == 2 }.count, mineM = board.filter { $0 == 1 }.count
+        let theirK = board.filter { $0 == -2 }.count, theirM = board.filter { $0 == -1 }.count
+        let counted = theirM == 0 && theirK == 1 && ((mineK == 1 && mineM == 1) || (ckCount > 0 && mineK == 2 && mineM == 0))
+        if !counted { ckCount = 0; ckCountBoard = nil }
+        else if ckCountBoard != board { ckCount += 1; ckCountBoard = board }
+        let countLeft = counted ? max(1, CheckersEngine.countMoves - (ckCount - 1)) : 0
         let g = gen, ms = thinkMs
         show(Overlay(game: .checkers, cells: draw, title: "คิด…", line: "ตาคุณ · AI กำลังคิด", mine: true, meColor: meC))
         work.async { [weak self] in
@@ -245,6 +254,7 @@ final class GameModel: ObservableObject {
                 self.checkers.loadTB(d)
             }
             self.tbLoaded = true
+            self.checkers.countLeft = countLeft
             let r = self.checkers.search(board, side: 1, maxMs: ms)
             let path = r.best.map { self.checkers.path(of: $0, board: board) } ?? []
             let caps = r.best.map { self.checkers.capsSquares($0) } ?? []
@@ -260,6 +270,7 @@ final class GameModel: ObservableObject {
                 else if r.score < -MATE + 1000 { verdict = "เสียเปรียบหนัก" }
                 else { let s = r.score; verdict = s >= 250 ? "ได้เปรียบมาก" : s >= 80 ? "ได้เปรียบ" : s > -80 ? "สูสี" : s > -250 ? "เสียเปรียบ" : "เสียเปรียบมาก" }
                 let what = best.caps != 0 ? "กิน \(caps.count) ตัว" : (best.promo ? "เดิน (เข้าฮอส)" : "เดิน")
+                if countLeft > 0 { verdict += " · นับ \(countLeft) ตา" }
                 let title = "\(GameModel.ckName(path[0]))→\(GameModel.ckName(path[path.count - 1]))"
                 let line = "\(what) · \(verdict)" + (r.trap > 0 ? " · วางกับดัก" : "") + (r.depth > 0 && r.depth < 99 ? " · ลึก \(r.depth)" : "")
                 self.show(Overlay(game: .checkers, cells: draw, path: path, caps: caps, title: title, line: line, mine: true, meColor: meC))
