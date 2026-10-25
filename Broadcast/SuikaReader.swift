@@ -127,7 +127,8 @@ extension BoardReader {
             }
         }
         var found: [(t: Int, x: Double, y: Double, sc: Double)] = []
-        for t in stride(from: SK.types - 1, through: 0, by: -1) {
+        // biggest first, except apples before the peach: a red apple beside a peach would be read as part of it
+        for t in [10, 9, 8, 5, 7, 6, 4, 3, 2, 1, 0] {
             let rr = SK.radius[t] / S, m = BoardReader.skMask[t]
             // a fruit can't stick out of the jar sideways or through the floor
             let iLo = Int(rr * 0.9), iHi = gw - Int(rr * 0.9), jHi = gh - Int(rr * 0.85)
@@ -157,15 +158,14 @@ extension BoardReader {
                         let dx = Double(x - i), dy = Double(y - j)
                         if dx * dx + dy * dy > rr * rr * 1.1 { continue }
                         let k = y * gw + x
-                        // a peach is centred on its pale skin alone: a red apple beside it would drag the centre over
-                        if !claimed[k] && grid[k] != 0 && m & (1 << UInt16(grid[k])) != 0 && (t != 7 || grid[k] == 6) { sxs += Double(x); sys += Double(y); cnt += 1 }
+                        if !claimed[k] && grid[k] != 0 && m & (1 << UInt16(grid[k])) != 0 { sxs += Double(x); sys += Double(y); cnt += 1 }
                     }
                 }
                 if cnt == 0 { continue }
                 var ci = sxs / cnt, cj = sys / cnt
                 // faces pull the middle of the colour off centre: nudge until the edge ring sits on the fruit
                 var bx = ci, by = cj, bh = edge(ci, cj, rr, m)
-                for dy in (t == 7 ? 0...0 : -8...8) { for dx in (t == 7 ? 0...0 : -8...8) {
+                for dy in -8...8 { for dx in -8...8 {
                     let x = ci + Double(dx) * 0.5, y = cj + Double(dy) * 0.5
                     let h = edge(x, y, rr, m)
                     if h > bh || (h == bh && (x - ci) * (x - ci) + (y - cj) * (y - cj) < (bx - ci) * (bx - ci) + (by - cj) * (by - cj)) { bx = x; by = y; bh = h }
