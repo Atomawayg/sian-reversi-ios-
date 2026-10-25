@@ -166,9 +166,9 @@ final class SuikaEngine {
         return (0..<n).map { lo + (hi - lo) * Double($0) / Double(n - 1) }
     }
 
-    private struct Try { var x: Double; var jar: [Body]; var created: [Int]; var v1: Double; var fill: Double; var land: (Double, Double)?; var travel: Double }
+    struct Try { var x: Double; var jar: [Body]; var created: [Int]; var v1: Double; var fill: Double; var land: (Double, Double)?; var travel: Double }
 
-    private static func drop(_ base: [Body], _ t: Int, _ x: Double) -> Try {
+    static func drop(_ base: [Body], _ t: Int, _ x: Double) -> Try {
         var b = base
         b.append(Body(t: t, x: x, y: SK.dropY, tag: 1))
         var created: [Int] = []

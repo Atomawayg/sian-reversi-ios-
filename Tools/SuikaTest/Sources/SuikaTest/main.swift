@@ -91,4 +91,21 @@ var maxErr = 0.0
 for (a, c) in zip(st.fruits, dec.fruits) { maxErr = max(maxErr, abs(a.x - c.x), abs(a.y - c.y)) }
 note("encode/decode: \(dec.fruits.count) fruits, held \(dec.held), next \(dec.next), heldX \(Int(dec.heldX)), max drift \(String(format: "%.1f", maxErr)) px")
 
+
+// why one spot over another: this drop alone, at the grape and at the AI's spot
+do {
+    var base = st.fruits.map { SuikaEngine.Body(t: $0.t, x: $0.x, y: $0.y) }
+    var none: [Int] = []
+    SuikaEngine.simulate(&base, created: &none, merge: false, maxT: 1.5)
+    var moved = 0.0
+    for (a, c) in zip(st.fruits, base) { moved = max(moved, hypot(a.x - c.x, a.y - c.y)) }
+    var out = "settle moved ≤\(Int(moved))px"
+    for x in [690.0, 706, 720, 760, 810, 850] {
+        let t = SuikaEngine.drop(base, st.held, x)
+        let e = SuikaEngine.eval(t.jar)
+        let made = t.jar.filter { $0.t == 3 }.map { "(\(Int($0.x)),\(Int($0.y)))" }.joined()
+        out += " | x\(Int(x)): v1 \(String(format: "%.1f", t.v1)) eval \(String(format: "%.1f", e.v)) travel \(Int(t.travel)) made \(t.created) deko \(made)"
+    }
+    note(out)
+}
 flush()
