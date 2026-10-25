@@ -21,7 +21,13 @@ enum BoardReader {
     }
 }
 
-func note(_ s: String) { print("::notice::" + s); print(s) }
+var notes: [String] = []
+func note(_ s: String) { notes.append(s); print(s) }
+// GitHub keeps only 10 notices per step: pack everything into at most 9
+func flush() {
+    let per = (notes.count + 8) / 9
+    for k in stride(from: 0, to: notes.count, by: max(1, per)) { print("::notice::" + notes[k..<min(notes.count, k + per)].joined(separator: " ║ ")) }
+}
 func ms(_ t0: UInt64) -> Int { Int((DispatchTime.now().uptimeNanoseconds - t0) / 1_000_000) }
 
 func load(_ name: String) -> BoardReader.Sampler {
@@ -43,7 +49,7 @@ let m = BoardReader.readSuika(s)
 note("read in \(ms(t0)) ms, valid \(m.valid) myTurn \(m.myTurn)")
 let st = SK.decode(m.cells)!
 note("held \(st.held >= 0 ? SK.names[st.held] : "-") at x \(Int(st.heldX)) · next \(st.next >= 0 ? SK.names[st.next] : "-") · \(st.fruits.count) fruits")
-for f in st.fruits { note("  \(SK.names[f.t]) (\(Int(f.x)), \(Int(f.y)))") }
+note("jar: " + st.fruits.map { "\(SK.names[$0.t]) (\(Int($0.x)),\(Int($0.y)))" }.joined(separator: " · "))
 note("same as itself: \(SK.same(m.cells, m.cells))")
 
 let e = SuikaEngine()
@@ -84,3 +90,5 @@ let dec = SK.decode(enc)!
 var maxErr = 0.0
 for (a, c) in zip(st.fruits, dec.fruits) { maxErr = max(maxErr, abs(a.x - c.x), abs(a.y - c.y)) }
 note("encode/decode: \(dec.fruits.count) fruits, held \(dec.held), next \(dec.next), heldX \(Int(dec.heldX)), max drift \(String(format: "%.1f", maxErr)) px")
+
+flush()

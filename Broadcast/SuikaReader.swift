@@ -72,15 +72,29 @@ extension BoardReader {
         for (fr, k) in [(0.3, 8), (0.55, 12), (0.8, 18)] {
             for a in 0..<k { let t = 2 * Double.pi * Double(a) / Double(k); unit.append((fr * cos(t), fr * sin(t))) }
         }
-        func score(_ ci: Double, _ cj: Double, _ rr: Double, _ m: UInt16) -> Double {
-            var hit = 0
-            for (ux, uy) in unit {
-                let x = Int((ci + ux * rr).rounded()), y = Int((cj + uy * rr).rounded())
-                if x < 0 || x >= gw || y < 0 || y >= gh { continue }
-                let k = y * gw + x
-                if !claimed[k] && m & (1 << UInt16(grid[k])) != 0 && grid[k] != 0 { hit += 1 }
+        func on(_ x: Int, _ y: Int, _ m: UInt16) -> Bool {
+            if x < 0 || x >= gw || y < 0 || y >= gh { return false }
+            let k = y * gw + x
+            return !claimed[k] && grid[k] != 0 && m & (1 << UInt16(grid[k])) != 0
+        }
+        /// share of the disc's sample points in the fruit's colour, and share of the outer ring alone
+        /// (a big disc over a smaller fruit of the same colour fills its middle but not its rim)
+        func score(_ ci: Double, _ cj: Double, _ rr: Double, _ m: UInt16) -> (all: Double, rim: Double) {
+            var hit = 0, rim = 0
+            for (k, (ux, uy)) in unit.enumerated() where on(Int((ci + ux * rr).rounded()), Int((cj + uy * rr).rounded()), m) {
+                hit += 1
+                if k >= 21 { rim += 1 }
             }
-            return Double(hit) / Double(unit.count)
+            return (Double(hit) / Double(unit.count), Double(rim) / Double(unit.count - 21))
+        }
+        /// hits on a ring just inside the edge: highest when the centre is right
+        func edge(_ ci: Double, _ cj: Double, _ rr: Double, _ m: UInt16) -> Int {
+            var h = 0
+            for a in 0..<36 {
+                let t = 2 * Double.pi * Double(a) / 36
+                if on(Int((ci + 0.88 * rr * cos(t)).rounded()), Int((cj + 0.88 * rr * sin(t)).rounded()), m) { h += 1 }
+            }
+            return h
         }
         var found: [(t: Int, x: Double, y: Double, sc: Double)] = []
         for t in stride(from: SK.types - 1, through: 0, by: -1) {
@@ -96,7 +110,7 @@ extension BoardReader {
                     let k = j * gw + i
                     if !claimed[k] && grid[k] != 0 && m & (1 << UInt16(grid[k])) != 0 {
                         let sc = score(Double(i), Double(j), rr, m)
-                        if sc >= 0.62 { cands.append((sc, i, j)) }
+                        if sc.all >= 0.62 && sc.rim >= 0.5 { cands.append((sc.all, i, j)) }
                     }
                     i += 2
                 }
@@ -117,15 +131,23 @@ extension BoardReader {
                     }
                 }
                 if cnt == 0 { continue }
-                let ci = sxs / cnt, cj = sys / cnt
+                var ci = sxs / cnt, cj = sys / cnt
+                // faces pull the middle of the colour off centre: nudge until the edge ring sits on the fruit
+                var bx = ci, by = cj, bh = edge(ci, cj, rr, m)
+                for dy in -8...8 { for dx in -8...8 {
+                    let x = ci + Double(dx) * 0.5, y = cj + Double(dy) * 0.5
+                    let h = edge(x, y, rr, m)
+                    if h > bh || (h == bh && (x - ci) * (x - ci) + (y - cj) * (y - cj) < (bx - ci) * (bx - ci) + (by - cj) * (by - cj)) { bx = x; by = y; bh = h }
+                } }
+                ci = bx; cj = by
                 let sc = score(ci, cj, rr, m)
-                if sc < 0.6 { continue }
+                if sc.all < 0.6 || sc.rim < 0.45 { continue }
                 var px = X0 + ci * S + S / 2, py = Y0 + cj * S + S / 2
                 px = min(max(px, SK.left + SK.radius[t]), SK.right - SK.radius[t])
                 py = min(py, SK.floor - SK.radius[t])
                 // two fruits never overlap much
                 if found.contains(where: { hypot($0.x - px, $0.y - py) < 0.7 * (SK.radius[$0.t] + SK.radius[t]) }) { continue }
-                found.append((t, px, py, sc))
+                found.append((t, px, py, sc.all))
                 let C = Int(rr + 2)
                 for y in max(0, Int(cj) - C)...min(gh - 1, Int(cj) + C) {
                     for x in max(0, Int(ci) - C)...min(gw - 1, Int(ci) + C) {
