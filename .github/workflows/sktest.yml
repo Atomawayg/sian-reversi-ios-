@@ -1,0 +1,28 @@
+name: SuikaTest
+# Fruit-game reader + AI on saved screenshots, on Linux. Results appear as notices on the run.
+on:
+  push:
+    branches: ['dev/suika*']
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gather sources
+        run: |
+          S=Tools/SuikaTest/Sources/SuikaTest
+          cp Shared/SuikaShared.swift Shared/BoardMessage.swift Broadcast/SuikaReader.swift App/SuikaEngine.swift $S/
+          gunzip -k Tools/SuikaTest/*.rgb.gz
+          swift --version
+      - name: Build
+        run: |
+          set -o pipefail
+          swift build -c release --package-path Tools/SuikaTest 2>&1 | grep -vE "^\[[0-9]+/[0-9]+\]" | tee tbuild.log | tail -60
+      - name: Report build errors
+        if: failure()
+        run: grep -E "error:" tbuild.log | head -30 | sed 's/^/::error::/' || true
+      - name: Run
+        run: Tools/SuikaTest/.build/release/SuikaTest
