@@ -506,8 +506,8 @@ final class GameModel: ObservableObject {
     private var poolLastLog = ""
     private var poolPlanned: [PoolEngine.Ball] = []   // the table the suggestion below was worked out for
     private var poolPlannedGroup = -1
-    private var poolBest: PoolEngine.Shot? = nil, poolNext: PoolEngine.Shot? = nil, poolCueEnd: (Double, Double)? = nil
-    private var poolOptions: [PoolEngine.Shot] = []    // every ball that pots straight from here (yours and the others)
+    private var poolFound: [PoolEngine.Found] = []     // every sure pot from here (PoolEngine.sweep)
+    private var poolPick: PoolEngine.Found? = nil, poolNextBall: Int? = nil
     private var poolAims: [(Double, Double)] = []   // the last few aim-circle readings (a sure pot needs it steady)
 
     private var poolGroup = 0            // your group once it is certain (kept for the whole game)
@@ -606,45 +606,49 @@ final class GameModel: ObservableObject {
         // you choose the ball; the app judges your aim (the game's own line makes that exact) and gives the power
         let mineLeft = others.filter { legal.contains($0.id) }.map { $0.id }.sorted()
         let mineText = group == 3 ? "ของคุณ: ลูก 8" : (group == 0 ? "โต๊ะเปิด" : "ของคุณ: " + mineLeft.map(String.init).joined(separator: " · "))
-        var title = "เล็งได้เลย", line = mineText
-        // a suggestion (worked out once per resting table): which ball, which pocket, how hard, and the ball after it;
-        // and a thin line for every ball that pots straight from where the cue ball is, yours or not
+        var title = "เล็งได้เลย", line = ""
+        _ = mineText
+        // what to play (worked out once per resting table): every sure way to pot one of your balls — straight,
+        // off cushions, or the cue ball off a cushion first — and the one that also leaves an easy next ball
         let moved = poolPlannedGroup != group || balls.count != poolPlanned.count
             || !balls.allSatisfy { b in poolPlanned.contains { $0.id == b.id && abs($0.x - b.x) < 6 && abs($0.y - b.y) < 6 } }
         if moved {
             poolPlanned = balls; poolPlannedGroup = group
-            poolBest = nil; poolNext = nil; poolCueEnd = nil; poolOptions = []
+            poolFound = []; poolPick = nil; poolNextBall = nil
             if let cue, !PoolEngine.isBreak(others) {
-                if let pl = PoolEngine.plan(cueX: cue.x, cueY: cue.y, balls: others, legal: legal, group: group) {
-                    poolBest = pl.first; poolNext = pl.next; poolCueEnd = pl.cueEnd
-                } else {
-                    poolBest = PoolEngine.shots(cueX: cue.x, cueY: cue.y, balls: others, legal: legal, banks: true).first
+                poolFound = PoolEngine.sweep(cueX: cue.x, cueY: cue.y, balls: balls, legal: legal)
+                var best: (Double, PoolEngine.Found, Int?)? = nil
+                for f in poolFound.prefix(6) {
+                    var score = f.width * pow(0.75, Double(f.objRails)) * pow(0.6, Double(f.cueRails))
+                    var nextBall: Int? = nil
+                    if f.ball != 8, f.cueStop.count >= 2 {
+                        let ex = f.cueStop[f.cueStop.count - 2], ey = f.cueStop[f.cueStop.count - 1]
+                        var nl = legal.subtracting([f.ball]); if nl.isEmpty { nl = [8] }
+                        let rest = others.filter { $0.id != f.ball }
+                        if let n = PoolEngine.shots(cueX: ex, cueY: ey, balls: rest, legal: nl, banks: false).first {
+                            score += 0.5 * min(1, n.tolerance); nextBall = n.ball
+                        }
+                    }
+                    if best == nil || score > best!.0 { best = (score, f, nextBall) }
                 }
-                var seen = Set<Int>()
-                for sh in PoolEngine.shots(cueX: cue.x, cueY: cue.y, balls: others, legal: Set(others.map { $0.id }), banks: false) where !seen.contains(sh.ball) {
-                    seen.insert(sh.ball); poolOptions.append(sh)
-                }
+                poolPick = best?.1; poolNextBall = best?.2
             }
         }
-        view.shot = poolBest; view.next = poolNext; view.options = poolOptions
-        if let e = poolCueEnd { view.cueEndX = e.0; view.cueEndY = e.1 }
-        if let s = poolBest {
-            title = "\(s.ball) → \(PoolEngine.pockets[s.pocket].name)"
-            var bankText = "ชิ่ง · "
-            if s.bank, let b = others.first(where: { $0.id == s.ball }) {
-                let d = hypot(b.x - s.ghostX, b.y - s.ghostY)
-                if let h = PoolEngine.cushionHit(b.x, b.y, (b.x - s.ghostX) / d, (b.y - s.ghostY) / d, balls: balls, skip: b.id) {
-                    bankText = "ชิ่ง" + PoolEngine.railSpot(h.0, h.1) + " · "
-                    if !hasAim { view.bankX = h.0; view.bankY = h.1 }
-                }
-            }
-            line = (s.bank ? bankText : "") + "แรง \(s.powerPct)" + (poolNext.map { " · ต่อด้วย \($0.ball)" } ?? "") + "\n" + mineText
+        view.found = poolFound; view.pick = poolPick
+        if let f = poolPick {
+            title = "\(f.ball) → \(PoolEngine.pockets[f.pocket].name)"
+            var bits: [String] = []
+            if f.cueRails > 0 { bits.append("ลูกขาวชิ่ง \(f.cueRails)") }
+            if f.objRails > 0 { bits.append("ชิ่ง \(f.objRails)") }
+            if let n = poolNextBall { bits.append("ต่อ \(n)") }
+            line = bits.joined(separator: " · ")
+            if !hasAim { view.powerTarget = f.power }
         } else if cue != nil && !PoolEngine.isBreak(others) {
-            title = "เซฟ"
-            if let cue, let sb = PoolEngine.safety(cueX: cue.x, cueY: cue.y, balls: others, legal: legal) { line = "ไม่มีลูกลงตรงๆ · แตะลูก \(sb.id) ก่อน\n" + mineText }
+            title = "ไม่มีลูกชัวร์"
+            if let cue, let sb = PoolEngine.safety(cueX: cue.x, cueY: cue.y, balls: others, legal: legal) { line = "แตะลูก \(sb.id) ก่อน (เซฟ)" }
         }
         if PoolEngine.isBreak(others) { title = "เบรก"; line = "ยิงตรงกลางลูกหน้าสุด แรงสุด" }
-        else if cue == nil { title = "วางลูกขาว"; line = mineText }
+        else if cue == nil { title = "วางลูกขาว"; line = "" }
         // your aim: draw where the balls go; one long tone when it pots one of your balls cleanly
         if hasAim, let cue {
             let a = PoolCodec.get(c, PoolCodec.aim)
@@ -654,21 +658,25 @@ final class GameModel: ObservableObject {
             poolAims.append((a.x, a.y)); if poolAims.count > 3 { poolAims.removeFirst() }
             let steady = pulling || (poolAims.count == 3 && poolAims.allSatisfy { abs($0.0 - a.x) <= 4 && abs($0.1 - a.y) <= 4 })
             let v = PoolEngine.judge(cueX: cue.x, cueY: cue.y, aimX: a.x, aimY: a.y, balls: others, legal: legal, dir: dir)
-            // where both balls go, every cushion included, as far as the pace carries them. Before you pull: the
-            // whole run at full power with marks where each ball stops at 25 / 50 / 75 / 100; while you pull: the run
-            // at your power and where they really stop
+            // where both balls go, every cushion included, as far as the pace carries them. The power to use is the
+            // least that drops the ball (simulated) plus a margin; your line is drawn all the way into the pocket at that
+            // power, and while you pull, the part your power really reaches is drawn bold
             let pullPct = c[PoolCodec.power] * 14 + c[PoolCodec.power + 1]
             let tgt = others.first(where: { $0.id == v.ball })
             func paths(_ p: Int) -> (obj: [Double], cue: [Double], cueStop: (Double, Double), objDrops: Bool, cueDrops: Bool) {
                 PoolEngine.powerPaths(cueX: cue.x, cueY: cue.y, aimX: a.x, aimY: a.y, target: tgt, balls: balls, dir: dir, power: p)
             }
-            let full = paths(pulling ? max(1, pullPct) : 100)
-            view.objPath = full.obj; view.cuePath = full.cue; view.stopsLive = pulling
-            for p in (pulling ? [max(1, pullPct)] : [25, 50, 75, 100]) {
-                let r = p == (pulling ? max(1, pullPct) : 100) ? full : paths(p)
-                if !r.cueDrops { view.cueStops.append(PoolStop(x: r.cueStop.0, y: r.cueStop.1, pct: p)) }
-                if !r.objDrops, r.obj.count >= 4 { view.objStops.append(PoolStop(x: r.obj[r.obj.count - 2], y: r.obj[r.obj.count - 1], pct: p)) }
+            var target: Int? = nil
+            if v.pocket >= 0, tgt != nil {
+                var p = 5
+                while p <= 100 { if paths(p).objDrops { target = min(100, p + 10); break }; p += 5 }
             }
+            let planned = paths(target ?? 60)
+            let now = pulling ? paths(max(1, pullPct)) : planned
+            view.objPathFull = planned.obj; view.objPath = now.obj; view.cuePath = now.cue
+            if !now.cueDrops { view.cueStops = [PoolStop(x: now.cueStop.0, y: now.cueStop.1, pct: pulling ? pullPct : (target ?? 60))] }
+            view.stopsLive = true
+            view.powerTarget = target; view.powerNow = pulling ? pullPct : nil
             // how far the cue may turn and still pot (the meter and the pocket close-up), and which way to turn
             var turnHint = ""
             if v.ball >= 0, let b = others.first(where: { $0.id == v.ball }),
@@ -695,23 +703,16 @@ final class GameModel: ObservableObject {
             let good = cleanPot && dir != nil && steady
             view.pots = good
             view.risky = !good && v.ball >= 0 && v.pocket >= 0 && !v.foul && !v.scratch
-            var bankText = "ชิ่ง · "
-            if v.bank && v.pocket >= 0 && view.objPath.count >= 4 && PoolEngine.onRail(view.objPath[2], view.objPath[3]) {
-                let hx = view.objPath[2], hy = view.objPath[3]
-                view.bankX = hx; view.bankY = hy
-                bankText = "ชิ่ง" + PoolEngine.railSpot(hx, hy) + " · "
-            }
+
             if good {
                 title = "✓ \(v.ball) → \(PoolEngine.pockets[v.pocket].name)"
-                line = (v.bank ? bankText : "") + "แรง \(v.powerPct)" + (turnHint.isEmpty ? "" : " · " + turnHint) + "\n" + mineText
+                line = turnHint
                 if pulling {
                     // pulling the power bar: tone off, one blip when it reaches the strength
                     poolSound.set(.off)
-                    let pct = c[PoolCodec.power] * 14 + c[PoolCodec.power + 1]
-                    let inZone = abs(pct - v.powerPct) <= 4
+                    let inZone = abs(pullPct - (target ?? v.powerPct)) <= 4
                     if inZone && !poolInZone { poolSound.ding() }
                     poolInZone = inZone
-                    line += " · ตอนนี้ \(pct)"
                 } else {
                     poolInZone = false
                     poolSound.set(.tone(660))
@@ -719,13 +720,13 @@ final class GameModel: ObservableObject {
             } else {
                 poolSound.set(.off); poolInZone = false
                 if v.ball >= 0 && (v.foul || v.scratch) {
-                    if v.foul { title = "\(v.ball) ไม่ใช่ของคุณ" }
-                    line = (v.foul ? "ฟาวล์ · " : "ลูกขาวจะตกตาม\n") + mineText
+                    if v.foul { title = "\(v.ball) ไม่ใช่ของคุณ" } else { title = "ลูกขาวจะตกตาม" }
+                    line = 
                 } else if let w = view.win {
                     // your line misses or only just drops: which pocket it is near and which way to turn
                     title = "\(v.ball) → \(PoolEngine.pockets[w.pocket].name)" + (v.pocket >= 0 ? " เสี่ยง" : "?")
-                    let why = cleanPot ? (dir == nil ? "ช็อตบาง มองไม่เห็นเส้นของเกม" : "รอวงเล็งนิ่ง") : (v.pocket >= 0 ? "เฉียดจมูกหลุม" : "")
-                    line = (cleanPot || turnHint.isEmpty ? why : turnHint) + (v.pocket >= 0 ? " · แรง \(v.powerPct)" : "") + "\n" + mineText
+                    let why = cleanPot ? (dir == nil ? "ช็อตบาง" : "รอวงเล็งนิ่ง") : ""
+                    line = cleanPot || turnHint.isEmpty ? why : turnHint
                 }
             }
         } else {
@@ -739,7 +740,7 @@ final class GameModel: ObservableObject {
             var t = "P turn=\(m.myTurn ? 1 : 0) bar=\(m.me) mine=\(c[PoolCodec.myLeft]) group=\(group) balls=" + balls.map { "\($0.id):\(f($0.x)),\(f($0.y))" }.joined(separator: " ")
             if let a = view.aimX, let b = view.aimY { t += " aim=\(f(a)),\(f(b))" }
             if let d = PoolCodec.dir(c) { t += String(format: " dir=%.1f", d * 180 / Double.pi) }
-            if let s = poolBest { t += " best=\(s.ball)>\(s.pocket)@\(s.powerPct)" + (poolNext.map { " next=\($0.ball)" } ?? "") }
+            if let f = poolPick { t += String(format: " best=%d>%d@%d r%d/%d w%.1f", f.ball, f.pocket, f.power, f.objRails, f.cueRails, f.width) + (poolNextBall.map { " next=\($0)" } ?? "") + " n=\(poolFound.count)" }
             if let w = view.win { t += String(format: " win=%d:%.2f..%.2f", w.pocket, w.lo, w.hi) }
             if pulling { t += " power=\(c[PoolCodec.power] * 14 + c[PoolCodec.power + 1])" }
             t += " says=\(title)|" + line.replacingOccurrences(of: "\n", with: " / ")

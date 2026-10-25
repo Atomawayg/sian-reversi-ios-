@@ -17,7 +17,10 @@ enum PoolEngine {
     // the cue ball leaves at about 4150 px/s × power (51 % → 2070, 54 % → 2230, 63 % → 2700 px/s),
     // and slows by (100 + 1.4·v) px/s every second (fast balls lose speed quickly, slow ones roll on).
     static let fullSpeed = 4150.0
-    static let decel0 = 100.0, decelV = 1.4
+    // Oct 25 logs (rolling balls, 36 shots): slow balls coast much further than (100 + 1.4·v) allowed, and full-power
+    // runs went ~2300 px with two cushions; the low-speed part is eased to 30 (only total distances, not times, could be
+    // trusted from the log)
+    static let decel0 = 30.0, decelV = 1.3
 
     struct Ball: Equatable { var id: Int; var x: Double; var y: Double }
     struct Shot: Equatable {
@@ -52,13 +55,12 @@ enum PoolEngine {
 
     /// Off a cushion: measured on the Oct 25 bank recording, a ball comes off flatter than it went in
     /// (tan of the angle from the cushion's normal grows by about 1.28), and keeps about half its speed.
-    static let bounceFlatten = 1.28
-    static func bounce(_ x: Double, _ ux: Double, _ uy: Double) -> (Double, Double) {
-        var nx = ux, ny = uy
-        if abs(x - xMin) < 0.5 || abs(x - xMax) < 0.5 { nx = -ux; ny = uy * bounceFlatten } else { ny = -uy; nx = ux * bounceFlatten }
-        let l = (nx * nx + ny * ny).squareRoot()
-        return (nx / l, ny / l)
-    }
+    /// Oct 25 log, nine cushion hits read off rolling balls: the ball keeps ~85 % of its pace along the cushion and
+    /// about 1/1.45 of that into it (tan of the angle from the normal grows ×1.45; fast hits 1.36–1.55, slow up to 2).
+    /// "Sure" shots must still drop with this anywhere in `flatRange`.
+    static let bounceFlatten = 1.45
+    static let flatRange = [1.35, 1.6]
+    static let keepAlong = 0.85
 
     // MARK: table edges with the pocket jaws
     // Measured on the 1180×2556 screen (same on every table theme), then checked against shots in the logs:
@@ -126,7 +128,7 @@ enum PoolEngine {
         return best
     }
 
-    struct Run { var pts: [Double]; var pocket = -1; var ball: Int? = nil; var rails = 0; var jaws = 0; var railJaws = 0; var len = 0.0; var off = 1.0 }
+    struct Run { var pts: [Double]; var pocket = -1; var ball: Int? = nil; var rails = 0; var jaws = 0; var railJaws = 0; var len = 0.0; var off = 1.0; var left = 0.0 }
     /// A ball rolling along a cushion (within 12° of it, centre at most 16 px off touching it): it slides past the
     /// corner jaw into the pocket. Seen in the logs: 5 px off the left cushion up into the top-left corner, 13 px off
     /// it down into the bottom-left one; both nudged the jaw and dropped.
@@ -142,7 +144,7 @@ enum PoolEngine {
     /// where they are drawn (a ball read as going in rattled out), so "sure" pots are worked out with pad 4.
     static let safePad = 4.0
     /// `speed` (px/s): roll only as far as that pace carries the ball, losing half of it at each cushion.
-    static func run(_ x0: Double, _ y0: Double, _ ux0: Double, _ uy0: Double, balls: [Ball], skip: Int, maxLen: Double = 3000, maxRails: Int = 2, gap: Double = 2 * R, pad: Double = 0, speed: Double? = nil) -> Run {
+    static func run(_ x0: Double, _ y0: Double, _ ux0: Double, _ uy0: Double, balls: [Ball], skip: Int, maxLen: Double = 3000, maxRails: Int = 2, gap: Double = 2 * R, pad: Double = 0, speed: Double? = nil, flat: Double = bounceFlatten) -> Run {
         var r = Run(pts: [x0, y0])
         let start = speed.map { rollDistance($0) } ?? maxLen
         var x = x0, y = y0, ux = ux0, uy = uy0, left = start
@@ -171,16 +173,16 @@ enum PoolEngine {
                 r.rails += 1   // a ball grazing the cushion it rolls along is no bank
             }
             if r.rails > maxRails { break }
-            if speed != nil && (isJaw || abs(vn) >= sin(12 * Double.pi / 180)) { left = rollDistance(railKeep * speedFor(distance: left)) }
-            ux = tx * bounceFlatten - vn * nx; uy = ty * bounceFlatten - vn * ny
+            // off the cushion: along it × keepAlong, into it × keepAlong / flat
+            let e = keepAlong / flat
+            ux = tx * keepAlong - vn * nx * e; uy = ty * keepAlong - vn * ny * e
             let l = (ux * ux + uy * uy).squareRoot(); ux /= l; uy /= l
+            if speed != nil && (isJaw || abs(vn) >= sin(12 * Double.pi / 180)) { left = rollDistance(l * speedFor(distance: left)) }
             x += nx * 0.01; y += ny * 0.01
         }
-        r.len = start - left
+        r.len = start - left; r.left = left
         return r
     }
-    /// share of its pace a ball keeps off a cushion (measured on two banks; rough)
-    static let railKeep = 0.5
     /// the pace that rolls exactly d before stopping (inverse of rollDistance)
     static func speedFor(distance d: Double) -> Double {
         if d <= 0 { return 0 }
@@ -274,9 +276,9 @@ enum PoolEngine {
     /// or off one cushion into one. Returns pocket index, path length, whether it banked, and how far off the
     /// pocket centre it runs (0 = dead centre, 1 = on the edge; 0.85 = it needs the jaw).
     static func trace(_ tx: Double, _ ty: Double, _ ux0: Double, _ uy0: Double, balls: [Ball], skip: Int, pad: Double = 0) -> (pocket: Int, len: Double, bank: Bool, off: Double)? {
-        let r = run(tx, ty, ux0, uy0, balls: balls.filter { $0.id != 0 }, skip: skip, maxRails: 1, gap: 2 * R - 3, pad: pad)
+        let r = run(tx, ty, ux0, uy0, balls: balls.filter { $0.id != 0 }, skip: skip, maxRails: 4, gap: 2 * R - 3, pad: pad)
         guard r.pocket >= 0 else { return nil }
-        return (r.pocket, r.len, r.rails == 1, r.off)
+        return (r.pocket, r.len, r.rails >= 1, r.off)
     }
 
     /// Scratch after a stun hit: the cue ball runs along the tangent line from the ghost position.
@@ -392,6 +394,10 @@ enum PoolEngine {
             v.pocket = tr.pocket; v.bank = tr.bank; v.off = tr.off
             // a sure pot also drops with the jaws a little fatter (where the game really has them is only known to a few px)
             if trace(t.x, t.y, ux, uy, balls: balls, skip: t.id, pad: safePad)?.pocket != tr.pocket { v.off = max(v.off, 0.8) }
+            // a bank is sure only if it drops however lively the cushions turn out (within what was measured)
+            if tr.bank {
+                for f in flatRange where run(t.x, t.y, ux, uy, balls: balls.filter { $0.id != 0 }, skip: t.id, maxRails: 4, gap: 2 * R - 3, pad: safePad, flat: f).pocket != tr.pocket { v.off = max(v.off, 0.8) }
+            }
             let vx = aimX - cueX, vy = aimY - cueY, d1 = (vx * vx + vy * vy).squareRoot()
             let cut = acos(max(-1, min(1, (vx * ux + vy * uy) / max(d1, 1e-6)))) * 180 / Double.pi
             v.powerPct = powerPct(cueToGhost: d1, objLen: tr.len, cut: cut, bank: tr.bank)
@@ -533,5 +539,99 @@ enum PoolEngine {
     /// Opening break: most balls still racked at the top.
     static func isBreak(_ balls: [Ball]) -> Bool {
         balls.filter { $0.id != 0 && $0.y < 1100 && $0.x > 430 && $0.x < 750 }.count >= 9
+    }
+
+    // MARK: every shot from here (straight, banks, cue ball off cushions first)
+
+    /// One way to pot a ball: turn the cue to `angle` (± `width`/2 still pots), pull `power`.
+    struct Found: Equatable {
+        var ball: Int, pocket: Int
+        var angle: Double, width: Double          // cue direction (radians) and how much turn still pots (degrees)
+        var objRails: Int, cueRails: Int
+        var power: Int                             // power-bar % (the least that drops it, plus a margin)
+        var ghostX: Double, ghostY: Double         // where the cue ball meets the ball
+        var cuePts: [Double], objPts: [Double]     // the cue ball's way to the ball, the ball's way to the pocket
+        var cueStop: [Double]                      // the cue ball after the hit until it stops (x,y pairs)
+    }
+
+    private struct Hit: Equatable { var ball: Int, pocket: Int, objRails: Int, cueRails: Int }
+    private static func hitAt(_ cx: Double, _ cy: Double, _ a: Double, _ others: [Ball], flat: Double) -> (Hit, Run, Run)? {
+        let ux = cos(a), uy = sin(a)
+        let c = run(cx, cy, ux, uy, balls: others, skip: 0, maxLen: 4000, maxRails: 2, gap: 2 * R, flat: flat)
+        guard c.pocket < 0, let id = c.ball, let b = others.first(where: { $0.id == id }), c.pts.count >= 4 else { return nil }
+        let gx = c.pts[c.pts.count - 2], gy = c.pts[c.pts.count - 1]
+        var ox = b.x - gx, oy = b.y - gy
+        let d = (ox * ox + oy * oy).squareRoot(); ox /= max(d, 1e-6); oy /= max(d, 1e-6)
+        let o = run(b.x, b.y, ox, oy, balls: others, skip: id, maxLen: 4000, maxRails: 4, gap: 2 * R - 3, pad: safePad, flat: flat)
+        guard o.pocket >= 0 else { return nil }
+        return (Hit(ball: id, pocket: o.pocket, objRails: o.rails, cueRails: c.rails), c, o)
+    }
+
+    /// Sweep the cue all the way round (0.1° steps) and keep, for your balls, every window of directions that pots:
+    /// only shots that are sure — at least 0.3° of turn to spare (0.2° for banks), still dropping with the cushions bouncing anywhere
+    /// in `flatRange`, within 90 % power, and the cue ball not following it in.
+    static func sweep(cueX: Double, cueY: Double, balls: [Ball], legal: Set<Int>) -> [Found] {
+        let others = balls.filter { $0.id != 0 }
+        let n = 3600, step = 2 * Double.pi / Double(n)
+        var keys = [Hit?](repeating: nil, count: n)
+        for k in 0..<n { if let h = hitAt(cueX, cueY, Double(k) * step, others, flat: bounceFlatten), legal.contains(h.0.ball) { keys[k] = h.0 } }
+        // windows (the sweep wraps round)
+        var out: [Found] = []
+        guard let firstGap = keys.firstIndex(where: { $0 == nil }) else { return [] }
+        var visited = 0
+        var k = firstGap
+        while visited < n {
+            guard let h = keys[k % n] else { k += 1; visited += 1; continue }
+            var len = 0
+            while len < n && keys[(k + len) % n] == h { len += 1 }
+            visited += len
+            let w = Double(len) * 0.1
+            let mid = (Double(k) + Double(len - 1) / 2) * step
+            k += len
+            if w < (h.objRails + h.cueRails > 0 ? 0.2 : 0.3) { continue }
+            // sure: the middle still pots with the cushions a bit livelier or deader than measured
+            if h.objRails + h.cueRails > 0 {
+                var ok = true
+                for f in flatRange { if hitAt(cueX, cueY, mid, others, flat: f)?.0 != h { ok = false } }
+                if !ok { continue }
+            }
+            guard let hm = hitAt(cueX, cueY, mid, others, flat: bounceFlatten) else { continue }
+            let c = hm.1
+            // power: the least that drops it (in steps of 5), then a margin
+            var need: Int? = nil
+            var p = 10
+            var objPts: [Double] = [], stop: [Double] = []
+            while p <= 90 {
+                let v0 = Double(p) / 100 * fullSpeed
+                let cr = run(cueX, cueY, cos(mid), sin(mid), balls: others, skip: 0, maxLen: 4000, maxRails: 2, gap: 2 * R, speed: v0)
+                if cr.ball == h.ball, cr.pts.count >= 4 {
+                    let gx = cr.pts[cr.pts.count - 2], gy = cr.pts[cr.pts.count - 1]
+                    let lx = gx - cr.pts[cr.pts.count - 4], ly = gy - cr.pts[cr.pts.count - 3], ll = max(1e-6, (lx * lx + ly * ly).squareRoot())
+                    guard let b = others.first(where: { $0.id == h.ball }) else { break }
+                    var ox = b.x - gx, oy = b.y - gy
+                    let d = max(1e-6, (ox * ox + oy * oy).squareRoot()); ox /= d; oy /= d
+                    let along = max(0, min(1, (lx * ox + ly * oy) / ll))
+                    let vHit = speedFor(distance: cr.left)
+                    let o = run(b.x, b.y, ox, oy, balls: others, skip: h.ball, maxLen: 4000, maxRails: 4, gap: 2 * R - 3, pad: safePad, speed: vHit * along)
+                    if o.pocket == h.pocket {
+                        // the cue ball after the hit (a stun hit runs along the tangent; a full hit stops)
+                        let side = (lx / ll) * -oy + (ly / ll) * ox > 0
+                        let tx = side ? -oy : oy, ty = side ? ox : -ox
+                        let cAfter = along > 0.995 ? Run(pts: [gx, gy]) : run(gx, gy, tx, ty, balls: others, skip: h.ball, maxRails: 4, speed: vHit * (1 - along * along).squareRoot())
+                        if cAfter.pocket >= 0 { need = nil; break }   // the cue ball follows it in
+                        need = p; objPts = o.pts; stop = cAfter.pts
+                        break
+                    }
+                }
+                p += 5
+            }
+            guard let pw = need else { continue }
+            out.append(Found(ball: h.ball, pocket: h.pocket, angle: mid, width: w, objRails: h.objRails, cueRails: h.cueRails,
+                             power: min(100, pw + 10), ghostX: c.pts[c.pts.count - 2], ghostY: c.pts[c.pts.count - 1],
+                             cuePts: c.pts, objPts: objPts, cueStop: stop))
+        }
+        // easiest first: more turn to spare, fewer cushions, less power
+        func score(_ f: Found) -> Double { f.width * pow(0.75, Double(f.objRails)) * pow(0.6, Double(f.cueRails)) * (f.power > 80 ? 0.8 : 1) }
+        return out.sorted { score($0) > score($1) }
     }
 }

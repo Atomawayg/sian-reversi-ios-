@@ -540,7 +540,11 @@ struct PoolView: Equatable {
     var cueStops: [PoolStop] = []              // where the cue ball comes to rest for your aim (by power %)
     var objStops: [PoolStop] = []              // where the hit ball comes to rest (when it doesn't drop)
     var stopsLive = false                      // pulling: the one stop for your power (else marks for 25/50/75/100)
-    var options: [PoolEngine.Shot] = []        // every ball that pots straight from here: a thin line to its pocket                 // no turn pots, but your line ends by this pocket: close-up only
+    var options: [PoolEngine.Shot] = []        // (no longer filled: see `found`)
+    var found: [PoolEngine.Found] = []         // every sure pot from here: a thin line along the ball's way to its pocket
+    var pick: PoolEngine.Found? = nil          // the one suggested: drawn in gold with the cue ball's way and where it stops
+    var objPathFull: [Double] = []             // your line at the power to use (always into the pocket when it drops)
+    var powerTarget: Int? = nil, powerNow: Int? = nil   // the power bar: where to pull to, and where you are
     var target: Int? = nil                     // the ball your aim hits
     var legal: [Int] = []
 }
@@ -562,7 +566,8 @@ extension Renderer {
         let zoomAt = v.win?.pocket ?? v.zoomPocket
         let zoom = zoomAt != nil && v.aimX != nil
         let zs: CGFloat = min(250, rect.height - 24)   // the pocket close-up, big on the right while your line nears a pocket
-        let tx = area.maxX + 30, tw = rect.width - tx - 16 - (zoom ? zs + 10 : 0)
+        let barW: CGFloat = 26, barX = rect.width - (zoom ? zs + 12 : 0) - barW - 14
+        let tx = area.maxX + 30, tw = barX - tx - 10
         let tAttr: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: zoom ? 26 : 44, weight: .heavy), .foregroundColor: o.mine ? gold : UIColor.white]
         let tH = (o.title as NSString).boundingRect(with: CGSize(width: tw, height: 200), options: .usesLineFragmentOrigin, attributes: tAttr, context: nil).height
         let lAttr: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: zoom ? 18 : 28, weight: .semibold), .foregroundColor: UIColor(white: 0.8, alpha: 1)]
@@ -599,13 +604,25 @@ extension Renderer {
         }
         // suggested shot: gold (faint while you are aiming, so your own line stands out)
         let aiming = v.aimX != nil
-        // every ball that pots straight: thin lines to the pocket (gold yours, grey the others; fainter while aiming)
-        for s in v.options where s.ball != v.shot?.ball {
-            guard let b = v.balls.first(where: { $0.id == s.ball }) else { continue }
-            let p = PoolEngine.pockets[s.pocket], mine = v.legal.contains(s.ball)
-            let col = (mine ? gold : UIColor(white: 0.85, alpha: 1)).withAlphaComponent(aiming ? 0.2 : (mine ? 0.7 : 0.35))
-            let l = UIBezierPath(); l.move(to: pt(b.x, b.y)); l.addLine(to: pt(p.x, p.y))
-            l.lineWidth = mine ? 2 : 1.5; l.setLineDash([4, 4], count: 2, phase: 0); col.setStroke(); l.stroke()
+        // every sure pot: a thin line along the ball's way into the pocket, cushions included (the best per ball)
+        var drawnBalls = Set<Int>()
+        let thin = UIColor(red: 1.0, green: 0.45, blue: 0.35, alpha: aiming ? 0.25 : 0.8)
+        for f in v.found where f != v.pick && !drawnBalls.contains(f.ball) {
+            drawnBalls.insert(f.ball)
+            poly(f.objPts, thin, 1.5)
+        }
+        // the pick: the cue ball's way to the ball (gold), the ghost ring, the ball's way in, and where the cue ball stops
+        if let f = v.pick {
+            let col = aiming ? gold.withAlphaComponent(0.3) : gold
+            poly(f.cuePts, col, 2.5)
+            poly(f.objPts, col, 3)
+            let g = pt(f.ghostX, f.ghostY)
+            col.setStroke(); let gr = UIBezierPath(ovalIn: CGRect(x: g.x - br, y: g.y - br, width: br * 2, height: br * 2)); gr.lineWidth = 2; gr.stroke()
+            if !aiming, f.cueStop.count >= 2 {
+                poly(f.cueStop, UIColor.white.withAlphaComponent(0.7), 2, dash: true)
+                let e = pt(f.cueStop[f.cueStop.count - 2], f.cueStop[f.cueStop.count - 1])
+                UIColor.white.setStroke(); let r = UIBezierPath(ovalIn: CGRect(x: e.x - br, y: e.y - br, width: br * 2, height: br * 2)); r.lineWidth = 2; r.setLineDash([3, 3], count: 2, phase: 0); r.stroke()
+            }
         }
         let sg = aiming ? gold.withAlphaComponent(0.35) : gold
         if let s = v.shot {
@@ -623,6 +640,8 @@ extension Renderer {
         // your aim now: where the ball goes (green = drops, red = doesn't) and where the cue ball runs
         let orange = UIColor(red: 1.0, green: 0.62, blue: 0.15, alpha: 1)
         // a dark edge under your lines so they stand out on the small table
+        // your line all the way in at the power to use (thin), then what your pull really reaches (bold)
+        poly(v.objPathFull, (v.pots ? green : (v.risky ? orange : red)).withAlphaComponent(0.55), 2.5)
         poly(v.objPath, UIColor.black.withAlphaComponent(0.55), 8)
         poly(v.cuePath, UIColor.black.withAlphaComponent(0.55), 6)
         poly(v.objPath, v.pots ? green : (v.risky ? orange : red), 5)
@@ -641,7 +660,7 @@ extension Renderer {
                                                      .strokeColor: UIColor.black, .strokeWidth: -3]
             if v.stopsLive {
                 col.setStroke(); let r = UIBezierPath(ovalIn: CGRect(x: e.x - br, y: e.y - br, width: br * 2, height: br * 2)); r.lineWidth = 3; r.stroke()
-                ("\(s.pct)" as NSString).draw(at: CGPoint(x: e.x + br + 2, y: e.y - 9), withAttributes: at)
+                _ = at
             } else {
                 UIColor.black.setFill(); UIBezierPath(ovalIn: CGRect(x: e.x - 4.5, y: e.y - 4.5, width: 9, height: 9)).fill()
                 col.setFill(); UIBezierPath(ovalIn: CGRect(x: e.x - 3, y: e.y - 3, width: 6, height: 6)).fill()
@@ -686,6 +705,28 @@ extension Renderer {
             let a = pt(ax, ay)
             (v.pots ? green : UIColor.white).setStroke()
             let c = UIBezierPath(ovalIn: CGRect(x: a.x - br, y: a.y - br, width: br * 2, height: br * 2)); c.lineWidth = 2.5; c.stroke()
+        }
+        // the power bar, like the game's: a cue stick in a slot, a gold mark where to pull to, white down to where you are
+        if v.powerTarget != nil || v.powerNow != nil {
+            let top = CGFloat(18), h = rect.height - 36
+            let slot = CGRect(x: barX, y: top, width: barW, height: h)
+            UIColor(white: 0.12, alpha: 0.9).setFill(); UIBezierPath(roundedRect: slot.insetBy(dx: -3, dy: -3), cornerRadius: 8).fill()
+            // the stick: tip at the top, wood below
+            let stick = CGRect(x: slot.midX - 3, y: slot.minY + 4, width: 6, height: h - 8)
+            UIColor(red: 0.78, green: 0.58, blue: 0.33, alpha: 1).setFill(); UIBezierPath(roundedRect: stick, cornerRadius: 3).fill()
+            UIColor(red: 0.42, green: 0.25, blue: 0.12, alpha: 1).setFill(); UIBezierPath(roundedRect: CGRect(x: stick.minX, y: stick.minY + stick.height * 0.62, width: stick.width, height: stick.height * 0.38), cornerRadius: 3).fill()
+            UIColor.white.setFill(); UIRectFill(CGRect(x: stick.minX, y: stick.minY, width: stick.width, height: 6))
+            func yAt(_ p: Int) -> CGFloat { slot.minY + CGFloat(max(0, min(100, p))) / 100 * h }
+            if let n = v.powerNow {   // how far you have pulled
+                UIColor.white.withAlphaComponent(0.35).setFill(); UIRectFill(CGRect(x: slot.minX, y: slot.minY, width: barW, height: yAt(n) - slot.minY))
+                UIColor.white.setFill(); UIRectFill(CGRect(x: slot.minX - 4, y: yAt(n) - 1.5, width: barW + 8, height: 3))
+            }
+            if let p = v.powerTarget {   // pull to here
+                let y = yAt(p), near = v.powerNow.map { abs($0 - p) <= 4 } ?? false
+                (near ? green : gold).setFill()
+                UIBezierPath(roundedRect: CGRect(x: slot.minX - 6, y: y - 3, width: barW + 12, height: 6), cornerRadius: 3).fill()
+                let tri = UIBezierPath(); tri.move(to: CGPoint(x: slot.minX - 7, y: y)); tri.addLine(to: CGPoint(x: slot.minX - 15, y: y - 7)); tri.addLine(to: CGPoint(x: slot.minX - 15, y: y + 7)); tri.close(); tri.fill()
+            }
         }
         if zoom, let k = zoomAt {
             drawPoolZoom(v, k, v.win, CGRect(x: rect.width - zs - 12, y: (rect.height - zs) / 2, width: zs, height: zs), pots: v.pots, risky: v.risky)
