@@ -518,7 +518,9 @@ final class GameModel: ObservableObject {
             if mine == solids { poolGroup = 1 } else if mine == stripes { poolGroup = 2 }
         }
         var g = poolGroup != 0 ? poolGroup : (m.me == 3 ? 0 : m.me)
-        if m.me == 3 && poolGroup == 0 && mine == 0 { g = 3 }
+        // the reader says "on the 8" only from the bars; believe it when one group really is gone from the table
+        // (an open table with both bars empty, or a bar covered by the floating window, must not read as the 8)
+        if m.me == 3 && poolGroup == 0 && mine == 0 && (solids == 0 || stripes == 0) { g = 3 }
         // none of your balls left on the table: the 8 is next
         if g == 1 && solids == 0 { g = 3 }
         if g == 2 && stripes == 0 { g = 3 }
