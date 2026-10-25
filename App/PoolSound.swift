@@ -1,10 +1,10 @@
 import AVFoundation
 
-/// Sounds for aiming in pool, so the floating window can be tucked away:
-/// a long tone while the aim pots a ball (high = the suggested shot, low = another ball that drops),
-/// beeps that speed up as you turn towards a pot, a double blip for a foul or scratch, and Thai speech.
+/// Sounds for aiming in pool, so the floating window can be tucked away: silence = not yet,
+/// one long tone = this aim pots a ball, a blip when the power bar is pulled far enough, and Thai speech
+/// (the tone waits while the voice speaks, so they never overlap).
 /// Plays over the game's own sound (the audio session mixes with others).
-final class PoolSound {
+final class PoolSound: NSObject, AVSpeechSynthesizerDelegate {
     enum Mode: Equatable { case off, tone(Double), beeps(Double, Double), warn }
 
     private let engine = AVAudioEngine()
@@ -15,7 +15,7 @@ final class PoolSound {
     private var lastSaid = "", lastSaidAt = Date.distantPast
 
     // read by the audio thread
-    private final class State { var freq = 0.0; var on = 1.0; var off = 0.0; var ding = 0 }
+    private final class State { var freq = 0.0; var on = 1.0; var off = 0.0; var ding = 0; var mute = false }
     private let st = State()
 
     private func start() {
@@ -28,7 +28,7 @@ final class PoolSound {
             let buf = UnsafeMutableAudioBufferListPointer(abl)
             for i in 0..<Int(frames) {
                 var f = s.freq
-                var gate = f > 0
+                var gate = f > 0 && !s.mute         // the tone waits while the voice speaks
                 if s.off > 0 { gate = gate && t.truncatingRemainder(dividingBy: s.on + s.off) < s.on }
                 if s.ding > 0 { f = 1760; gate = true; s.ding -= 1 }
                 let target = gate ? 0.35 : 0.0
@@ -67,10 +67,16 @@ final class PoolSound {
     func say(_ text: String, again: Double = 6) {
         if text == lastSaid && Date().timeIntervalSince(lastSaidAt) < again { return }
         lastSaid = text; lastSaidAt = Date()
+        start()
+        speech.delegate = self
+        st.mute = true
         if speech.isSpeaking { speech.stopSpeaking(at: .immediate) }
         let u = AVSpeechUtterance(string: text)
         u.voice = AVSpeechSynthesisVoice(language: "th-TH")
         u.rate = 0.55
         speech.speak(u)
     }
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) { if !synthesizer.isSpeaking { st.mute = false } }
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) { if !synthesizer.isSpeaking { st.mute = false } }
 }
