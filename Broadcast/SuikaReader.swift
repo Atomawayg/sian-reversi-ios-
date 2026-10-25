@@ -47,11 +47,13 @@ extension BoardReader {
     static func looksLikeSuika(_ s: Sampler) -> Bool {
         let sx = Double(s.w) / 1179, sy = Double(s.h) / 2556
         func at(_ x: Double, _ y: Double) -> (Double, Double, Double) { s.avg(x * sx, y * sy, 3 * sx) }
-        // the sky's blue varies between recordings and screenshots: (111,190,249) on one, (69,189,255) on another
-        func sky(_ p: (Double, Double, Double)) -> Bool { p.2 > 215 && p.1 > 155 && p.1 < 220 && p.0 > 40 && p.0 < 150 && p.2 - p.0 > 80 }
-        func white(_ p: (Double, Double, Double)) -> Bool { min(p.0, p.1, p.2) > 232 }
-        guard sky(at(30, 1300)), sky(at(1150, 1300)), sky(at(30, 1900)), sky(at(1150, 1900)) else { return false }
-        guard white(at(70, 1500)), white(at(1108, 1500)), white(at(70, 2000)), white(at(1108, 2000)) else { return false }
+        // the sky's blue differs between screenshots (111,190,249), recordings (67,183,254) and live frames,
+        // so only ask for "clearly blue" and "white", and let one of the four points be covered
+        func sky(_ p: (Double, Double, Double)) -> Bool { p.2 > 190 && p.2 >= p.1 && p.1 > 130 && p.2 - p.0 > 60 }
+        func white(_ p: (Double, Double, Double)) -> Bool { min(p.0, p.1, p.2) > 215 }
+        let skies = [at(30, 1300), at(1150, 1300), at(30, 1900), at(1150, 1900)].filter(sky).count
+        let walls = [at(70, 1500), at(1108, 1500), at(70, 2000), at(1108, 2000)].filter(white).count
+        guard skies >= 3, walls >= 3 else { return false }
         return true
     }
 
