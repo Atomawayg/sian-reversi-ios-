@@ -503,10 +503,9 @@ final class GameModel: ObservableObject {
     private var poolBalls: [PoolEngine.Ball] = []      // last cleanly read table
     private var poolKey: [Int] = []
     private var poolBest: PoolEngine.Shot? = nil
-    private var poolShots: [PoolEngine.Shot] = []
     private var poolLock: (ball: Int, pocket: Int)? = nil
     private var poolNote = ""
-    private var poolDingAt = Date.distantPast
+    private var poolInZone = false
 
     private func handlePool(_ m: BoardMessage) {
         let c = m.cells
@@ -531,69 +530,67 @@ final class GameModel: ObservableObject {
             poolSound.set(.off); computedFor = []; poolBest = nil; poolKey = []; poolLock = nil
             show(Overlay(game: .pool, title: "รอ…", line: "ตาคู่แข่ง")); return
         }
-        let legal = PoolEngine.legal(group: m.me)
         let cue = balls.first { $0.id == 0 }
         let others = balls.filter { $0.id != 0 }
-        // a new table on your turn: choose the shot and say it once
-        let key = balls.flatMap { [$0.id, Int($0.x / 6), Int($0.y / 6)] } + [m.me]
+        // your group, double-checked against the table: none of your balls left on it means the 8 is next
+        var group = m.me
+        if group == 1 && !others.contains(where: { (1...7).contains($0.id) }) { group = 3 }
+        if group == 2 && !others.contains(where: { (9...15).contains($0.id) }) { group = 3 }
+        let legal = PoolEngine.legal(group: group)
+        // a new table on your turn: choose a straight-in shot and say it once
+        let key = balls.flatMap { [$0.id, Int($0.x / 6), Int($0.y / 6)] } + [group]
         if key != poolKey {
-            poolKey = key; poolBest = nil; poolNote = ""; poolShots = []; poolLock = nil
+            poolKey = key; poolBest = nil; poolNote = ""; poolLock = nil
             if PoolEngine.isBreak(others) {
                 poolNote = "break"
                 poolSound.say("เบรก แรงสุด")
             } else if let cue {
-                poolShots = PoolEngine.shots(cueX: cue.x, cueY: cue.y, balls: others, legal: legal)
-                poolBest = poolShots.first
+                poolBest = PoolEngine.shots(cueX: cue.x, cueY: cue.y, balls: others, legal: legal, banks: false).first
                 if let s = poolBest {
-                    poolSound.say("ลูก \(s.ball) " + (s.bank ? "ชิ่ง " : "") + "หลุม" + PoolEngine.pockets[s.pocket].name)
+                    poolSound.say("ลูก \(s.ball) หลุม" + PoolEngine.pockets[s.pocket].name + " แรง \(s.powerPct)")
+                    poolLock = (s.ball, s.pocket)   // already said: no need to say its power again
                 } else if let sb = PoolEngine.safety(cueX: cue.x, cueY: cue.y, balls: others, legal: legal) {
-                    poolNote = "ไม่มีลูกลง · แตะลูก \(sb.id) ให้โดนก่อน (เล่นเซฟ)"
-                    poolSound.say("ไม่มีลูกลง เล่นเซฟ ลูก \(sb.id)")
+                    poolNote = "ไม่มีลูกลงตรง · แตะลูก \(sb.id) ให้โดนก่อน (เล่นเซฟ)"
+                    poolSound.say("ไม่มีลูกลง เล่นเซฟ")
                 }
             } else {
                 poolBest = PoolEngine.bestPlacement(balls: others, legal: legal)   // ball in hand
                 if let s = poolBest { poolSound.say("วางลูกขาว แล้วแทงลูก \(s.ball)") }
             }
         }
-        // the sound follows the aim
         var title = "เซฟ", line = poolNote
         if let s = poolBest {
             title = "ลูก \(s.ball) → \(PoolEngine.pockets[s.pocket].name)"
-            line = (s.bank ? "ชิ่ง · " : "") + "ตัด \(Int(s.cut.rounded()))° · แรง \(s.powerPct)" + (s.scratch ? " · ระวังลูกขาวตก" : "")
+            line = "ตัด \(Int(s.cut.rounded()))° · แรง \(s.powerPct)" + (s.scratch ? " · ระวังลูกขาวตก" : "")
         }
         if poolNote == "break" { title = "เบรก"; line = "ยิงตรงกลางลูกหน้าสุด แรงสุด" }
+        // silence = not yet · one long tone = this aim pots one of your balls cleanly
         if hasAim, let cue {
             let a = PoolCodec.get(c, PoolCodec.aim)
             let v = PoolEngine.judge(cueX: cue.x, cueY: cue.y, aimX: a.x, aimY: a.y, balls: others, legal: legal)
-            if v.ball >= 0 && v.pocket >= 0 && (v.foul || v.scratch) {
-                poolSound.set(.warn); poolLock = nil
-                line = v.foul ? "ลูกนี้ไม่ใช่ของคุณ (ฟาวล์)" : "ลูกขาวจะตกตาม"
-            } else if v.ball >= 0 && v.pocket >= 0 {
-                let best = poolBest.map { $0.ball == v.ball && $0.pocket == v.pocket } ?? false
-                // dead centre: long tone · near the edge of the pocket: quick beeps (it may rattle out)
-                let f = best ? 880.0 : 523.0
-                poolSound.set(v.off < 0.45 ? .tone(f) : .beeps(f, 0.08))
+            let good = v.ball >= 0 && v.pocket >= 0 && !v.foul && !v.scratch && v.off < 0.45
+            if good {
                 if poolLock == nil || poolLock!.ball != v.ball || poolLock!.pocket != v.pocket {
                     poolLock = (v.ball, v.pocket)
-                    poolSound.say("แรง \(v.powerPct)", again: 3)
+                    poolSound.say("แรง \(v.powerPct)", again: 3)    // the tone pauses while this is said
                 }
                 title = "✓ ลูก \(v.ball) → \(PoolEngine.pockets[v.pocket].name)"
                 line = (v.bank ? "ชิ่ง · " : "") + "แรง \(v.powerPct)"
-                // pulling the power bar: a blip when it is at the right strength
                 if pulling {
+                    // pulling the power bar: tone off, one blip when it reaches the strength
+                    poolSound.set(.off)
                     let pct = c[PoolCodec.power] * 14 + c[PoolCodec.power + 1]
-                    if abs(pct - v.powerPct) <= 4 && Date().timeIntervalSince(poolDingAt) > 0.35 { poolDingAt = Date(); poolSound.ding() }
+                    let inZone = abs(pct - v.powerPct) <= 4
+                    if inZone && !poolInZone { poolSound.ding() }
+                    poolInZone = inZone
                     line += " · ตอนนี้ \(pct)"
+                } else {
+                    poolInZone = false
+                    poolSound.set(.tone(660))
                 }
             } else {
-                poolLock = nil
-                // not potting: beep faster the closer the aim is to a shot that does
-                var near = Double.infinity
-                for s in poolShots {
-                    let d = abs(PoolEngine.aimError(s, aimX: a.x, aimY: a.y).turn)
-                    near = min(near, d)
-                }
-                if near < 3 { poolSound.set(.beeps(near < 1 ? 660 : 440, 0.08 + near * 0.15)) } else { poolSound.set(.off) }
+                poolSound.set(.off); poolInZone = false
+                if v.ball >= 0 && v.pocket >= 0 { line = v.foul ? "ลูกนี้ไม่ใช่ของคุณ (ฟาวล์)" : (v.scratch ? "ลูกขาวจะตกตาม" : "เฉียดขอบหลุม") }
             }
         } else {
             poolSound.set(.off)

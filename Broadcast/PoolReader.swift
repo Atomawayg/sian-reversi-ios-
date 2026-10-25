@@ -56,12 +56,16 @@ enum PoolReader {
         // group: the bars show the balls each player still has to pot
         let mine = barIcons(s, xs: (0..<7).map { 206 + 46.8 * Double($0) }, y: 398)
         let opp = barIcons(s, xs: (0..<7).map { 697 + 47 * Double($0) }, y: 397)
+        // the 8 appears in a bar near the end (with a player's last ball, or alone): it says nothing about
+        // solids or stripes, so leave it out; a bar holding only the 8 means that player is on the 8
         var group = 0
         func avg(_ a: [Double]) -> Double { a.reduce(0, +) / Double(max(1, a.count)) }
-        if !mine.isEmpty && !opp.isEmpty { group = avg(mine) < avg(opp) ? 2 : 1 }   // the bar with white caps is stripes
-        else if !mine.isEmpty { group = avg(mine) < 0.63 ? 2 : 1 }
-        else if !opp.isEmpty { group = 3 }   // opponent still has balls, you have none left: play the 8
-        cells[PoolCodec.myLeft] = min(13, mine.count); cells[PoolCodec.oppLeft] = min(13, opp.count)
+        let mineC = mine.filter { !$0.black }.map { $0.ratio }, oppC = opp.filter { !$0.black }.map { $0.ratio }
+        if !mine.isEmpty && mineC.isEmpty { group = 3 }
+        else if !mineC.isEmpty && !oppC.isEmpty { group = avg(mineC) < avg(oppC) ? 2 : 1 }   // the bar with white caps is stripes
+        else if !mineC.isEmpty { group = avg(mineC) < 0.63 ? 2 : 1 }
+        else if mine.isEmpty && !opp.isEmpty { group = 3 }   // opponent still has balls, you have none left: play the 8
+        cells[PoolCodec.myLeft] = min(13, mineC.count); cells[PoolCodec.oppLeft] = min(13, oppC.count)
 
         // 1) coarse felt grid → candidate ball centres
         let g = 3.0
@@ -205,18 +209,21 @@ enum PoolReader {
     }
 
     /// Cap/band saturation ratio per icon (stripes ≈ 0.42–0.56: white caps; solids ≈ 0.70–0.84); empty slots left out.
-    static func barIcons(_ s: BoardReader.Sampler, xs: [Double], y: Double) -> [Double] {
+    static func barIcons(_ s: BoardReader.Sampler, xs: [Double], y: Double) -> [(ratio: Double, black: Bool)] {
         let sx = Double(s.w) / 1180, sy = Double(s.h) / 2556
-        var out: [Double] = []
+        var out: [(ratio: Double, black: Bool)] = []
         let r = 19.0
         for cx in xs {
             var sumS = 0.0, sumV = 0.0, sumV2 = 0.0, n = 0.0, capS = 0.0, capN = 0.0, bandS = 0.0, bandN = 0.0
+            var ringS: [Double] = [], ringV: [Double] = []
             var dy = -r
             while dy <= r {
                 var dx = -r
                 while dx <= r {
-                    if (dx * dx + dy * dy).squareRoot() <= 0.85 * r {
+                    let dd = (dx * dx + dy * dy).squareRoot()
+                    if dd <= 0.85 * r {
                         let c = hsv(s.get(Int((cx + dx) * sx), Int((y + dy) * sy)))
+                        if dd > 0.55 * r { ringS.append(c.s); ringV.append(c.v) }   // the ball's colour, around its number
                         sumS += c.s; sumV += c.v; sumV2 += c.v * c.v; n += 1
                         if abs(dy) >= 0.6 * r { capS += c.s; capN += 1 }
                         if abs(dy) <= 0.3 * r && abs(dx) >= 0.45 * r { bandS += c.s; bandN += 1 }
@@ -228,7 +235,10 @@ enum PoolReader {
             let meanS = sumS / n, meanV = sumV / n, sdV = max(0, sumV2 / n - meanV * meanV).squareRoot()
             if meanS < 0.2 && sdV < 0.06 { continue }   // empty grey slot
             let ratio = (capS / max(1, capN)) / max(0.01, bandS / max(1, bandN))
-            out.append(ratio)
+            ringS.sort(); ringV.sort()
+            let mS = ringS.isEmpty ? 1 : ringS[ringS.count / 2], mV = ringV.isEmpty ? 1 : ringV[ringV.count / 2]
+            // the 8 is black: dark AND colourless around its number (a dimmed maroon 7 is dark but saturated: 0.62)
+            out.append((ratio, mV < 0.3 && mS < 0.35))
         }
         return out
     }
