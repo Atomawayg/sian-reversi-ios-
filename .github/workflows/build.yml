@@ -20,7 +20,9 @@ jobs:
           xcodebuild -project SianReversi.xcodeproj -scheme SianReversi -configuration Release \
             -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build | tee build.log | grep -E "error:|warning: .*deprecated|BUILD" || true
-          test -d build/Build/Products/Release-iphoneos/SianReversi.app
+          # the .app folder appears even when Swift fails to compile: check the executables are really there
+          test -f build/Build/Products/Release-iphoneos/SianReversi.app/SianReversi
+          test -f build/Build/Products/Release-iphoneos/SianReversi.app/PlugIns/SianBroadcast.appex/SianBroadcast
       - name: Report build errors
         if: failure()
         run: grep -E "error:" build.log | sort -u | head -40 | sed 's/^/::error::/' || true
