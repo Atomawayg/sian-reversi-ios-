@@ -510,6 +510,7 @@ final class GameModel: ObservableObject {
     private var poolNext: PoolEngine.Shot? = nil
     private var poolCueEnd: (Double, Double)? = nil
     private var poolLastLog = ""
+    private var poolAims: [(Double, Double)] = []   // the last few aim-circle readings (a sure pot needs it steady)
 
     private var poolGroup = 0            // your group once it is certain (kept for the whole game)
 
@@ -526,9 +527,10 @@ final class GameModel: ObservableObject {
         // the reader says "on the 8" only from the bars; believe it when one group really is gone from the table
         // (an open table with both bars empty, or a bar covered by the floating window, must not read as the 8)
         if m.me == 3 && poolGroup == 0 && mine == 0 && (solids == 0 || stripes == 0) { g = 3 }
-        // none of your balls left on the table: the 8 is next
-        if g == 1 && solids == 0 { g = 3 }
-        if g == 2 && stripes == 0 { g = 3 }
+        // none of your balls left on the table: the 8 is next (unless your bar still shows one: a ball of yours
+        // misread as the other group must not put you on the 8)
+        if g == 1 && solids == 0 && mine == 0 { g = 3 }
+        if g == 2 && stripes == 0 && mine == 0 { g = 3 }
         return g
     }
 
@@ -613,6 +615,9 @@ final class GameModel: ObservableObject {
             let a = PoolCodec.get(c, PoolCodec.aim)
             view.aimX = a.x; view.aimY = a.y
             let dir = PoolCodec.dir(c)
+            // the ring can flick between two spots a few px apart (by a cushion): trust it once three readings agree
+            poolAims.append((a.x, a.y)); if poolAims.count > 3 { poolAims.removeFirst() }
+            let steady = pulling || (poolAims.count == 3 && poolAims.allSatisfy { abs($0.0 - a.x) <= 4 && abs($0.1 - a.y) <= 4 })
             let v = PoolEngine.judge(cueX: cue.x, cueY: cue.y, aimX: a.x, aimY: a.y, balls: others, legal: legal, dir: dir)
             if v.ball >= 0, let b = others.first(where: { $0.id == v.ball }) {
                 view.objPath = PoolEngine.objectPath(b.x, b.y, gx: a.x, gy: a.y, balls: balls, skip: b.id, dir: dir)
@@ -630,7 +635,10 @@ final class GameModel: ObservableObject {
                     turnHint = "กลางหลุมแล้ว"
                 }
             }
-            let good = v.ball >= 0 && v.pocket >= 0 && !v.foul && !v.scratch && v.off < 0.75   // the game's own line makes the edge of the mouth trustworthy
+            let cleanPot = v.ball >= 0 && v.pocket >= 0 && !v.foul && !v.scratch && v.off < 0.75   // the game's own line makes the edge of the mouth trustworthy
+            // never a sure pot on a guessed direction: on a thin cut the game's line is too short to read, and a few px
+            // of ring error then turn the ball by 10° or more (an 8 shown as dropping went wide by 14°)
+            let good = cleanPot && dir != nil && steady
             view.pots = good
             view.risky = !good && v.ball >= 0 && v.pocket >= 0 && !v.foul && !v.scratch
             var bankText = "ชิ่ง · "
@@ -661,11 +669,12 @@ final class GameModel: ObservableObject {
                 } else if let w = view.win {
                     // your line misses or only just drops: which pocket it is near and which way to turn
                     title = "\(v.ball) → \(PoolEngine.pockets[w.pocket].name)" + (v.pocket >= 0 ? " เสี่ยง" : "?")
-                    line = (turnHint.isEmpty ? (v.pocket >= 0 ? "เฉียดจมูกหลุม" : "") : turnHint) + "\n" + mineText
+                    let why = cleanPot ? (dir == nil ? "ช็อตบาง มองไม่เห็นเส้นของเกม" : "รอวงเล็งนิ่ง") : (v.pocket >= 0 ? "เฉียดจมูกหลุม" : "")
+                    line = (cleanPot || turnHint.isEmpty ? why : turnHint) + "\n" + mineText
                 }
             }
         } else {
-            poolSound.set(.off)
+            poolSound.set(.off); poolAims = []
         }
         var o = Overlay(game: .pool, title: title, line: line, mine: true); o.pool = view
         show(o)

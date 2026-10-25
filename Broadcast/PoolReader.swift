@@ -186,7 +186,18 @@ enum PoolReader {
             balls.append(Ball(x: cx, y: cy, id: id.id, rimWhite: id.rim))
         }
 
-        // 3) consistency: one cue ball (the whitest), every number at most once, at most 16 balls
+        // 3) a ball that hasn't moved keeps its number: the glow the game draws round the ball you aim at, or a
+        // cushion's shadow, can make a solid read as its striped twin (a 7 on the rail read as the 15, a 5 as the 13)
+        if let old = cache, old.clean {
+            for k in balls.indices {
+                if let o = old.balls.first(where: { abs($0.x - balls[k].x) < 5 && abs($0.y - balls[k].y) < 5 }), o.id != balls[k].id,
+                   !balls.contains(where: { $0.id == o.id }) {
+                    balls[k].id = o.id
+                }
+            }
+        }
+
+        // 4) consistency: one cue ball (the whitest), every number at most once, at most 16 balls
         clean = balls.count <= 16
         if !balls.contains(where: { $0.id == 0 }), let k = balls.indices.filter({ balls[$0].id >= 9 || balls[$0].id == 0 }).max(by: { balls[$0].rimWhite < balls[$1].rimWhite }),
            balls[k].rimWhite > 0.85 {

@@ -126,7 +126,16 @@ enum PoolEngine {
         return best
     }
 
-    struct Run { var pts: [Double]; var pocket = -1; var ball: Int? = nil; var rails = 0; var jaws = 0; var len = 0.0; var off = 1.0 }
+    struct Run { var pts: [Double]; var pocket = -1; var ball: Int? = nil; var rails = 0; var jaws = 0; var railJaws = 0; var len = 0.0; var off = 1.0 }
+    /// A ball rolling along a cushion (within 12° of it, centre at most 16 px off touching it): it slides past the
+    /// corner jaw into the pocket. Seen in the logs: 5 px off the left cushion up into the top-left corner, 13 px off
+    /// it down into the bottom-left one; both nudged the jaw and dropped.
+    @inline(__always) static func alongRail(_ x: Double, _ y: Double, _ ux: Double, _ uy: Double) -> Bool {
+        let c = cos(12 * Double.pi / 180), n = R + 16
+        if abs(uy) >= c && (x - 207.5 < n || 966.5 - x < n) { return true }
+        if abs(ux) >= c && (y - 584 < n || 2135 - y < n) { return true }
+        return false
+    }
     /// A ball rolling from (x,y) along (ux,uy): off cushions and jaws (they bend it: tan of the angle from the
     /// normal grows ×1.28), until it drops, touches another ball, or has gone `maxLen` / `maxRails` cushions.
     /// `pad`: make the pocket jaws and the cushion ends that much fatter. The game's own jaws sit a few px off
@@ -142,18 +151,24 @@ enum PoolEngine {
             for b in balls where b.id != skip {
                 if let t = rayCircle(x, y, ux, uy, b.x, b.y, gap), t > 1e-6, t < best { best = t; kind = 3; which = b.id }
             }
+            let along = alongRail(x, y, ux, uy)
             x += ux * best; y += uy * best; left -= best; r.pts += [x, y]
             if kind == 1 {
                 r.pocket = which
-                // how central: the last leg's line against the hole centre (0 middle … 1 by the jaw)
+                // how central: the last leg's line against the hole centre (0 middle … 1 by the jaw);
+                // a ball that only brushed the corner jaw rolling along the cushion drops for sure
                 let h = holes[which], perp = abs((h.x - x) * uy - (h.y - y) * ux)
-                r.off = r.jaws > 0 ? 0.85 : min(1, perp / (which == 2 || which == 3 ? 16.5 : 20))
+                r.off = r.jaws > 0 ? 0.85 : (r.railJaws > 0 ? 0.5 : min(1, perp / (which == 2 || which == 3 ? 16.5 : 20)))
             }
             if kind == 3 { r.ball = which }
             if kind != 2 { break }
-            if isJaw { r.jaws += 1 } else { r.rails += 1 }
-            if r.rails > maxRails { break }
             let vn = ux * nx + uy * ny, tx = ux - vn * nx, ty = uy - vn * ny
+            if isJaw {
+                if along && abs(y - midY) > 300 { r.railJaws += 1 } else { r.jaws += 1 }
+            } else if abs(vn) >= sin(12 * Double.pi / 180) {
+                r.rails += 1   // a ball grazing the cushion it rolls along is no bank
+            }
+            if r.rails > maxRails { break }
             ux = tx * bounceFlatten - vn * nx; uy = ty * bounceFlatten - vn * ny
             let l = (ux * ux + uy * uy).squareRoot(); ux /= l; uy /= l
             x += nx * 0.01; y += ny * 0.01

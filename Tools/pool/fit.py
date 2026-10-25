@@ -19,7 +19,8 @@ def build(e, rc, jl=30):
 def d(a): return math.cos(math.radians(a)),math.sin(math.radians(a))
 cases=[('A 11 bounce',(793,1134),283.55,False,1),('B rail roll',(845,608),0.0,False,1),('C 8 pot',(821,822),305.1,True,1),
        ('D 5 pot',(916,619),-24.1,True,1),('E 8 pot',(574,1184),304.0,True,1),('F left rail roll',(236,893),270.0,True,0),
-       ('G pot 2 MR',(441,1587),337.6,True,3),('H pot 1 MR',(848,1428),331.1,True,3)]
+       ('G pot 2 MR',(441,1587),337.6,True,3),('H pot 1 MR',(848,1428),331.1,True,3),
+       ('I 7 down left rail (Oct 25 19:39)',(244,1507),90.0,True,4)]
 def score(e,rc,verbose=False):
     build(e,rc); ok=0
     for name,p,a,truth,hole in cases:
