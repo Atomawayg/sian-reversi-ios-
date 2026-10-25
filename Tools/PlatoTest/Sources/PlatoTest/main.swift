@@ -56,7 +56,7 @@ if mode == "hos" {
         }
         if !ok { continue }
         let res = e.search(b, side: 1, maxMs: 100)
-        if res.instant == "tb" && res.score > 0 { starts.append(b) }
+        if res.instant == "tb" { starts.append(b) }
     }
     for random in [false, true] { for tie in [true] {
         e.humanTieBreak = tie
