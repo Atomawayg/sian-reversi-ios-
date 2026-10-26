@@ -73,7 +73,8 @@ extension BoardReader {
         let sx = Double(s.w) / 1179, sy = Double(s.h) / 2556
         var sum = 0.0, n = 0.0
         var y = 860.0
-        while y <= 950 { var x = SK.left; while x <= SK.right { let g = skGroup(s.get(Int(x * sx), Int(y * sy))); if g >= 1 && g <= 5 { sum += x; n += 1 }   // (not 6: the lid's white rim runs through here); x += 3 }; y += 6 }
+        // (groups 1…5 only: the lid's white rim runs through this strip and reads as 6)
+        while y <= 950 { var x = SK.left; while x <= SK.right { let g = skGroup(s.get(Int(x * sx), Int(y * sy))); if g >= 1 && g <= 5 { sum += x; n += 1 }; x += 3 }; y += 6 }
         return n >= 25 ? sum / n : nil
     }
 
