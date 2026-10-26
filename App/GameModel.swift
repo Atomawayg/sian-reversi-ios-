@@ -519,7 +519,7 @@ final class GameModel: ObservableObject {
     private var poolPick: PoolEngine.Found? = nil, poolNextBall: Int? = nil, poolRunWins = false
     private var poolSafe: PoolEngine.Safety? = nil        // no sure pot: the safety to play (worked out off the main thread)
     private var poolHand: (x: Double, y: Double, pick: PoolEngine.Found)? = nil   // ball in hand: where to put the cue ball
-    private var poolHandFor: [PoolEngine.Ball] = []
+    private var poolHandFor: [PoolEngine.Ball] = [], poolHandBusy = false
     private var poolThinkGen = 0, poolThinking = false
     private var poolTitlePocket: (pocket: Int, pending: Int?, since: Date) = (-1, nil, Date())
     private var poolAims: [(Double, Double)] = []   // the last few aim-circle readings (a sure pot needs it steady)
@@ -528,7 +528,10 @@ final class GameModel: ObservableObject {
     private var poolGroupCand = 0, poolGroupCandSince = Date()   // a group the counts agree on, and since when
     private var poolGroupAltSince: Date? = nil                    // since when the counts fit the other group clearly better
     private var poolStillSince = Date()  // when the balls last stopped moving
-    private var poolPrev: [PoolEngine.Ball] = []
+    private var poolPrev: [PoolEngine.Ball] = []   // where the balls were when they last moved beyond a few px (the stillness anchor)
+    private var poolLastPull = Date.distantPast    // when you last pulled the power bar
+    private var poolDragAt = Date.distantPast      // when the cue ball last moved on its own on your turn (ball in hand, dragged)
+    private var poolInHand = false
 
     /// Your group, from counts only: how many balls your bar holds against how many solids and stripes are on the
     /// table (the bar icons' look is not used any more: on the pink table the phone's capture made stripes read as
@@ -580,6 +583,21 @@ final class GameModel: ObservableObject {
         return opp
     }
 
+    /// Ball in hand: work out where to put the cue ball (once per table; the answer is kept while only the cue ball moves).
+    private func startHandSpot(_ others: [PoolEngine.Ball], _ legal: Set<Int>) {
+        func near(_ a: [PoolEngine.Ball], _ b: [PoolEngine.Ball]) -> Bool {
+            a.count == b.count && a.allSatisfy { x in b.contains { $0.id == x.id && abs($0.x - x.x) < 6 && abs($0.y - x.y) < 6 } }
+        }
+        if poolHandBusy || (poolHand != nil && near(poolHandFor, others)) { return }
+        if !near(poolHandFor, others) { poolHand = nil }
+        poolHandFor = others; poolHandBusy = true
+        let all = others, lg = legal
+        work.async { [weak self] in
+            let h = PoolEngine.handSpot(balls: all, legal: lg)
+            DispatchQueue.main.async { guard let self else { return }; self.poolHandBusy = false; if near(self.poolHandFor, all) { self.poolHand = h } }
+        }
+    }
+
     private func handlePool(_ m: BoardMessage) {
         let started = Date()
         defer {
@@ -612,10 +630,25 @@ final class GameModel: ObservableObject {
         let others = balls.filter { $0.id != 0 }
         // still or rolling: any ball moved more than a few px since the last reading (or one came or went)
         // (the cue ball gets more slack: under the ball-in-hand hand its place comes from the aim line, a few px loose)
-        let movedNow = balls.count != poolPrev.count || !balls.allSatisfy { b in let tol = b.id == 0 ? 8.0 : 4.0; return poolPrev.contains { $0.id == b.id && abs($0.x - b.x) < tol && abs($0.y - b.y) < tol } }
-        poolPrev = balls
-        if movedNow { poolStillSince = Date() }
-        let still = Date().timeIntervalSince(poolStillSince) > 0.35
+        // still: nothing has drifted more than a few px from where it was 0.35 s ago. Measured against an anchor, not the
+        // last reading: a cue ball creeping at the end of its roll moves under 8 px per reading, and was taken as at rest
+        // (a safety was worked out over and over while it crept 100 px)
+        let nowS = Date()
+        if pulling { poolLastPull = nowS }
+        if !m.myTurn { poolInHand = false }
+        func same(_ a: [PoolEngine.Ball], _ b: [PoolEngine.Ball], cueTol: Double) -> Bool {
+            a.count == b.count && a.allSatisfy { x in let tol = x.id == 0 ? cueTol : 4.0; return b.contains { $0.id == x.id && abs($0.x - x.x) < tol && abs($0.y - x.y) < tol } }
+        }
+        if !same(balls, poolPrev, cueTol: 8) {
+            // only the cue ball moved, on your turn, long after your last shot: you are dragging it (ball in hand)
+            let restNow = balls.filter { $0.id != 0 }, restPrev = poolPrev.filter { $0.id != 0 }
+            if m.myTurn && cue != nil && poolPrev.contains(where: { $0.id == 0 }) && same(restNow, restPrev, cueTol: 8)
+                && nowS.timeIntervalSince(poolLastPull) > 8 { poolInHand = true; poolDragAt = nowS }
+            else if !same(restNow, restPrev, cueTol: 8) { poolInHand = false }
+            poolPrev = balls; poolStillSince = nowS
+        }
+        let dragging = poolInHand && nowS.timeIntervalSince(poolDragAt) < 1.0
+        let still = nowS.timeIntervalSince(poolStillSince) > 0.35 && !dragging
         let group = poolGroupNow(m, others, still: still)
         let legal = PoolEngine.legal(group: group)
         let groupName = ["โต๊ะเปิด", "คุณ: ลูกเต็ม", "คุณ: ลูกลาย", "คุณ: ลูก 8"][max(0, min(3, group))]
@@ -623,6 +656,18 @@ final class GameModel: ObservableObject {
         guard m.myTurn else {
             poolSound.set(.off); computedFor = []; poolAims = []
             var o = Overlay(game: .pool, title: "รอ…", line: "ตาคู่แข่ง · " + groupName); o.pool = view; show(o); return
+        }
+        // ball in hand, being dragged: where to put it (worked out once for this table), nothing else
+        if dragging && !pulling {
+            poolSound.set(.off); poolAims = []
+            startHandSpot(others, legal)
+            var title = "วางลูกขาว", line = "กำลังหาจุดวาง…"
+            if let h = poolHand {
+                view.breakSpotX = h.x; view.breakSpotY = h.y; view.pick = h.pick
+                title = "วางขาวที่วงทอง"; line = "แล้วยิง \(h.pick.ball) → \(PoolEngine.pockets[h.pick.pocket].name)"
+            } else if !poolHandBusy { line = "" }
+            var o = Overlay(game: .pool, title: title, line: line, mine: true); o.pool = view; show(o)
+            return
         }
         // balls still rolling: nothing to work out yet (it used to change its mind every frame)
         guard still || pulling else {
@@ -677,12 +722,7 @@ final class GameModel: ObservableObject {
                 }
             } else if cue == nil && !PoolEngine.isBreak(others) {
                 // ball in hand (the hand lies on the cue ball, so it isn't seen): where to put it
-                let gen = poolThinkGen, all = others, lg = legal
-                poolThinking = true; poolHandFor = others
-                work.async { [weak self] in
-                    let h = PoolEngine.handSpot(balls: all, legal: lg)
-                    DispatchQueue.main.async { guard let self, self.poolThinkGen == gen else { return }; self.poolHand = h; self.poolThinking = false }
-                }
+                startHandSpot(others, legal)
             }
         }
         view.found = poolFound; view.pick = poolPick
@@ -695,8 +735,8 @@ final class GameModel: ObservableObject {
             line = bits.joined(separator: " · ")
             if !hasAim { view.powerTarget = f.power }
         } else if let sf = poolSafe {
-            title = "เซฟ: แตะ \(sf.ball)"
-            line = sf.hidden ? "สนุก · ขาวหยุดวงทอง" : "ขาวหยุดวงทอง"
+            title = sf.cueRails > 0 ? "เซฟ: ชิ่ง \(sf.cueRails) ไปแตะ \(sf.ball)" : "เซฟ: แตะ \(sf.ball)"
+            line = sf.tier == 3 ? "แค่ให้โดนลูกตัวเอง ไม่เสียฟาวล์" : (sf.hidden ? "สนุก · ขาวหยุดวงทอง" : "ขาวหยุดวงทอง")
             view.safe = sf
             if !hasAim { view.powerTarget = sf.power }
         } else if cue != nil && !PoolEngine.isBreak(others) {
@@ -742,7 +782,7 @@ final class GameModel: ObservableObject {
             if poolPick == nil && poolSafe == nil { title = "วางขาวที่วงทอง"; line = "แล้วยิง \(h.pick.ball) → \(PoolEngine.pockets[h.pick.pocket].name)" }
         }
         else if cue == nil {
-            title = "วางลูกขาว"; line = poolThinking ? "กำลังหาจุดวาง…" : ""
+            title = "วางลูกขาว"; line = poolHandBusy ? "กำลังหาจุดวาง…" : ""
             if let h = poolHand {
                 view.breakSpotX = h.x; view.breakSpotY = h.y
                 title = "วางขาวที่วงทอง"; line = "แล้วยิง \(h.pick.ball) → \(PoolEngine.pockets[h.pick.pocket].name)"

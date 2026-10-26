@@ -31,7 +31,7 @@ enum PoolEngine {
     static let decel0 = 3.0, decelV = 0.57
     /// the cue ball rolls into the hit (a centre hit in this game is a rolling ball): afterwards it keeps this share of
     /// the pace along the hit ball's line on top of the tangent pace (2/7, as for a rolling ball; a full hit follows through)
-    static let follow = 0.15   // clip: after a near-full hit the cue ball crept on at ~0.15 of its hit pace
+    static let follow = 0.25   // 40 of your shots in the logs (where the cue ball really came to rest): 0.25 halves the miss of 0.15
 
     struct Ball: Equatable { var id: Int; var x: Double; var y: Double }
     struct Shot: Equatable {
@@ -77,6 +77,10 @@ enum PoolEngine {
     static let flatRange = [0.84, 1.19]
     static let keepAlong = 0.8
     static let keepInto = 0.8 / 1.85
+    /// The direction off a cushion. 34 clean object-ball bounces read off the logs (Oct 25–26): tan(out) ≈ 1.40·tan(in)
+    /// + 0.11 — shallow hits come off ~1.75× flatter, steep ones only ~1.3× (the old flat 1.85 sent banks ~5° wide).
+    /// Pace kept: `keepAlong`/`keepInto` as before. `flat` scales tan(out).
+    static let bounceA = 1.40, bounceB = 0.11
     /// a cushion hit this close to a pocket's centre is where the game's jaws behave unlike the model: never "sure"
     static let mouthNear = 90.0
 
@@ -192,11 +196,13 @@ enum PoolEngine {
             }
             if r.rails > maxRails { break }
             if !isJaw && abs(vn) >= sin(12 * Double.pi / 180) && holes.contains(where: { hypot($0.x - x, $0.y - y) < mouthNear }) { r.nearMouth = true }
-            // off the cushion: pace along it × keepAlong, into it × keepInto (÷ flat)
-            let an = abs(vn)
-            let vt2 = keepAlong, vn2 = an * keepInto / flat
-            ux = tx * vt2 + nx * vn2; uy = ty * vt2 + ny * vn2
-            let l = (ux * ux + uy * uy).squareRoot(); ux /= l; uy /= l
+            // off the cushion: the angle from the law above; the pace kept from along × keepAlong, into × keepInto
+            let an = abs(vn), tm = (tx * tx + ty * ty).squareRoot()
+            let l = ((tm * keepAlong) * (tm * keepAlong) + (an * keepInto) * (an * keepInto)).squareRoot()
+            let tanIn = tm / max(an, 1e-6)
+            let tanOut = flat * (bounceA * tanIn + bounceB * min(1, tanIn / 0.3))
+            let co = 1 / (1 + tanOut * tanOut).squareRoot(), so = tanOut * co
+            if tm > 1e-9 { ux = tx / tm * so + nx * co; uy = ty / tm * so + ny * co } else { ux = nx; uy = ny }
             if speed != nil && (isJaw || abs(vn) >= sin(12 * Double.pi / 180)) { left = rollDistance(l * speedFor(distance: left)) }
             x += nx * 0.01; y += ny * 0.01
         }
@@ -711,12 +717,14 @@ enum PoolEngine {
         var cueStop: [Double]                     // the cue ball after the hit until it stops
         var hidden: Bool                          // they can't see any of their balls (a snooker)
         var oppChance: Double                     // what they are left: sum of drop chances of their straight pots (worst of power ±5)
+        var cueRails = 0                          // cushions the cue ball takes before the hit (a kick)
+        var tier = 1                              // 1 a full safety, 2 a ball runs into another (stops less certain), 3 just a legal touch
     }
 
     private struct SafeTry { var ball: Int; var c: Run; var o: Run; var after: Run; var cue: (Double, Double); var obj: (Double, Double) }
     /// One try: cue along `a` at `power`; nil when it is a foul or can't be told (wrong ball or none first, no cushion
     /// after the hit, a ball dropping, or the balls running into others — those positions can't be foreseen).
-    private static func safeTry(_ cx: Double, _ cy: Double, _ a: Double, _ power: Int, _ others: [Ball], _ legal: Set<Int>) -> SafeTry? {
+    private static func safeTry(_ cx: Double, _ cy: Double, _ a: Double, _ power: Int, _ others: [Ball], _ legal: Set<Int>, tier: Int = 1) -> SafeTry? {
         let cr = run(cx, cy, cos(a), sin(a), balls: others, skip: 0, maxLen: 4000, maxRails: 2, speed: speedAt(power: Double(power)))
         guard cr.pocket < 0, cr.jaws == 0, let id = cr.ball, legal.contains(id), let b = others.first(where: { $0.id == id }), cr.pts.count >= 4 else { return nil }
         let n = cr.pts.count
@@ -727,14 +735,16 @@ enum PoolEngine {
         let along = max(0, min(1, (lx * ox + ly * oy) / ll))
         let vHit = speedFor(distance: cr.left)
         let o = run(b.x, b.y, ox, oy, balls: others, skip: id, maxLen: 4000, maxRails: 6, speed: vHit * along)
-        guard o.pocket < 0, o.ball == nil else { return nil }
+        if tier < 3 { guard o.pocket < 0 else { return nil } }
+        if tier < 2 { guard o.ball == nil else { return nil } }
         let after = cueAfter(gx, gy, ix: lx / ll, iy: ly / ll, ox: ox, oy: oy, vHit: vHit, balls: others, skip: id)
-        guard after.pocket < 0, after.ball == nil else { return nil }
-        // a cushion after the hit (by either ball), or it is a foul
-        guard o.rails + o.jaws + after.rails + after.jaws >= 1 else { return nil }
+        guard after.pocket < 0 else { return nil }
+        if tier < 2 { guard after.ball == nil else { return nil } }
+        // a cushion after the hit (by either ball), or it is a foul (a ball sent into another may still reach one: tier 3)
+        if tier < 3 { guard o.rails + o.jaws + after.rails + after.jaws >= 1 || o.pocket >= 0 else { return nil } }
         let oe = (o.pts[o.pts.count - 2], o.pts[o.pts.count - 1]), ce = (after.pts[after.pts.count - 2], after.pts[after.pts.count - 1])
         // the two balls must not end up on top of each other (they would have met on the way)
-        if hypot(oe.0 - ce.0, oe.1 - ce.1) < 2 * R { return nil }
+        if tier < 3 && hypot(oe.0 - ce.0, oe.1 - ce.1) < 2 * R { return nil }
         return SafeTry(ball: id, c: cr, o: o, after: after, cue: ce, obj: oe)
     }
 
@@ -762,8 +772,13 @@ enum PoolEngine {
     /// works with the power 5 off either way and the cue turned ½° either way (where the cue ball stops is only known
     /// roughly). `opp`: the balls they would be on.
     static func safetyPlan(cueX: Double, cueY: Double, balls: [Ball], legal: Set<Int>, opp: Set<Int>) -> Safety? {
+        // a full safety if there is one; else let the balls run into others; else at least a legal touch (a kick off
+        // cushions when nothing is in sight) — anything beats giving away ball in hand
+        for tier in 1...3 { if let s = safetyPlan(cueX: cueX, cueY: cueY, balls: balls, legal: legal, opp: opp, tier: tier) { return s } }
+        return nil
+    }
+    private static func safetyPlan(cueX: Double, cueY: Double, balls: [Ball], legal: Set<Int>, opp: Set<Int>, tier: Int) -> Safety? {
         let others = balls.filter { $0.id != 0 }
-        guard !opp.isEmpty else { return nil }
         let n = 720, step = 2 * Double.pi / Double(n)
         let powers = Array(stride(from: 5, through: 65, by: 5))
         // directions whose first ball (ignoring pace) is one of yours
@@ -775,7 +790,7 @@ enum PoolEngine {
         }
         var tries = [[SafeTry?]](repeating: [SafeTry?](repeating: nil, count: powers.count), count: n)
         for k in 0..<n where okDir[k] {
-            for (j, p) in powers.enumerated() { tries[k][j] = safeTry(cueX, cueY, Double(k) * step, p, others, legal) }
+            for (j, p) in powers.enumerated() { tries[k][j] = safeTry(cueX, cueY, Double(k) * step, p, others, legal, tier: tier) }
         }
         // what they are left (cached by where the two balls stop, to 6 px)
         var memo: [String: (Double, Bool)] = [:]
@@ -789,20 +804,30 @@ enum PoolEngine {
         var best: (cost: Double, k: Int, j: Int, chance: Double, hidden: Bool)? = nil
         for k in 0..<n where okDir[k] {
             for j in 1..<(powers.count - 1) where powers[j] >= 10 && powers[j] <= 60 {
-                guard let t = tries[k][j], let lo = tries[k][j - 1], let hi = tries[k][j + 1],
-                      lo.ball == t.ball, hi.ball == t.ball,
-                      let l = tries[(k + n - 1) % n][j], let r = tries[(k + 1) % n][j], l.ball == t.ball, r.ball == t.ball else { continue }
+                guard let t = tries[k][j] else { continue }
+                // tier 1: still a safety with the power 5 off and the cue ½° off; tier 2: the power 5 off; tier 3: as is
+                var group: [SafeTry] = [t]
+                if tier <= 2 {
+                    guard let lo = tries[k][j - 1], let hi = tries[k][j + 1], lo.ball == t.ball, hi.ball == t.ball else { continue }
+                    group += [lo, hi]
+                }
+                if tier == 1 {
+                    guard let l = tries[(k + n - 1) % n][j], let r = tries[(k + 1) % n][j], l.ball == t.ball, r.ball == t.ball else { continue }
+                    group += [l, r]
+                }
                 var worst = 0.0, allHidden = true
-                for x in [t, lo, hi, l, r] { let e = left(x); worst = max(worst, e.0); allHidden = allHidden && e.1 }
-                // least left for them; a snooker is worth a lot; gentle shots are easier to get right
-                let cost = worst * 10 + (allHidden ? 0 : 1.5) + Double(powers[j]) / 100
+                if opp.isEmpty { allHidden = false } else {
+                    for x in group { let e = left(x); worst = max(worst, e.0); allHidden = allHidden && e.1 }
+                }
+                // least left for them; a snooker is worth a lot; gentle shots and fewer kick cushions are easier to get right
+                let cost = worst * 10 + (allHidden ? 0 : 1.5) + Double(powers[j]) / 100 + Double(t.c.rails) * 0.4
                 if best == nil || cost < best!.cost { best = (cost, k, j, worst, allHidden) }
             }
         }
         guard let b = best, let t = tries[b.k][b.j] else { return nil }
         let g = t.c.pts
         return Safety(ball: t.ball, angle: Double(b.k) * step, power: powers[b.j], ghostX: g[g.count - 2], ghostY: g[g.count - 1],
-                      cuePts: t.c.pts, objPts: t.o.pts, cueStop: t.after.pts, hidden: b.hidden, oppChance: b.chance)
+                      cuePts: t.c.pts, objPts: t.o.pts, cueStop: t.after.pts, hidden: b.hidden, oppChance: b.chance, cueRails: t.c.rails, tier: tier)
     }
 
     // MARK: ball in hand
