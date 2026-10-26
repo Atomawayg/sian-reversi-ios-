@@ -511,10 +511,11 @@ final class GameModel: ObservableObject {
     private var poolInZone = false
     // the two tables a break leaves (3.31, from Atom's two clips): which ball into which pocket, in order, and the power the
     // clip used. Told apart by where the cue ball rests after the break. The clips play solids.
-    static let clipPlans: [(cue: (Double, Double), steps: [(ball: Int, pocket: Int, power: Int?)])] = [
-        ((489, 1144), [(3, 5, 37), (1, 5, 39), (5, 0, 30), (2, 2, 60), (6, 0, 27), (7, 3, 20), (4, 1, nil), (8, 2, 27)]),
-        ((723, 1144), [(5, 1, 21), (6, 0, 25), (4, 2, 50), (1, 3, 30), (2, 2, 33), (3, 1, 42), (7, 0, 44), (8, 1, 43)])]   // the peak just before the bar slides back (3.31.3)
-    private var poolPattern: Int? = nil, poolSawRack = false, poolPlanNote = "", poolPlanStep: (ball: Int, pocket: Int, power: Int?)? = nil, poolPlanGuide: PoolEngine.Guide? = nil
+    static let clipPlans: [(cue: (Double, Double), steps: [(ball: Int, pocket: Int, power: Int?, spin: (Double, Double)?)])] = [
+        ((489, 1144), [(3, 5, 37, nil), (1, 5, 39, nil), (5, 0, 30, nil), (2, 2, 60, nil), (6, 0, 27, nil), (7, 3, 20, nil), (4, 1, nil, nil), (8, 2, 27, nil)]),
+        // clip 2's spin (read off the spin icon at each shot; 3.31.5): centre except these, all below centre (draw)
+        ((723, 1144), [(5, 1, 21, nil), (6, 0, 25, nil), (4, 2, 50, (0, 0.25)), (1, 3, 30, nil), (2, 2, 33, nil), (3, 1, 42, (0, 0.85)), (7, 0, 44, (0, 0.1)), (8, 1, 43, (-0.1, 0.45))])]
+    private var poolPattern: Int? = nil, poolSawRack = false, poolPlanNote = "", poolPlanStep: (ball: Int, pocket: Int, power: Int?, spin: (Double, Double)?)? = nil, poolPlanGuide: PoolEngine.Guide? = nil
     // the opening book (3.30): this phone plays the same table the same way every time (two breaks matched to the px), so
     // a shot that potted from a table is worth repeating exactly, and one that missed is worth not repeating
     struct BookShot: Codable, Equatable { var aimX: Double; var aimY: Double; var dir: Double?; var power: Int }
@@ -1039,6 +1040,11 @@ final class GameModel: ObservableObject {
             let name = "ลูก \(ps.ball) → \(PoolEngine.pockets[ps.pocket].name)"
             title = (view.pots ? "✓ " : "แผน: ") + name
             line = view.powerTarget.map { "แรง \($0)" } ?? ""
+            if let sp = ps.spin {
+                view.spinDot = sp
+                let amt = sp.1 >= 0.7 ? "เต็ม" : (sp.1 >= 0.35 ? "ครึ่ง" : "นิด")
+                line += (line.isEmpty ? "" : " · ") + "สปินล่าง \(amt)" + (sp.0 < -0.05 ? " ค่อนซ้าย" : "")
+            }
         }
                 // the book: this very table was played before — the shot that potted, exactly (gold ring + power)
         if !PoolEngine.isBreak(others), let bi = bookFind(balls) {
