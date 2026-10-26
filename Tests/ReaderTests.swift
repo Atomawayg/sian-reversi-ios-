@@ -28,4 +28,17 @@ final class ReaderTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(n[1], 5, "strawberries")
         XCTAssertLessThanOrEqual(n[0], 5, "cherries")
     }
+
+    /// Atom's screenshots 26 Oct 21:35/21:36: Will holds a cherry; the jar has one strawberry and one cherry (and two grapes)
+    func testHeldCherryAndJar() throws {
+        for (name, grapes) in [("suika-2135.png", 0), ("suika-2136.png", 2)] {
+            let st = SK.decode(BoardReader.readSuika(try sampler(name)).cells)!
+            print("READER \(name): held \(st.held) next \(st.next) jar", st.fruits.map { "\($0.t):\(Int($0.x)),\(Int($0.y))" })
+            XCTAssertEqual(st.held, 0, "\(name) held")
+            XCTAssertEqual(st.fruits.filter { $0.t == 1 }.count, 1, "\(name) strawberries")
+            XCTAssertEqual(st.fruits.filter { $0.t == 0 }.count, 1, "\(name) cherries")
+            XCTAssertEqual(st.fruits.filter { $0.t == 2 }.count, grapes, "\(name) grapes")
+            XCTAssertEqual(st.next, 1, "\(name) next")
+        }
+    }
 }

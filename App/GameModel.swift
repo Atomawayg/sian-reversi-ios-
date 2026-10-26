@@ -1161,7 +1161,8 @@ final class GameModel: ObservableObject {
         if st.next >= 0 && st.held >= 0 { skLastNext = st.next }   // (while falling, the wheel already shows the one after)
         if st.held >= 0 {
             skHeldGone = nil
-            if st.held <= 1 && (skPrior == 0 || skPrior == 1) { st.held = skPrior; m.cells[SK.held] = skPrior + 1 }
+            // (3.37 took the wheel's last "next" as the held fruit: wrong — Will already holds the new fruit while the old one
+            // falls, so the wheel had moved on. 3.38: the reader tells cherry from strawberry by colour now; no override.)
             skVotes[st.held] += 1
             // keep the locked kind unless another clearly outvotes it (it takes ~10 readings, a sixth of a second)
             if skLockT < 0 || skVotes[st.held] >= max(10, 2 * skVotes[skLockT]) { skLockT = st.held }
