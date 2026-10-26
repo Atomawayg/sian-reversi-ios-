@@ -251,9 +251,15 @@ enum Renderer {
         func P(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: ox + CGFloat(x - wx0) * k, y: oy + CGFloat(y - wy0) * k) }
         let jarRect = CGRect(origin: P(SK.left, SK.dead), size: CGSize(width: CGFloat(SK.right - SK.left) * k, height: CGFloat(SK.floor - SK.dead) * k))
         UIColor(red: 0.55, green: 0.78, blue: 0.97, alpha: 1).setFill()
-        UIBezierPath(roundedRect: jarRect, cornerRadius: 6).fill()
+        let cr = CGFloat(SK.corner) * k   // the jar's rounded bottom corners (3.36)
+        UIBezierPath(roundedRect: jarRect, byRoundingCorners: [.bottomLeft, .bottomRight], cornerRadii: CGSize(width: cr, height: cr)).fill()
         UIColor.white.setStroke()
-        let wall = UIBezierPath(roundedRect: jarRect.insetBy(dx: -2, dy: -2), cornerRadius: 7); wall.lineWidth = 3; wall.stroke()
+        let wall = UIBezierPath(roundedRect: jarRect.insetBy(dx: -2, dy: -2), byRoundingCorners: [.bottomLeft, .bottomRight], cornerRadii: CGSize(width: cr + 2, height: cr + 2)); wall.lineWidth = 3; wall.stroke()
+        // how far Will can carry a fruit: the lid's opening (grey ticks above the jar)
+        for xe in [SK.dropLeft, SK.dropRight] {
+            let a = P(xe, SK.dropY - 40), b = P(xe, SK.dead)
+            let t = UIBezierPath(); t.move(to: a); t.addLine(to: b); t.lineWidth = 2; UIColor.white.withAlphaComponent(0.5).setStroke(); t.stroke()
+        }
         // dashed line in the middle (the game draws it too) and scale 0…10 above the jar
         let mid = UIBezierPath(); mid.move(to: P((SK.left + SK.right) / 2, SK.dead)); mid.addLine(to: P((SK.left + SK.right) / 2, SK.floor))
         mid.lineWidth = 1.5; mid.setLineDash([5, 5], count: 2, phase: 0); UIColor.white.withAlphaComponent(0.7).setStroke(); mid.stroke()
@@ -272,8 +278,11 @@ enum Renderer {
         if let dx = o.drop, st.held >= 0 {
             let x = Double(dx)
             let endY = o.land.count == 2 ? Double(o.land[1]) : SK.floor
+            // solid and thick with a dark edge (3.36: the dashed line was hard to see on the small window)
             let line = UIBezierPath(); line.move(to: P(x, SK.dropY)); line.addLine(to: P(x, endY))
-            line.lineWidth = 3; line.setLineDash([7, 5], count: 2, phase: 0); gold.setStroke(); line.stroke()
+            line.lineCapStyle = .round
+            line.lineWidth = 8; UIColor.black.withAlphaComponent(0.55).setStroke(); line.stroke()
+            line.lineWidth = 5; gold.setStroke(); line.stroke()
             let rr = CGFloat(SK.radius[st.held]) * k
             if o.land.count == 2 {
                 let c = P(Double(o.land[0]), Double(o.land[1]))

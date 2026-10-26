@@ -57,7 +57,43 @@ extension BoardReader {
         return true
     }
 
+    /// The last full reading (3.36). While you drag, only the held fruit moves: a quick look over the jar (one point every
+    /// 24 px) tells whether anything else changed; if not, only the strip under Will is read and the jar is reused.
+    /// The full reading took tens of ms and made the line lag behind your finger.
+    private static var skCache: (sig: [UInt8], jar: [SK.Fruit], held: Int, next: Int, age: Int)? = nil
+    private static func skSignature(_ s: Sampler) -> [UInt8] {
+        let sx = Double(s.w) / 1179, sy = Double(s.h) / 2556
+        var out: [UInt8] = []
+        var y = SK.dead + 20
+        while y < SK.floor { var x = SK.left + 6; while x < SK.right { out.append(skGroup(s.get(Int(x * sx), Int(y * sy)))); x += 24 }; y += 24 }
+        return out
+    }
+    /// the held fruit's x: middle of the fruit-coloured pixels in the strip Will carries it in (nil when none)
+    private static func skHeldX(_ s: Sampler) -> Double? {
+        let sx = Double(s.w) / 1179, sy = Double(s.h) / 2556
+        var sum = 0.0, n = 0.0
+        var y = 860.0
+        while y <= 950 { var x = SK.left; while x <= SK.right { let g = skGroup(s.get(Int(x * sx), Int(y * sy))); if g >= 1 && g <= 5 { sum += x; n += 1 }   // (not 6: the lid's white rim runs through here); x += 3 }; y += 6 }
+        return n >= 25 ? sum / n : nil
+    }
+
     static func readSuika(_ s: Sampler) -> BoardMessage {
+        let sig = skSignature(s)
+        if var c = skCache, c.age < 40, c.sig.count == sig.count {
+            var diff = 0
+            for i in sig.indices where sig[i] != c.sig[i] { diff += 1 }
+            if diff <= 3, let hx = skHeldX(s), c.held >= 0 {
+                c.age += 1; skCache = c
+                let cells = SK.encode(held: c.held, heldX: hx, next: c.next, fruits: c.jar)
+                return BoardMessage(valid: true, game: .suika, cells: cells, me: 1, myTurn: true)
+            }
+        }
+        let full = readSuikaFull(s)
+        if let st = SK.decode(full.cells) { skCache = (sig, st.fruits, st.held, st.next, 0) }
+        return full
+    }
+
+    static func readSuikaFull(_ s: Sampler) -> BoardMessage {
         let sx = Double(s.w) / 1179, sy = Double(s.h) / 2556
         let S = 4.0                                   // grid step in screenshot pixels
         let X0 = SK.left, Y0 = SK.top

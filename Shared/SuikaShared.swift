@@ -21,6 +21,13 @@ enum SK {
     static let dead = 1002.0     // dashed line at the top of the jar
     static let dropY = 905.0     // centre of the fruit Will holds
     static let top = 800.0       // top of the area that is read
+    // 3.36 (Atom's recording + screenshot): the lid narrows above the jar, so the fruit Will carries stops short of the
+    // walls — a cherry's centre got no further left than 176 (cherry r 35 → the opening's edge at 141). Symmetric about the
+    // jar's middle. The jar's bottom corners are rounded.
+    static let dropLeft = 141.0
+    static let dropRight = 2 * ((108.0 + 1070.0) / 2) - 141.0
+    static func dropRange(_ t: Int) -> (lo: Double, hi: Double) { (dropLeft + radius[t], dropRight - radius[t]) }
+    static let corner = 52.0     // radius of the rounded bottom corners (inside the glass)
 
     /// radius of each fruit type (cherry … watermelon), measured on the game screen
     static let radius: [Double] = [35, 48, 63, 75, 92, 121, 138, 168, 200, 235, 280]

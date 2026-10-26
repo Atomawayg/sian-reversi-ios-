@@ -114,6 +114,15 @@ final class SuikaEngine {
                         let slide = b[i].y - b[i].py, cap = SuikaEngine.mu * pen
                         b[i].y -= abs(slide) <= cap ? slide : (slide > 0 ? cap : -cap)
                     }
+                    // the rounded bottom corners: a fruit smaller than the curve sits further in (3.36)
+                    if r < SK.corner && b[i].y > SK.floor - SK.corner {
+                        let cx = b[i].x < SK.left + SK.corner ? SK.left + SK.corner : (b[i].x > SK.right - SK.corner ? SK.right - SK.corner : b[i].x)
+                        let cy = SK.floor - SK.corner
+                        if cx != b[i].x {
+                            let dx = b[i].x - cx, dy = b[i].y - cy, d = (dx * dx + dy * dy).squareRoot(), lim = SK.corner - r
+                            if d > lim && d > 1e-6 { b[i].x = cx + dx / d * lim; b[i].y = cy + dy / d * lim }
+                        }
+                    }
                     if b[i].y > SK.floor - r {
                         let pen = b[i].y - (SK.floor - r)
                         b[i].y = SK.floor - r
@@ -175,7 +184,7 @@ final class SuikaEngine {
                 let d = (dx * dx + dy * dy).squareRoot(), rs = b[i].r + b[j].r
                 if b[i].t == b[j].t {
                     // two of a kind close together: one more fruit could join them
-                    if d < rs * 1.35 { v += 0.4 * made(b[i].t + 1) * (1.35 - d / rs) / 0.35 }
+                    if d < rs * 1.35 { v += 0.6 * made(b[i].t + 1) * (1.35 - d / rs) / 0.35 }   // (0.6, 3.36: set up chains)
                 } else if d < rs + 3 {
                     // a small fruit buried under a much bigger one is hard to reach
                     let (lo, hi) = b[i].y > b[j].y ? (i, j) : (j, i)
@@ -192,7 +201,7 @@ final class SuikaEngine {
     }
 
     private static func xs(_ t: Int, _ n: Int) -> [Double] {
-        let r = SK.radius[t], lo = SK.left + r + 1, hi = SK.right - r - 1
+        let rg = SK.dropRange(t), lo = rg.lo + 1, hi = rg.hi - 1   // only where Will can carry it (3.36)
         return (0..<n).map { lo + (hi - lo) * Double($0) / Double(n - 1) }
     }
 
@@ -213,7 +222,7 @@ final class SuikaEngine {
         let travel = abs(end - x)
         // a chain (it bounces off one and rolls down into a merge, then that merges again) is worth more than its merges
         // one by one — Atom: the big combos are where the points are (3.35). A roll that ends in a merge isn't penalised.
-        let combo = created.count >= 2 ? gain * 0.3 * Double(created.count - 1) : 0
+        let combo = created.count >= 2 ? gain * 0.6 * Double(created.count - 1) : 0
         let rollCost = created.isEmpty ? 1.5 * travel / 100 : 0
         return Try(x: x, jar: b, created: created, v1: gain + combo + e.v - rollCost, fill: e.fill, land: landed.map { ($0.x, $0.y) }, travel: travel)
     }
