@@ -211,7 +211,11 @@ final class SuikaEngine {
         let landed = b.first { $0.tag == 1 }
         // a long roll is where the game's physics and ours part ways: prefer drops that land where they fall
         let travel = abs(end - x)
-        return Try(x: x, jar: b, created: created, v1: gain + e.v - 1.5 * travel / 100, fill: e.fill, land: landed.map { ($0.x, $0.y) }, travel: travel)
+        // a chain (it bounces off one and rolls down into a merge, then that merges again) is worth more than its merges
+        // one by one — Atom: the big combos are where the points are (3.35). A roll that ends in a merge isn't penalised.
+        let combo = created.count >= 2 ? gain * 0.3 * Double(created.count - 1) : 0
+        let rollCost = created.isEmpty ? 1.5 * travel / 100 : 0
+        return Try(x: x, jar: b, created: created, v1: gain + combo + e.v - rollCost, fill: e.fill, land: landed.map { ($0.x, $0.y) }, travel: travel)
     }
 
     /// Best drop for the held fruit. `cancel` is checked between simulations.

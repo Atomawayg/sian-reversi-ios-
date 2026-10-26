@@ -8,10 +8,11 @@ final class PoolReplayTests: XCTestCase {
     func testReplayLogs() throws {
         let here = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         let logs = try FileManager.default.contentsOfDirectory(at: here.appendingPathComponent("logs"), includingPropertiesForKeys: nil)
-            .filter { $0.pathExtension == "txt" }.sorted { $0.lastPathComponent < $1.lastPathComponent }
+            .filter { $0.pathExtension == "txt" && !$0.lastPathComponent.hasPrefix("suika") }.sorted { $0.lastPathComponent < $1.lastPathComponent }
         let out = here.appendingPathComponent("out")
         try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
         let only = ProcessInfo.processInfo.environment["REPLAY_ONLY"] ?? ""
+        if only == "none" { return }
         for url in logs where only.isEmpty || url.lastPathComponent.contains(only) {
             UserDefaults.standard.removeObject(forKey: "poolBook")
             try replay(url, out)
@@ -30,6 +31,51 @@ final class PoolReplayTests: XCTestCase {
         let many = (0..<45).map { SK.Fruit(t: 0, x: 150 + Double($0 % 12) * 70, y: 1500 + Double($0 / 12) * 70) }
         let st = SK.decode(SK.encode(held: 1, heldX: 500, next: 2, fruits: many))!
         XCTAssertEqual(st.total, 45); XCTAssertEqual(st.fruits.count, SK.maxFruits)
+    }
+
+    /// Atom's fruit log, with the held fruit flicking cherry/strawberry as it did on the phone: the suggestion must not
+    /// jump while the jar stays the same. Writes the trail to Tests/out/suika.txt.
+    func testSuikaReplay() throws {
+        let here = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        let text = try String(contentsOf: here.appendingPathComponent("logs/suika-1627.txt"), encoding: .utf8)
+        let model = GameModel()
+        var trail = "", jumps = 0, jars = 0
+        var lastJar: [Int] = [], lastDrop: Int? = nil
+        func send(_ held: Int, _ next: Int, _ fruits: [SK.Fruit], x: Double) {
+            let c = SK.encode(held: held, heldX: x, next: next, fruits: fruits)
+            model.replaySuika(BoardMessage(valid: true, game: .suika, cells: c, me: 1, myTurn: held >= 0))
+        }
+        for raw in text.split(separator: "\n") where raw.dropFirst(11).hasPrefix("S ") {
+            func field(_ k: String) -> Substring? { raw.range(of: " " + k + "=").map { r in raw[r.upperBound...].prefix { $0 != " " } } }
+            let held = Int(field("held") ?? "-1") ?? -1, next = Int(field("next") ?? "-1") ?? -1
+            var fruits: [SK.Fruit] = []
+            if let r = raw.range(of: "jar=") {
+                for tok in raw[r.upperBound...].split(separator: " ") {
+                    let p = tok.split(separator: ":"); guard p.count == 2, let t = Int(p[0]) else { continue }
+                    let xy = p[1].split(separator: ","); guard xy.count == 2, let x = Double(xy[0]), let y = Double(xy[1]) else { continue }
+                    fruits.append(SK.Fruit(t: t, x: x, y: y))
+                }
+            }
+            let jarKey = GameModel.skJarOnly(SK.encode(held: 0, heldX: 500, next: 0, fruits: fruits))
+            let sameJar = lastJar.count == jarKey.count && SK.same(lastJar, jarKey, tol: 3)
+            if !sameJar { jars += 1; lastDrop = nil }
+            // 20 readings while the finger drags across, the held fruit misread on every fourth, then a moment unseen
+            for k in 0..<20 {
+                let h = k % 4 == 3 && held <= 1 ? 1 - held : held
+                send(k == 10 ? -1 : h, next, fruits, x: 200 + Double(k) * 30)
+                RunLoop.main.run(until: Date().addingTimeInterval(0.03))
+            }
+            RunLoop.main.run(until: Date().addingTimeInterval(0.6))
+            let d = model.overlay.drop
+            if sameJar, let a = lastDrop, let b = d, abs(a - b) > 20 { jumps += 1; trail += "JUMP " }
+            if d != nil { lastDrop = d }
+            trail += String(raw.prefix(10)) + " held=\(held) drop=\(d.map(String.init) ?? "-") title=\(model.overlay.title)\n"
+            lastJar = jarKey
+        }
+        trail += "jars=\(jars) jumps=\(jumps)\n"
+        let out = here.appendingPathComponent("out"); try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+        try trail.write(to: out.appendingPathComponent("suika.txt"), atomically: true, encoding: .utf8)
+        XCTAssertEqual(jumps, 0, "the suggestion jumped on an unchanged jar")
     }
 
     func time(_ s: Substring) -> Double? {

@@ -630,6 +630,7 @@ final class GameModel: ObservableObject {
 
     /// for the replay test (Tests/PoolReplayTests): feed a pool reading as if it came from the screen
     func replayPool(_ m: BoardMessage) { handlePool(m) }
+    func replaySuika(_ m: BoardMessage) { handleSuika(m) }
 
     private func handlePool(_ m: BoardMessage) {
         let started = Date()
@@ -1121,6 +1122,8 @@ final class GameModel: ObservableObject {
             let up = f.t + 1 < SK.types ? SK.radius[f.t + 1] : r
             if after.contains(where: { $0.t == f.t + 1 && hypot($0.x - f.x, $0.y - f.y) < r + up + 40 }) { continue }
             if after.indices.contains(where: { !used[$0] && after[$0].t == f.t && hypot(after[$0].x - f.x, after[$0].y - f.y) < 3 * r + 80 }) { continue }   // pushed aside
+            // a chain: merged into something bigger that appeared since (any kind above, within its reach)
+            if after.contains(where: { a in a.t > f.t && !before.contains(where: { $0.t == a.t && hypot($0.x - a.x, $0.y - a.y) < 30 }) && hypot(a.x - f.x, a.y - f.y) < r + SK.radius[a.t] + 120 }) { continue }
             lost.append(f)
         }
         return lost
@@ -1138,8 +1141,32 @@ final class GameModel: ObservableObject {
         return o
     }
 
-    private func handleSuika(_ m: BoardMessage) {
-        guard let st = SK.decode(m.cells) else { return }
+    // the held fruit as locked for this jar (3.35: cherry and strawberry flicked back and forth under the finger, and each
+    // flick threw the answer away and thought again — the line jumped between two spots and lagged while dragging)
+    private var skLockJar: [Int] = [], skVotes = [Int](repeating: 0, count: SK.types), skLockT = -1, skHeldGone: Date? = nil
+    /// the jar's cells with the held and next fruit blanked: "the same jar" whatever the held fruit reads as
+    static func skJarOnly(_ c: [Int]) -> [Int] { var x = c; if x.count == SK.count { x[SK.held] = 0; x[SK.next] = 0 }; return x }
+
+    private func handleSuika(_ raw: BoardMessage) {
+        var m = raw
+        guard var st = SK.decode(m.cells) else { return }
+        let jar = Self.skJarOnly(m.cells)
+        if !(skLockJar.count == jar.count && SK.same(skLockJar, jar, tol: 3)) {
+            skLockJar = jar; skVotes = [Int](repeating: 0, count: SK.types); skLockT = -1
+        }
+        if st.held >= 0 {
+            skHeldGone = nil
+            skVotes[st.held] += 1
+            // keep the locked kind unless another clearly outvotes it (it takes ~10 readings, a sixth of a second)
+            if skLockT < 0 || skVotes[st.held] >= max(10, 2 * skVotes[skLockT]) { skLockT = st.held }
+            if st.held != skLockT { st.held = skLockT; m.cells[SK.held] = skLockT + 1 }
+        } else if m.myTurn || skLockT >= 0 {
+            // the held fruit not seen for a moment (under the finger) on the same jar: keep the last answer up for 0.6 s
+            if skHeldGone == nil { skHeldGone = Date() }
+            if skLockT >= 0, let g0 = skHeldGone, Date().timeIntervalSince(g0) < 0.6 {
+                st.held = skLockT; m.cells[SK.held] = skLockT + 1; m.myTurn = true
+            }
+        }
         if logOn {
             if st.held >= 0 { skLastHeld = (st.held, st.heldX) }
             else if let h = skLastHeld {   // the held fruit is gone: it was dropped here
@@ -1167,7 +1194,7 @@ final class GameModel: ObservableObject {
         }
         skComputed = m.cells; skAnswer = nil
         gen += 1
-        let g = gen, live = liveGen, ms = thinkMs
+        let g = gen, live = liveGen, ms = min(thinkMs, 450)   // 3.35: quick — the first pass alone is 41 drops
         show(Overlay(game: .suika, cells: m.cells, title: "คิด…", line: "AI กำลังลองปล่อยทุกจุด", mine: true))
         work.async { [weak self] in
             guard let self else { return }
