@@ -264,6 +264,34 @@ enum PoolEngine {
         return (o.pts, c.pts, (c.pts[c.pts.count - 2], c.pts[c.pts.count - 1]), o.pocket >= 0, c.pocket >= 0)
     }
 
+    /// Does the hit ball, once off its first cushion, run into the cue ball's way (or where it stops)? A bank coming back
+    /// across the table met the cue ball (3.29, log 26 Oct 11:2x). Timing is ignored: anywhere near its way = not sure.
+    static func meetsCue(obj: [Double], cue: [Double]) -> Bool {
+        guard obj.count >= 6, cue.count >= 2 else { return false }
+        func segDist(_ ax: Double, _ ay: Double, _ bx: Double, _ by: Double, _ px: Double, _ py: Double) -> Double {
+            let dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy
+            let t = l2 < 1e-9 ? 0 : max(0, min(1, ((px - ax) * dx + (py - ay) * dy) / l2))
+            return hypot(ax + dx * t - px, ay + dy * t - py)
+        }
+        func segSeg(_ a: (Double, Double, Double, Double), _ b: (Double, Double, Double, Double)) -> Double {
+            // closest approach of two segments: crossing = 0, else the nearest endpoint to the other segment
+            func cr(_ ox: Double, _ oy: Double, _ px: Double, _ py: Double, _ qx: Double, _ qy: Double) -> Double { (px - ox) * (qy - oy) - (py - oy) * (qx - ox) }
+            let d1 = cr(a.0, a.1, a.2, a.3, b.0, b.1), d2 = cr(a.0, a.1, a.2, a.3, b.2, b.3)
+            let d3 = cr(b.0, b.1, b.2, b.3, a.0, a.1), d4 = cr(b.0, b.1, b.2, b.3, a.2, a.3)
+            if d1 * d2 < 0 && d3 * d4 < 0 { return 0 }
+            return min(segDist(a.0, a.1, a.2, a.3, b.0, b.1), segDist(a.0, a.1, a.2, a.3, b.2, b.3),
+                       segDist(b.0, b.1, b.2, b.3, a.0, a.1), segDist(b.0, b.1, b.2, b.3, a.2, a.3))
+        }
+        var cs: [(Double, Double, Double, Double)] = []
+        if cue.count >= 4 { for i in stride(from: 0, to: cue.count - 3, by: 2) { cs.append((cue[i], cue[i + 1], cue[i + 2], cue[i + 3])) } }
+        else { cs.append((cue[0], cue[1], cue[0], cue[1])) }
+        for i in stride(from: 2, to: obj.count - 3, by: 2) {   // from the first cushion on
+            let s = (obj[i], obj[i + 1], obj[i + 2], obj[i + 3])
+            for c in cs where segSeg(s, c) < 2 * R + 4 { return true }
+        }
+        return false
+    }
+
     // MARK: diamonds (the light dots on the rails)
     // Three on the top and bottom rails, six on each side (three either side of the middle pocket), a quarter of
     // the way between pocket centres each. Rails are named as you see the table; dots count from the top / left.
@@ -636,35 +664,45 @@ enum PoolEngine {
             }
             guard let hm = hitAt(cueX, cueY, mid, others, flat: bounceFlatten) else { continue }
             let c = hm.1
-            // power: the least that drops it (in steps of 5), then a margin
-            var need: Int? = nil
+            // power: every power (steps of 5) that drops it cleanly — the ball doesn't meet the cue ball on its way, the
+            // cue ball doesn't follow it in. Then from the least that drops +10 up, the one leaving the easiest next ball
+            // (3.29: it was always least +10, mostly 30–40, with no thought for the next shot)
+            guard let tb = others.first(where: { $0.id == h.ball }) else { continue }
+            var ok: [Int: (obj: [Double], stop: [Double])] = [:]
             var p = 10
-            var objPts: [Double] = [], stop: [Double] = []
             while p <= 90 {
                 let v0 = speedAt(power: Double(p))
                 let cr = run(cueX, cueY, cos(mid), sin(mid), balls: others, skip: 0, maxLen: 4000, maxRails: 2, gap: 2 * R, speed: v0)
                 if cr.ball == h.ball, cr.pts.count >= 4 {
                     let gx = cr.pts[cr.pts.count - 2], gy = cr.pts[cr.pts.count - 1]
                     let lx = gx - cr.pts[cr.pts.count - 4], ly = gy - cr.pts[cr.pts.count - 3], ll = max(1e-6, (lx * lx + ly * ly).squareRoot())
-                    guard let b = others.first(where: { $0.id == h.ball }) else { break }
-                    var ox = b.x - gx, oy = b.y - gy
+                    var ox = tb.x - gx, oy = tb.y - gy
                     let d = max(1e-6, (ox * ox + oy * oy).squareRoot()); ox /= d; oy /= d
                     let along = max(0, min(1, (lx * ox + ly * oy) / ll))
                     let vHit = speedFor(distance: cr.left)
-                    let o = run(b.x, b.y, ox, oy, balls: others, skip: h.ball, maxLen: 4000, maxRails: 4, gap: 2 * R - 3, pad: safePad, speed: vHit * along)
+                    let o = run(tb.x, tb.y, ox, oy, balls: others, skip: h.ball, maxLen: 4000, maxRails: 4, gap: 2 * R - 3, pad: safePad, speed: vHit * along)
                     if o.pocket == h.pocket {
-                        // the cue ball after the hit: tangent pace plus the roll-through
                         let cAfter = cueAfter(gx, gy, ix: lx / ll, iy: ly / ll, ox: ox, oy: oy, vHit: vHit, balls: others, skip: h.ball)
-                        if cAfter.pocket >= 0 { need = nil; break }   // the cue ball follows it in
-                        need = p; objPts = o.pts; stop = cAfter.pts
-                        break
+                        if cAfter.pocket < 0 && !meetsCue(obj: o.pts, cue: cAfter.pts) { ok[p] = (o.pts, cAfter.pts) }
                     }
                 }
                 p += 5
             }
+            guard let least = ok.keys.min() else { continue }
+            var nl = legal.subtracting([h.ball]); if nl.isEmpty && h.ball != 8 { nl = [8] }
+            let rest = others.filter { $0.id != h.ball }
+            var need: Int? = nil, objPts: [Double] = [], stop: [Double] = [], bestV = -1.0
+            for q in stride(from: min(90, least + 10), through: 90, by: 5) {
+                guard let r = ok[q], r.stop.count >= 2, ok[q - 5] != nil else { continue }   // a power either side of it drops too
+                let cx = r.stop[r.stop.count - 2], cy = r.stop[r.stop.count - 1]
+                let nxt = h.ball == 8 ? 1 : (shots(cueX: cx, cueY: cy, balls: rest, legal: nl, banks: false).filter { !$0.scratch }.map { dropChance($0.tolerance) }.max() ?? 0)
+                let val = nxt * (1 - Double(q) / 400)
+                if val > bestV + 1e-9 { bestV = val; need = q; objPts = r.obj; stop = r.stop }
+            }
+            if need == nil, let r = ok[least] { need = min(90, least + 10); objPts = r.obj; stop = r.stop }
             guard let pw = need else { continue }
             out.append(Found(ball: h.ball, pocket: h.pocket, angle: mid, width: w, objRails: h.objRails, cueRails: h.cueRails,
-                             power: min(100, pw + 10), ghostX: c.pts[c.pts.count - 2], ghostY: c.pts[c.pts.count - 1],
+                             power: pw, ghostX: c.pts[c.pts.count - 2], ghostY: c.pts[c.pts.count - 1],
                              cuePts: c.pts, objPts: objPts, cueStop: stop))
         }
         // easiest first: more turn to spare, fewer cushions, less power

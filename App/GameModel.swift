@@ -523,6 +523,7 @@ final class GameModel: ObservableObject {
     private var poolThinkGen = 0, poolThinking = false
     private var poolTitlePocket: (pocket: Int, pending: Int?, since: Date) = (-1, nil, Date())
     private var poolAims: [(Double, Double)] = []   // the last few aim-circle readings (a sure pot needs it steady)
+    private var poolLastDir: (dir: Double, x: Double, y: Double, t: Date)? = nil   // the game's line, held through frames it isn't read
 
     private var poolGroup = 0            // your group once it is certain (kept for the whole game)
     private var poolGroupCand = 0, poolGroupCandSince = Date()   // a group the counts agree on, and since when
@@ -547,8 +548,9 @@ final class GameModel: ObservableObject {
             // which group the counts point at (a ball hidden for a moment is allowed for: one off still counts
             // when the other group is two further off)
             var cand = 0
+            // (3.29: one apart is not enough — the bar read 6 for 16 s with 5 solids and 6 stripes up, so it locked onto
+            // stripes and the game ran "not yours" until it flipped back; stay open until the counts are two apart)
             if ds <= 1 && dl >= ds + 2 { cand = 1 } else if dl <= 1 && ds >= dl + 2 { cand = 2 }
-            else if ds == 0 && dl >= 1 { cand = 1 } else if dl == 0 && ds >= 1 { cand = 2 }
             if poolGroup == 0 {
                 if cand != 0 && cand == poolGroupCand {
                     if Date().timeIntervalSince(poolGroupCandSince) >= 1 { poolGroup = cand }
@@ -808,7 +810,11 @@ final class GameModel: ObservableObject {
         } else if hasAim, let cue {
             let a = PoolCodec.get(c, PoolCodec.aim)
             view.aimX = a.x; view.aimY = a.y
-            let dir = PoolCodec.dir(c)
+            // the game's line drops out for a frame now and then: keep the last one while the ring hasn't moved (3.29, lines flickered)
+            let nowD = Date()
+            var dir = PoolCodec.dir(c)
+            if let d = dir { poolLastDir = (d, a.x, a.y, nowD) }
+            else if let l = poolLastDir, abs(l.x - a.x) <= 3, abs(l.y - a.y) <= 3, nowD.timeIntervalSince(l.t) < 0.6 { dir = l.dir }
             // the ring can flick between two spots a few px apart (by a cushion): trust it once three readings agree
             poolAims.append((a.x, a.y)); if poolAims.count > 3 { poolAims.removeFirst() }
             let steady = pulling || (poolAims.count == 3 && poolAims.allSatisfy { abs($0.0 - a.x) <= 4 && abs($0.1 - a.y) <= 4 })
@@ -832,9 +838,12 @@ final class GameModel: ObservableObject {
             var target: Int? = nil
             if v.pocket >= 0, tgt != nil {
                 var p = 5
-                while p <= 100 { if paths(p).objDrops { target = min(100, p + 10); break }; p += 5 }
+                while p <= 100 { let q = paths(p); if q.objDrops && !PoolEngine.meetsCue(obj: q.obj, cue: q.cue) { target = min(100, p + 10); break }; p += 5 }
+                // the suggested shot: its power was picked for the next ball (3.29)
+                if let pk = poolPick, pk.ball == v.ball, pk.pocket == v.pocket, target != nil { target = pk.power }
             }
             let planned = paths(target ?? 60)
+            let hitsCue = PoolEngine.meetsCue(obj: planned.obj, cue: planned.cue)
             let now = pulling ? paths(max(1, pullPct)) : planned
             view.objPathFull = planned.obj; view.objPath = now.obj; view.cuePath = now.cue
             if !now.cueDrops { view.cueStops = [PoolStop(x: now.cueStop.0, y: now.cueStop.1, pct: pulling ? pullPct : (target ?? 60))] }
@@ -867,7 +876,7 @@ final class GameModel: ObservableObject {
                 let ds = poolGuides.map(diff)
                 if let bi = ds.indices.min(by: { ds[$0] < ds[$1] }) {
                     let cur = poolZoom.pocket.flatMap { p in ds.indices.filter { poolGuides[$0].pocket == p }.min(by: { ds[$0] < ds[$1] }) }
-                    if let ci = cur, ds[ci] <= 4, ds[ci] <= ds[bi] + 1.5 { match = ci } else if ds[bi] <= 4 { match = bi }
+                    if let ci = cur, ds[ci] <= 6, ds[ci] <= ds[bi] + 3 { match = ci } else if ds[bi] <= 4 { match = bi }
                 }
                 if let mi = match { want = poolGuides[mi].pocket }
             }
@@ -877,9 +886,9 @@ final class GameModel: ObservableObject {
                 if w == poolZoom.pocket { poolZoom.seen = nowT; poolZoom.pending = nil }
                 else if poolZoom.pocket == nil { poolZoom = (w, nowT, nil) }
                 else if let pd = poolZoom.pending, pd.pocket == w {
-                    if nowT.timeIntervalSince(pd.since) >= 0.15 { poolZoom = (w, nowT, nil) }
+                    if nowT.timeIntervalSince(pd.since) >= 0.4 { poolZoom = (w, nowT, nil) }
                 } else { poolZoom.pending = (w, nowT) }
-            } else if poolZoom.pocket != nil && nowT.timeIntervalSince(poolZoom.seen) > 0.6 {
+            } else if poolZoom.pocket != nil && nowT.timeIntervalSince(poolZoom.seen) > 1.0 {
                 poolZoom = (nil, nowT, nil)
             }
             if let k = poolZoom.pocket { view.zoomPocket = k; if v.ball >= 0 { view.target = v.ball } }
@@ -890,7 +899,7 @@ final class GameModel: ObservableObject {
             // or plenty to spare either way with the jaws made fatter (4 logs: every "risky" with ±0.3° or more dropped)
             let roomy = v.ball >= 0 && v.pocket >= 0 && !v.foul && !v.scratch && !v.bank
                 && (view.win.map { $0.sure && $0.pocket == v.pocket && $0.lo <= -0.3 && $0.hi >= 0.3 } ?? false)
-            let good = (cleanPot || roomy) && dir != nil && steady
+            let good = (cleanPot || roomy) && dir != nil && steady && !hitsCue
             view.pots = good
             view.risky = !good && v.ball >= 0 && v.pocket >= 0 && !v.foul && !v.scratch
             // on the safety: the aim ring where the safety meets its ball
@@ -907,7 +916,7 @@ final class GameModel: ObservableObject {
                 else if poolTitlePocket.pending == w.pocket { if nowT.timeIntervalSince(poolTitlePocket.since) >= 0.4 { poolTitlePocket = (w.pocket, nil, nowT) } }
                 else { poolTitlePocket.pending = w.pocket; poolTitlePocket.since = nowT }
             }
-            let namePocket = view.win.map { v.pocket >= 0 ? $0.pocket : (poolZoom.pocket ?? $0.pocket) }
+            let namePocket = view.win.map { v.pocket >= 0 ? $0.pocket : (poolZoom.pocket ?? (poolTitlePocket.pocket >= 0 ? poolTitlePocket.pocket : $0.pocket)) }
 
             if good {
                 title = "✓ \(v.ball) → \(PoolEngine.pockets[v.pocket].name)"
@@ -944,7 +953,7 @@ final class GameModel: ObservableObject {
             }
         } else {
             poolSound.set(.off); poolAims = []
-            poolZoom = (nil, Date(), nil)
+            if poolZoom.pocket != nil && Date().timeIntervalSince(poolZoom.seen) > 1.0 { poolZoom = (nil, Date(), nil) }
         }
         var o = Overlay(game: .pool, title: title, line: line, mine: true); o.pool = view
         show(o)
