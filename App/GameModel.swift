@@ -687,7 +687,7 @@ final class GameModel: ObservableObject {
         if pulling { bookPull.append(c[PoolCodec.power] * 14 + c[PoolCodec.power + 1]); if bookPull.count > 400 { bookPull.removeFirst(100) } }
         if !still && !pulling && bookPending == nil, nowS.timeIntervalSince(poolLastPull) < 1.0, let ba = bookAim, !bookPull.isEmpty, !PoolEngine.isBreak(ba.state.filter { $0.id != 0 }) {
             var k = bookPull.count - 1
-            while k > 0 && bookPull[k - 1] > bookPull[k] + 1 { k -= 1 }   // back up the slide to where it started
+            while k > 0 && bookPull[k - 1] >= bookPull[k] { k -= 1 }   // back up the slide (and the plateau) to where it started
             bookPending = (ba.state, BookShot(aimX: ba.x, aimY: ba.y, dir: ba.dir, power: bookPull[k]), ba.legal)
             bookPull = []
         }
@@ -774,14 +774,13 @@ final class GameModel: ObservableObject {
                 poolPlanNote = ""; poolPlanStep = nil; poolPlanGuide = nil
                 if let pt = poolPattern, group == 0 || group == 1 || group == 3,
                    let st = Self.clipPlans[pt].steps.first(where: { s in others.contains { $0.id == s.ball } }), legal.contains(st.ball) {
-                    let pw = st.power.map { " · แรง \($0) ตามคลิป" } ?? ""
+                    let pw = ""   // (3.31.4: the clip's power didn't carry over — the table is a few px off from the first shot on)
                     poolPlanStep = st
                     if let t = others.first(where: { $0.id == st.ball }) {
                         let gs = PoolEngine.pocketLines(t, balls: others).filter { $0.pocket == st.pocket }
                         poolPlanGuide = gs.first(where: { !$0.bank }) ?? gs.first
                     }
-                    if var f = poolFound.first(where: { $0.ball == st.ball && $0.pocket == st.pocket }) {
-                        if let cp = st.power { f.power = cp }   // Atom: the clip's power, not ours (3.31.1)
+                    if let f = poolFound.first(where: { $0.ball == st.ball && $0.pocket == st.pocket }) {
                         poolPick = f; poolPlanNote = "แผนคลิป \(pt + 1)" + pw
                     } else {
                         poolPlanNote = "คลิป: \(st.ball) → \(PoolEngine.pockets[st.pocket].name) (ไม่ชัวร์)" + pw
@@ -913,7 +912,6 @@ final class GameModel: ObservableObject {
                 while p <= 100 { let q = paths(p); if q.objDrops && !PoolEngine.meetsCue(obj: q.obj, cue: q.cue) { target = min(100, p + 10); break }; p += 5 }
                 // the suggested shot: its power was picked for the next ball (3.29)
                 if let pk = poolPick, pk.ball == v.ball, pk.pocket == v.pocket, target != nil { target = pk.power }
-                if let ps = poolPlanStep, let cp = ps.power, ps.ball == v.ball, ps.pocket == v.pocket { target = cp }
             }
             let planned = paths(target ?? 60)
             let hitsCue = PoolEngine.meetsCue(obj: planned.obj, cue: planned.cue)
@@ -1040,7 +1038,7 @@ final class GameModel: ObservableObject {
             if view.breakSpotX == nil { view.breakSpotX = PoolEngine.pockets[ps.pocket].x; view.breakSpotY = PoolEngine.pockets[ps.pocket].y }
             let name = "ลูก \(ps.ball) → \(PoolEngine.pockets[ps.pocket].name)"
             title = (view.pots ? "✓ " : "แผน: ") + name
-            line = ps.power.map { "แรง \($0) ตามคลิป" } ?? ""
+            line = view.powerTarget.map { "แรง \($0)" } ?? ""
         }
                 // the book: this very table was played before — the shot that potted, exactly (gold ring + power)
         if !PoolEngine.isBreak(others), let bi = bookFind(balls) {
