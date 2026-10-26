@@ -93,27 +93,8 @@ enum PoolReader {
         }
         var cells = [Int](repeating: 0, count: PoolCodec.count)
 
-        // the spin icon (bottom right, a white ball with a red ring you drag about): the ring's place is the spin.
-        // Measured on the 1180-wide screen: icon centre (1099, 1958), the ring goes ~50 px each way.
-        do {
-            var mx = 0.0, my = 0.0, n = 0.0
-            var dy = -75.0
-            while dy <= 75 {
-                var dx = -75.0
-                while dx <= 75 {
-                    if dx * dx + dy * dy <= 75 * 75 {
-                        let c = hsv(at(1099 + dx, 1958 + dy))
-                        if (c.h < 18 || c.h > 338) && c.s > 0.45 && c.v > 0.5 { mx += dx; my += dy; n += 1 }
-                    }
-                    dx += 3
-                }
-                dy += 3
-            }
-            if n >= 6 {
-                cells[PoolCodec.spinX] = max(0, min(12, Int((mx / n / 50 * 6).rounded()) + 6))
-                cells[PoolCodec.spinY] = max(0, min(12, Int((my / n / 50 * 6).rounded()) + 6))
-            } else { cells[PoolCodec.spinX] = 13; cells[PoolCodec.spinY] = 13 }
-        }
+        // spin is left to the player (Atom, Oct 26): the spin icon is no longer read
+        cells[PoolCodec.spinX] = 13; cells[PoolCodec.spinY] = 13
         // the spin menu open: a huge white cue ball over the middle of the table (and dimmed icons above it) —
         // reading the table now would take it for the cue ball and its icons for the aim ring
         var menuWhite = 0

@@ -610,7 +610,7 @@ final class GameModel: ObservableObject {
             poolSound.set(.off); poolAims = []
             var o = Overlay(game: .pool, title: "รอลูกหยุด", line: groupName, mine: true); o.pool = view; show(o)
             if logOn {   // the balls while they roll: to measure cushions and pace from real shots
-                let t = "M" + String(format: " spin=%.2f,%.2f", poolSpin.x, poolSpin.y) + " balls=" + balls.map { "\($0.id):\(Int($0.x.rounded())),\(Int($0.y.rounded()))" }.joined(separator: " ")
+                let t = "M balls=" + balls.map { "\($0.id):\(Int($0.x.rounded())),\(Int($0.y.rounded()))" }.joined(separator: " ")
                 if t != poolLastLog { poolLastLog = t; log(t) }
             }
             return
@@ -812,7 +812,7 @@ final class GameModel: ObservableObject {
             if let f = poolPick { t += String(format: " best=%d>%d@%d r%d/%d w%.1f", f.ball, f.pocket, f.power, f.objRails, f.cueRails, f.width) + (poolRunWins ? " runout" : "") + " n=\(poolFound.count)" }
             if let w = view.win { t += String(format: " win=%d:%.2f..%.2f", w.pocket, w.lo, w.hi) }
             if pulling { t += " power=\(c[PoolCodec.power] * 14 + c[PoolCodec.power + 1])" }
-            if poolSpin.x != 0 || poolSpin.y != 0 { t += String(format: " spin=%.2f,%.2f", poolSpin.x, poolSpin.y) }
+
             t += " says=\(title)|" + line.replacingOccurrences(of: "\n", with: " / ")
             if !view.objPath.isEmpty { t += " path=" + view.objPath.map(f).joined(separator: ",") }
             if t != poolLastLog {
