@@ -548,7 +548,7 @@ struct PoolView: Equatable {
     var powerTarget: Int? = nil, powerNow: Int? = nil
     var breakSpotX: Double? = nil, breakSpotY: Double? = nil
     var guides: [PoolEngine.Guide] = []        // from the ball you aim at to every pocket (straight and off one cushion)
-    var spinDot: (x: Double, y: Double)? = nil   // the clip's spin for this shot: where the red dot sits on the cue ball (−1…1, + = right / down)
+    var spinX: Double? = nil, spinY: Double? = nil   // the clip's spin for this shot: where the red dot sits on the cue ball (−1…1, + = right / down)
     var guideMatch: Int? = nil                 // the one your line runs along (its pocket is the one zoomed)
     var guideLines: [[Double]] = []            // from the ball you aim at to every pocket (straight and one-cushion banks)   // the break: where to put the cue ball   // the power bar: where to pull to, and where you are
     var target: Int? = nil                     // the ball your aim hits
@@ -582,12 +582,12 @@ extension Renderer {
         let ty = max(8, (rect.height - tH - 10 - lH - (zoom ? 40 : 0)) / 2)
         (o.title as NSString).draw(with: CGRect(x: tx, y: ty, width: tw, height: tH), options: .usesLineFragmentOrigin, attributes: tAttr, context: nil)
         (o.line as NSString).draw(with: CGRect(x: tx, y: ty + tH + 10, width: tw, height: lH), options: .usesLineFragmentOrigin, attributes: lAttr, context: nil)
-        if let sd = v.spinDot {   // a little cue ball with the red dot where the clip put it
+        if let sdx = v.spinX, let sdy = v.spinY {   // a little cue ball with the red dot where the clip put it
             let r: CGFloat = 30, c = CGPoint(x: tx + r + 4, y: min(rect.height - r - 10, ty + tH + 10 + lH + r + 12))
             UIColor.white.setFill(); UIBezierPath(ovalIn: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r)).fill()
             let cross = UIBezierPath(); cross.move(to: CGPoint(x: c.x - r, y: c.y)); cross.addLine(to: CGPoint(x: c.x + r, y: c.y))
             cross.move(to: CGPoint(x: c.x, y: c.y - r)); cross.addLine(to: CGPoint(x: c.x, y: c.y + r)); cross.lineWidth = 1; UIColor(white: 0.7, alpha: 1).setStroke(); cross.stroke()
-            let d = CGPoint(x: c.x + CGFloat(sd.x) * r * 0.8, y: c.y + CGFloat(sd.y) * r * 0.8)
+            let d = CGPoint(x: c.x + CGFloat(sdx) * r * 0.8, y: c.y + CGFloat(sdy) * r * 0.8)
             let ring = UIBezierPath(ovalIn: CGRect(x: d.x - 6, y: d.y - 6, width: 12, height: 12)); ring.lineWidth = 3
             UIColor(red: 0.9, green: 0.15, blue: 0.15, alpha: 1).setStroke(); ring.stroke()
         }

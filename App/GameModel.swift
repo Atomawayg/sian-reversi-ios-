@@ -1041,7 +1041,7 @@ final class GameModel: ObservableObject {
             title = (view.pots ? "✓ " : "แผน: ") + name
             line = view.powerTarget.map { "แรง \($0)" } ?? ""
             if let sp = ps.spin {
-                view.spinDot = sp
+                view.spinX = sp.0; view.spinY = sp.1
                 let amt = sp.1 >= 0.7 ? "เต็ม" : (sp.1 >= 0.35 ? "ครึ่ง" : "นิด")
                 line += (line.isEmpty ? "" : " · ") + "สปินล่าง \(amt)" + (sp.0 < -0.05 ? " ค่อนซ้าย" : "")
             }
