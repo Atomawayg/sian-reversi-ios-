@@ -1151,7 +1151,7 @@ final class GameModel: ObservableObject {
         var m = raw
         guard var st = SK.decode(m.cells) else { return }
         let jar = Self.skJarOnly(m.cells)
-        if !(skLockJar.count == jar.count && SK.same(skLockJar, jar, tol: 3)) {
+        if !(skLockJar.count == jar.count && SK.same(skLockJar, jar, tol: 4)) {
             skLockJar = jar; skVotes = [Int](repeating: 0, count: SK.types); skLockT = -1
         }
         if st.held >= 0 {
@@ -1187,7 +1187,7 @@ final class GameModel: ObservableObject {
             show(Overlay(game: .suika, cells: m.cells, title: "รอ…", line: "รอผลไม้หยุดกลิ้ง"))
             return
         }
-        if !skComputed.isEmpty && SK.same(skComputed, m.cells) {
+        if !skComputed.isEmpty && SK.same(skComputed, m.cells, tol: 4) {   // (tol 4: the jar reads a few px apart frame to frame)
             // same jar: keep the answer, only the held fruit moved
             if skAnswer != nil { let o = skOverlay(m.cells); if o != overlay { show(o) } }
             return

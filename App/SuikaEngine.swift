@@ -231,11 +231,17 @@ final class SuikaEngine {
 
         // 1. this drop alone, across the jar
         let pos = SuikaEngine.xs(st.held, 41)
-        var tries: [Try] = []
-        for x in pos {
-            if cancel() { return nil }
-            tries.append(SuikaEngine.drop(base, st.held, x))
+        // every drop on its own core (3.35: one after another it took over a second on a full jar)
+        var slots = [Try?](repeating: nil, count: pos.count)
+        let lock = NSLock()
+        DispatchQueue.concurrentPerform(iterations: pos.count) { k in
+            if cancel() { return }
+            let t = SuikaEngine.drop(base, st.held, pos[k])
+            lock.lock(); slots[k] = t; lock.unlock()
         }
+        if cancel() { return nil }
+        let tries = slots.compactMap { $0 }
+        if tries.count != pos.count { return nil }
         // a spot is only as good as its neighbours: you can't drop to the exact pixel
         func robust(_ k: Int, _ v: Double) -> Double {
             var r = v
@@ -253,16 +259,23 @@ final class SuikaEngine {
             let order = tries.indices.sorted { tries[$0].v1 > tries[$1].v1 }
             let pos2 = SuikaEngine.xs(st.next, 21)
             var done: [Int] = []
-            for k in order.prefix(10) {
-                if late() { break }
+            let top = Array(order.prefix(10))
+            var res = [(Double, Double)?](repeating: nil, count: top.count)
+            DispatchQueue.concurrentPerform(iterations: top.count) { n in
+                if late() { return }
+                let k = top[n]
                 var b2 = tries[k].jar
                 for i in b2.indices { b2[i].tag = 0 }
-                let gain1 = tries[k].created.reduce(0.0) { $0 + SuikaEngine.made($1) }
                 var bestV = -Double.infinity, bestX = 0.0
                 for x in pos2 {
                     let t2 = SuikaEngine.drop(b2, st.next, x)
                     if t2.v1 > bestV { bestV = t2.v1; bestX = x }
                 }
+                lock.lock(); res[n] = (bestV, bestX); lock.unlock()
+            }
+            for (n, k) in top.enumerated() {
+                guard let (bestV, bestX) = res[n] else { continue }
+                let gain1 = tries[k].created.reduce(0.0) { $0 + SuikaEngine.made($1) }
                 total[k] = gain1 + 0.9 * bestV + 0.1 * tries[k].v1
                 nextX[k] = bestX
                 done.append(k)
