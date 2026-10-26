@@ -509,6 +509,12 @@ final class GameModel: ObservableObject {
     private var poolBalls: [PoolEngine.Ball] = []      // last cleanly read table
     private var poolMsgs = 0, poolRate = 0, poolRateSince = Date(), poolAppMs = 0.0
     private var poolInZone = false
+    // the two tables a break leaves (3.31, from Atom's two clips): which ball into which pocket, in order, and the power the
+    // clip used. Told apart by where the cue ball rests after the break. The clips play solids.
+    static let clipPlans: [(cue: (Double, Double), steps: [(ball: Int, pocket: Int, power: Int?)])] = [
+        ((489, 1144), [(3, 5, 37), (1, 5, 39), (5, 0, 30), (2, 2, 60), (6, 0, 27), (7, 3, 19), (4, 1, nil), (8, 2, 27)]),
+        ((723, 1144), [(5, 1, 21), (6, 0, 22), (4, 2, 49), (1, 3, 28), (2, 2, 31), (3, 1, 41), (7, 0, 44), (8, 1, 42)])]
+    private var poolPattern: Int? = nil, poolSawRack = false, poolPlanNote = ""
     // the opening book (3.30): this phone plays the same table the same way every time (two breaks matched to the px), so
     // a shot that potted from a table is worth repeating exactly, and one that missed is worth not repeating
     struct BookShot: Codable, Equatable { var aimX: Double; var aimY: Double; var dir: Double?; var power: Int }
@@ -736,6 +742,13 @@ final class GameModel: ObservableObject {
         // (only with the table at rest: after you let go, the power bar slides back while the balls already roll)
         let moved = still && (poolPlannedGroup != group || balls.count != poolPlanned.count
             || !balls.allSatisfy { b in poolPlanned.contains { $0.id == b.id && abs($0.x - b.x) < 6 && abs($0.y - b.y) < 6 } })
+        if PoolEngine.isBreak(others) && others.count == 15 { poolSawRack = true; poolPattern = nil }
+        else if still && poolSawRack, let cb = cue {
+            poolSawRack = false
+            let ds = Self.clipPlans.map { hypot($0.cue.0 - cb.x, $0.cue.1 - cb.y) }
+            if let k = ds.indices.min(by: { ds[$0] < ds[$1] }), ds[k] < 90 { poolPattern = k }
+            if logOn { log("pattern=\(poolPattern.map { String($0 + 1) } ?? "-") cue=\(Int(cb.x)),\(Int(cb.y))") }
+        }
         if moved {
             poolPlanned = balls; poolPlannedGroup = group
             poolFound = []; poolPick = nil; poolNextBall = nil; poolRunWins = false
@@ -757,6 +770,17 @@ final class GameModel: ObservableObject {
                     }
                 }
                 poolPick = bestRun?.pick ?? poolFound.first
+                // the clip's order for this break: its next ball (the first one still up), if it is yours
+                poolPlanNote = ""
+                if let pt = poolPattern, group == 0 || group == 1 || group == 3,
+                   let st = Self.clipPlans[pt].steps.first(where: { s in others.contains { $0.id == s.ball } }), legal.contains(st.ball) {
+                    let pw = st.power.map { " · คลิปแรง \($0)" } ?? ""
+                    if let f = poolFound.first(where: { $0.ball == st.ball && $0.pocket == st.pocket }) {
+                        poolPick = f; poolPlanNote = "แผนคลิป \(pt + 1)" + pw
+                    } else {
+                        poolPlanNote = "คลิป: \(st.ball) → \(PoolEngine.pockets[st.pocket].name) (ไม่ชัวร์)" + pw
+                    }
+                }
                 poolRunWins = bestRun?.wins ?? false
                 // nothing sure: look for a safety in the background (a few hundred ms) and show it when it's ready
                 if Self.poolSafetyOn && poolPick == nil {
@@ -789,6 +813,7 @@ final class GameModel: ObservableObject {
             if f.cueRails > 0 { bits.append("ลูกขาวชิ่ง \(f.cueRails)") }
             if f.objRails > 0 { bits.append("ชิ่ง \(f.objRails)") }
             if poolRunWins { bits.append("จบได้ในไม้นี้") }
+            if !poolPlanNote.isEmpty { bits.insert(poolPlanNote, at: 0) }
             line = bits.joined(separator: " · ")
             if !hasAim { view.powerTarget = f.power }
         } else if let sf = poolSafe {
@@ -798,7 +823,7 @@ final class GameModel: ObservableObject {
             if !hasAim { view.powerTarget = sf.power }
         } else if cue != nil && !PoolEngine.isBreak(others) {
             title = "ไม่มีลูกชัวร์"
-            line = ""
+            line = poolPlanNote
         }
         // the break (the clips' pattern): cue ball in the middle of the line, dead straight into the front ball, full power
         var breakShot = false
