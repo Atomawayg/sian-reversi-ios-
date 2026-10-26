@@ -514,7 +514,7 @@ final class GameModel: ObservableObject {
     static let clipPlans: [(cue: (Double, Double), steps: [(ball: Int, pocket: Int, power: Int?)])] = [
         ((489, 1144), [(3, 5, 37), (1, 5, 39), (5, 0, 30), (2, 2, 60), (6, 0, 27), (7, 3, 19), (4, 1, nil), (8, 2, 27)]),
         ((723, 1144), [(5, 1, 21), (6, 0, 22), (4, 2, 49), (1, 3, 28), (2, 2, 31), (3, 1, 41), (7, 0, 44), (8, 1, 42)])]
-    private var poolPattern: Int? = nil, poolSawRack = false, poolPlanNote = ""
+    private var poolPattern: Int? = nil, poolSawRack = false, poolPlanNote = "", poolPlanStep: (ball: Int, pocket: Int, power: Int?)? = nil
     // the opening book (3.30): this phone plays the same table the same way every time (two breaks matched to the px), so
     // a shot that potted from a table is worth repeating exactly, and one that missed is worth not repeating
     struct BookShot: Codable, Equatable { var aimX: Double; var aimY: Double; var dir: Double?; var power: Int }
@@ -771,11 +771,13 @@ final class GameModel: ObservableObject {
                 }
                 poolPick = bestRun?.pick ?? poolFound.first
                 // the clip's order for this break: its next ball (the first one still up), if it is yours
-                poolPlanNote = ""
+                poolPlanNote = ""; poolPlanStep = nil
                 if let pt = poolPattern, group == 0 || group == 1 || group == 3,
                    let st = Self.clipPlans[pt].steps.first(where: { s in others.contains { $0.id == s.ball } }), legal.contains(st.ball) {
-                    let pw = st.power.map { " · คลิปแรง \($0)" } ?? ""
-                    if let f = poolFound.first(where: { $0.ball == st.ball && $0.pocket == st.pocket }) {
+                    let pw = st.power.map { " · แรง \($0) ตามคลิป" } ?? ""
+                    poolPlanStep = st
+                    if var f = poolFound.first(where: { $0.ball == st.ball && $0.pocket == st.pocket }) {
+                        if let cp = st.power { f.power = cp }   // Atom: the clip's power, not ours (3.31.1)
                         poolPick = f; poolPlanNote = "แผนคลิป \(pt + 1)" + pw
                     } else {
                         poolPlanNote = "คลิป: \(st.ball) → \(PoolEngine.pockets[st.pocket].name) (ไม่ชัวร์)" + pw
@@ -907,6 +909,7 @@ final class GameModel: ObservableObject {
                 while p <= 100 { let q = paths(p); if q.objDrops && !PoolEngine.meetsCue(obj: q.obj, cue: q.cue) { target = min(100, p + 10); break }; p += 5 }
                 // the suggested shot: its power was picked for the next ball (3.29)
                 if let pk = poolPick, pk.ball == v.ball, pk.pocket == v.pocket, target != nil { target = pk.power }
+                if let ps = poolPlanStep, let cp = ps.power, ps.ball == v.ball, ps.pocket == v.pocket { target = cp }
             }
             let planned = paths(target ?? 60)
             let hitsCue = PoolEngine.meetsCue(obj: planned.obj, cue: planned.cue)
