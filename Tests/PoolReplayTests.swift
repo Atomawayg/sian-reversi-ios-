@@ -78,6 +78,22 @@ final class PoolReplayTests: XCTestCase {
         XCTAssertEqual(jumps, 0, "the suggestion jumped on an unchanged jar")
     }
 
+    /// the suggestion stays where Will can carry the fruit, and a fruit in a rounded corner sits inside the curve
+    func testSuikaReach() {
+        let e = SuikaEngine()
+        for t in 0...4 {
+            let st = SK.State(held: t, heldX: 500, next: 0, fruits: [SK.Fruit(t: 5, x: 700, y: SK.floor - SK.radius[5])])
+            guard let r = e.think(st, ms: 300, cancel: { false }) else { return XCTFail("no answer") }
+            let rg = SK.dropRange(t)
+            XCTAssert(r.x >= rg.lo - 0.5 && r.x <= rg.hi + 0.5, "kind \(t) at \(r.x) outside \(rg)")
+        }
+        var b = [SuikaEngine.Body(t: 0, x: SK.left + 10, y: SK.floor - 10)]
+        var made: [Int] = []
+        SuikaEngine.simulate(&b, created: &made, maxT: 1)
+        let cx = SK.left + SK.corner, cy = SK.floor - SK.corner
+        XCTAssertLessThanOrEqual(hypot(b[0].x - cx, b[0].y - cy), SK.corner - b[0].r + 1)
+    }
+
     func time(_ s: Substring) -> Double? {
         let p = s.prefix(10).split(separator: ":")
         guard p.count == 3, let h = Double(p[0]), let m = Double(p[1]), let x = Double(p[2]) else { return nil }
