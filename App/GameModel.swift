@@ -517,6 +517,11 @@ final class GameModel: ObservableObject {
     private var poolPlannedGroup = -1
     private var poolFound: [PoolEngine.Found] = []     // every sure pot from here (PoolEngine.sweep)
     private var poolPick: PoolEngine.Found? = nil, poolNextBall: Int? = nil, poolRunWins = false
+    private var poolSafe: PoolEngine.Safety? = nil        // no sure pot: the safety to play (worked out off the main thread)
+    private var poolHand: (x: Double, y: Double, pick: PoolEngine.Found)? = nil   // ball in hand: where to put the cue ball
+    private var poolHandFor: [PoolEngine.Ball] = []
+    private var poolThinkGen = 0, poolThinking = false
+    private var poolTitlePocket: (pocket: Int, pending: Int?, since: Date) = (-1, nil, Date())
     private var poolAims: [(Double, Double)] = []   // the last few aim-circle readings (a sure pot needs it steady)
 
     private var poolGroup = 0            // your group once it is certain (kept for the whole game)
@@ -534,7 +539,8 @@ final class GameModel: ObservableObject {
         if solids + stripes >= 14 { poolGroup = 0; poolGroupCand = 0; poolGroupAltSince = nil }   // a new game
         let mine = m.cells[PoolCodec.myLeft]
         let ds = abs(mine - solids), dl = abs(mine - stripes)
-        if still && mine > 0 {
+        let myOnTable = poolGroup == 1 ? solids : (poolGroup == 2 ? stripes : -1)
+        if still && mine > 0 && myOnTable != 0 {
             // which group the counts point at (a ball hidden for a moment is allowed for: one off still counts
             // when the other group is two further off)
             var cand = 0
@@ -554,11 +560,24 @@ final class GameModel: ObservableObject {
         }
         var g = poolGroup
         // on the 8: none of your group left on the table and none in your bar
-        if g == 1 && solids == 0 && mine == 0 { g = 3 }
-        if g == 2 && stripes == 0 && mine == 0 { g = 3 }
+        // (the table decides once it is at rest: with your bar emptied the game showed it as 7 again, and the last 8
+        // came up as "not yours" for 10 s)
+        if g == 1 && solids == 0 && (mine == 0 || still) { g = 3 }
+        if g == 2 && stripes == 0 && (mine == 0 || still) { g = 3 }
         // group never known this game (you joined late): the bar showing only the 8 tells
         if g == 0 && m.me == 3 && mine == 0 && (solids == 0 || stripes == 0) { g = 3 }
         return g
+    }
+
+    /// The balls the other side is on (to judge what a safety leaves them): the other group, the 8 once that is gone.
+    private func poolOpp(_ group: Int, _ others: [PoolEngine.Ball]) -> Set<Int> {
+        let g = group == 3 ? poolGroup : group
+        let onTable = Set(others.map { $0.id })
+        var opp: Set<Int>
+        switch g { case 1: opp = Set(9...15); case 2: opp = Set(1...7); default: opp = Set(1...15).subtracting([8]) }
+        opp = opp.intersection(onTable)
+        if opp.isEmpty && onTable.contains(8) { opp = [8] }
+        return opp
     }
 
     private func handlePool(_ m: BoardMessage) {
@@ -628,6 +647,10 @@ final class GameModel: ObservableObject {
         if moved {
             poolPlanned = balls; poolPlannedGroup = group
             poolFound = []; poolPick = nil; poolNextBall = nil; poolRunWins = false
+            poolSafe = nil; poolThinkGen += 1; poolThinking = false
+            // the ball-in-hand spot stays while only the cue ball moves (it is dragged about, then found under the hand)
+            let rest = balls.filter { $0.id != 0 }
+            if !(rest.count == poolHandFor.count && rest.allSatisfy { b in poolHandFor.contains { $0.id == b.id && abs($0.x - b.x) < 6 && abs($0.y - b.y) < 6 } }) { poolHand = nil }
             if let cue, !PoolEngine.isBreak(others) {
                 // the whole rack ahead: pick the first ball of the run most likely to clear the table and the 8
                 // (open table: try clearing the solids and clearing the stripes, keep the better)
@@ -643,6 +666,23 @@ final class GameModel: ObservableObject {
                 }
                 poolPick = bestRun?.pick ?? poolFound.first
                 poolRunWins = bestRun?.wins ?? false
+                // nothing sure: look for a safety in the background (a few hundred ms) and show it when it's ready
+                if poolPick == nil {
+                    let gen = poolThinkGen, cx = cue.x, cy = cue.y, all = balls, lg = legal, opp = poolOpp(group, others)
+                    poolThinking = true
+                    work.async { [weak self] in
+                        let sf = PoolEngine.safetyPlan(cueX: cx, cueY: cy, balls: all, legal: lg, opp: opp)
+                        DispatchQueue.main.async { guard let self, self.poolThinkGen == gen else { return }; self.poolSafe = sf; self.poolThinking = false }
+                    }
+                }
+            } else if cue == nil && !PoolEngine.isBreak(others) {
+                // ball in hand (the hand lies on the cue ball, so it isn't seen): where to put it
+                let gen = poolThinkGen, all = others, lg = legal
+                poolThinking = true; poolHandFor = others
+                work.async { [weak self] in
+                    let h = PoolEngine.handSpot(balls: all, legal: lg)
+                    DispatchQueue.main.async { guard let self, self.poolThinkGen == gen else { return }; self.poolHand = h; self.poolThinking = false }
+                }
             }
         }
         view.found = poolFound; view.pick = poolPick
@@ -654,9 +694,15 @@ final class GameModel: ObservableObject {
             if poolRunWins { bits.append("จบได้ในไม้นี้") }
             line = bits.joined(separator: " · ")
             if !hasAim { view.powerTarget = f.power }
+        } else if let sf = poolSafe {
+            title = "เซฟ: แตะ \(sf.ball)"
+            line = sf.hidden ? "สนุก · ขาวหยุดวงทอง" : "ขาวหยุดวงทอง"
+            view.safe = sf
+            if !hasAim { view.powerTarget = sf.power }
         } else if cue != nil && !PoolEngine.isBreak(others) {
             title = "ไม่มีลูกชัวร์"
-            if let cue, let sb = PoolEngine.safety(cueX: cue.x, cueY: cue.y, balls: others, legal: legal) { line = "แตะลูก \(sb.id) ก่อน (เซฟ)" }
+            line = poolThinking ? "กำลังหาไม้เซฟ…" : ""
+            if !poolThinking, let cue, let sb = PoolEngine.safety(cueX: cue.x, cueY: cue.y, balls: others, legal: legal) { line = "แตะลูก \(sb.id) ก่อน" }
         }
         // the break (the clips' pattern): cue ball in the middle of the line, dead straight into the front ball, full power
         var breakShot = false
@@ -691,7 +737,18 @@ final class GameModel: ObservableObject {
                 }
             } else { poolSound.set(.off) }
         }
-        else if cue == nil { title = "วางลูกขาว"; line = "" }
+        else if let h = poolHand, let cue, hypot(cue.x - h.x, cue.y - h.y) > 10 {
+            view.breakSpotX = h.x; view.breakSpotY = h.y   // ball in hand: the spot stays up until it's there
+            if poolPick == nil && poolSafe == nil { title = "วางขาวที่วงทอง"; line = "แล้วยิง \(h.pick.ball) → \(PoolEngine.pockets[h.pick.pocket].name)" }
+        }
+        else if cue == nil {
+            title = "วางลูกขาว"; line = poolThinking ? "กำลังหาจุดวาง…" : ""
+            if let h = poolHand {
+                view.breakSpotX = h.x; view.breakSpotY = h.y
+                title = "วางขาวที่วงทอง"; line = "แล้วยิง \(h.pick.ball) → \(PoolEngine.pockets[h.pick.pocket].name)"
+                view.pick = h.pick
+            }
+        }
         // your aim: draw where the balls go; one long tone when it pots one of your balls cleanly
         if breakShot {
             // handled above
@@ -769,9 +826,27 @@ final class GameModel: ObservableObject {
             let cleanPot = v.ball >= 0 && v.pocket >= 0 && !v.foul && !v.scratch && v.off < 0.75   // the game's own line makes the edge of the mouth trustworthy
             // never a sure pot on a guessed direction: on a thin cut the game's line is too short to read, and a few px
             // of ring error then turn the ball by 10° or more (an 8 shown as dropping went wide by 14°)
-            let good = cleanPot && dir != nil && steady
+            // or plenty to spare either way with the jaws made fatter (4 logs: every "risky" with ±0.3° or more dropped)
+            let roomy = v.ball >= 0 && v.pocket >= 0 && !v.foul && !v.scratch && !v.bank
+                && (view.win.map { $0.sure && $0.pocket == v.pocket && $0.lo <= -0.3 && $0.hi >= 0.3 } ?? false)
+            let good = (cleanPot || roomy) && dir != nil && steady
             view.pots = good
             view.risky = !good && v.ball >= 0 && v.pocket >= 0 && !v.foul && !v.scratch
+            // on the safety: the aim ring where the safety meets its ball
+            var onSafe = false
+            if !good, poolPick == nil, let sf = poolSafe {
+                view.safe = sf
+                onSafe = v.ball == sf.ball && hypot(a.x - sf.ghostX, a.y - sf.ghostY) <= 6 && steady
+                if onSafe || target == nil { view.powerTarget = sf.power }
+            }
+            // the pocket named in the title: changes only after 0.4 s on a new one (long banks flicked between pockets)
+            if let w = view.win {
+                if w.pocket == poolTitlePocket.pocket { poolTitlePocket.pending = nil }
+                else if poolTitlePocket.pocket < 0 { poolTitlePocket = (w.pocket, nil, nowT) }
+                else if poolTitlePocket.pending == w.pocket { if nowT.timeIntervalSince(poolTitlePocket.since) >= 0.4 { poolTitlePocket = (w.pocket, nil, nowT) } }
+                else { poolTitlePocket.pending = w.pocket; poolTitlePocket.since = nowT }
+            }
+            let namePocket = view.win.map { v.pocket >= 0 ? $0.pocket : (poolTitlePocket.pocket >= 0 ? poolTitlePocket.pocket : $0.pocket) }
 
             if good {
                 title = "✓ \(v.ball) → \(PoolEngine.pockets[v.pocket].name)"
@@ -786,6 +861,14 @@ final class GameModel: ObservableObject {
                     poolInZone = false
                     poolSound.set(.tone(660))
                 }
+            } else if onSafe, let sf = poolSafe {
+                title = "✓ เซฟ \(sf.ball)"; line = ""
+                if pulling {
+                    poolSound.set(.off)
+                    let inZone = abs(pullPct - sf.power) <= 3
+                    if inZone && !poolInZone { poolSound.ding() }
+                    poolInZone = inZone
+                } else { poolInZone = false; poolSound.set(.tone(660)) }
             } else {
                 poolSound.set(.off); poolInZone = false
                 if v.ball >= 0 && (v.foul || v.scratch) {
@@ -793,7 +876,8 @@ final class GameModel: ObservableObject {
                     line = ""
                 } else if let w = view.win {
                     // your line misses or only just drops: which pocket it is near and which way to turn
-                    title = "\(v.ball) → \(PoolEngine.pockets[w.pocket].name)" + (v.pocket >= 0 ? " เสี่ยง" : "?")
+                    title = "\(v.ball) → \(PoolEngine.pockets[namePocket ?? w.pocket].name)" + (v.pocket >= 0 ? " เสี่ยง" : "?")
+                    if v.pocket < 0 && poolSafe != nil && poolPick == nil { title = "เซฟ: แตะ \(poolSafe!.ball)"; line = "เล็งให้วงตรงวงทอง" }
                     line = ""
                 }
             }
@@ -811,6 +895,10 @@ final class GameModel: ObservableObject {
             if let d = PoolCodec.dir(c) { t += String(format: " dir=%.1f", d * 180 / Double.pi) }
             if let f = poolPick { t += String(format: " best=%d>%d@%d r%d/%d w%.1f", f.ball, f.pocket, f.power, f.objRails, f.cueRails, f.width) + (poolRunWins ? " runout" : "") + " n=\(poolFound.count)" }
             if let w = view.win { t += String(format: " win=%d:%.2f..%.2f", w.pocket, w.lo, w.hi) }
+            if let sf = poolSafe, let e = sf.cueStop.last.map({ _ in (sf.cueStop[sf.cueStop.count - 2], sf.cueStop[sf.cueStop.count - 1]) }) {
+                t += String(format: " safe=%d@%d a%.1f stop=%d,%d opp%.2f", sf.ball, sf.power, sf.angle * 180 / Double.pi, Int(e.0), Int(e.1), sf.oppChance) + (sf.hidden ? " hidden" : "")
+            }
+            if let h = poolHand { t += " hand=\(Int(h.x)),\(Int(h.y))>\(h.pick.ball)" }
             if pulling { t += " power=\(c[PoolCodec.power] * 14 + c[PoolCodec.power + 1])" }
 
             t += " says=\(title)|" + line.replacingOccurrences(of: "\n", with: " / ")

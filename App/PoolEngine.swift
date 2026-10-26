@@ -698,6 +698,143 @@ enum PoolEngine {
         return (firsts[best.first], best.n, best.done, best.p)
     }
 
+    // MARK: safety (no sure pot)
+
+    /// A safety: touch one of your balls first, a cushion after, the cue ball stays up, and it comes to rest where the
+    /// other side has nothing easy (best: no straight line to any of their balls at all).
+    struct Safety: Equatable {
+        var ball: Int
+        var angle: Double, power: Int
+        var ghostX: Double, ghostY: Double        // where the cue ball meets the ball (the aim ring then sits here)
+        var cuePts: [Double]                      // the cue ball to the hit (cushions first included)
+        var objPts: [Double]                      // the hit ball until it stops
+        var cueStop: [Double]                     // the cue ball after the hit until it stops
+        var hidden: Bool                          // they can't see any of their balls (a snooker)
+        var oppChance: Double                     // what they are left: sum of drop chances of their straight pots (worst of power ±5)
+    }
+
+    private struct SafeTry { var ball: Int; var c: Run; var o: Run; var after: Run; var cue: (Double, Double); var obj: (Double, Double) }
+    /// One try: cue along `a` at `power`; nil when it is a foul or can't be told (wrong ball or none first, no cushion
+    /// after the hit, a ball dropping, or the balls running into others — those positions can't be foreseen).
+    private static func safeTry(_ cx: Double, _ cy: Double, _ a: Double, _ power: Int, _ others: [Ball], _ legal: Set<Int>) -> SafeTry? {
+        let cr = run(cx, cy, cos(a), sin(a), balls: others, skip: 0, maxLen: 4000, maxRails: 2, speed: speedAt(power: Double(power)))
+        guard cr.pocket < 0, cr.jaws == 0, let id = cr.ball, legal.contains(id), let b = others.first(where: { $0.id == id }), cr.pts.count >= 4 else { return nil }
+        let n = cr.pts.count
+        let gx = cr.pts[n - 2], gy = cr.pts[n - 1]
+        let lx = gx - cr.pts[n - 4], ly = gy - cr.pts[n - 3], ll = max(1e-6, (lx * lx + ly * ly).squareRoot())
+        var ox = b.x - gx, oy = b.y - gy
+        let d = max(1e-6, (ox * ox + oy * oy).squareRoot()); ox /= d; oy /= d
+        let along = max(0, min(1, (lx * ox + ly * oy) / ll))
+        let vHit = speedFor(distance: cr.left)
+        let o = run(b.x, b.y, ox, oy, balls: others, skip: id, maxLen: 4000, maxRails: 6, speed: vHit * along)
+        guard o.pocket < 0, o.ball == nil else { return nil }
+        let after = cueAfter(gx, gy, ix: lx / ll, iy: ly / ll, ox: ox, oy: oy, vHit: vHit, balls: others, skip: id)
+        guard after.pocket < 0, after.ball == nil else { return nil }
+        // a cushion after the hit (by either ball), or it is a foul
+        guard o.rails + o.jaws + after.rails + after.jaws >= 1 else { return nil }
+        let oe = (o.pts[o.pts.count - 2], o.pts[o.pts.count - 1]), ce = (after.pts[after.pts.count - 2], after.pts[after.pts.count - 1])
+        // the two balls must not end up on top of each other (they would have met on the way)
+        if hypot(oe.0 - ce.0, oe.1 - ce.1) < 2 * R { return nil }
+        return SafeTry(ball: id, c: cr, o: o, after: after, cue: ce, obj: oe)
+    }
+
+    /// What the other side is left with the cue ball at `cue`: the summed drop chance of their straight pots, and
+    /// whether they can see any of their balls at all (centre or either edge).
+    static func leaves(cue: (Double, Double), balls: [Ball], opp: Set<Int>) -> (chance: Double, hidden: Bool) {
+        let theirs = balls.filter { opp.contains($0.id) }
+        var seen = false
+        for t in theirs where !seen {
+            var ux = t.x - cue.0, uy = t.y - cue.1
+            let d = max(1e-6, (ux * ux + uy * uy).squareRoot()); ux /= d; uy /= d
+            for side in [-0.85, 0, 0.85] {
+                // the cue ball touching the ball on this side: 2R from its centre
+                let gx = t.x - ux * 2 * R * (1 - side * side).squareRoot() - uy * 2 * R * side
+                let gy = t.y - uy * 2 * R * (1 - side * side).squareRoot() + ux * 2 * R * side
+                if clear(cue.0, cue.1, gx, gy, balls, skip: t.id, gap: 2 * R - 1) { seen = true; break }
+            }
+        }
+        let shotsLeft = shots(cueX: cue.0, cueY: cue.1, balls: balls, legal: opp, banks: false).filter { !$0.scratch }
+        let chance = shotsLeft.prefix(4).reduce(0.0) { $0 + dropChance($1.tolerance) }
+        return (chance, !seen)
+    }
+
+    /// Search every cue direction (½° steps) and power (10–60 %) for the safety that leaves the other side least, and still
+    /// works with the power 5 off either way and the cue turned ½° either way (where the cue ball stops is only known
+    /// roughly). `opp`: the balls they would be on.
+    static func safetyPlan(cueX: Double, cueY: Double, balls: [Ball], legal: Set<Int>, opp: Set<Int>) -> Safety? {
+        let others = balls.filter { $0.id != 0 }
+        guard !opp.isEmpty else { return nil }
+        let n = 720, step = 2 * Double.pi / Double(n)
+        let powers = Array(stride(from: 5, through: 65, by: 5))
+        // directions whose first ball (ignoring pace) is one of yours
+        var okDir = [Bool](repeating: false, count: n)
+        for k in 0..<n {
+            let a = Double(k) * step
+            let c = run(cueX, cueY, cos(a), sin(a), balls: others, skip: 0, maxLen: 4000, maxRails: 2)
+            if c.pocket < 0, c.jaws == 0, let id = c.ball, legal.contains(id) { okDir[k] = true }
+        }
+        var tries = [[SafeTry?]](repeating: [SafeTry?](repeating: nil, count: powers.count), count: n)
+        for k in 0..<n where okDir[k] {
+            for (j, p) in powers.enumerated() { tries[k][j] = safeTry(cueX, cueY, Double(k) * step, p, others, legal) }
+        }
+        // what they are left (cached by where the two balls stop, to 6 px)
+        var memo: [String: (Double, Bool)] = [:]
+        func left(_ t: SafeTry) -> (Double, Bool) {
+            let key = "\(t.ball):\(Int(t.cue.0 / 6)),\(Int(t.cue.1 / 6)):\(Int(t.obj.0 / 6)),\(Int(t.obj.1 / 6))"
+            if let m = memo[key] { return m }
+            var after = others.filter { $0.id != t.ball }; after.append(Ball(id: t.ball, x: t.obj.0, y: t.obj.1))
+            let r = leaves(cue: t.cue, balls: after, opp: opp)
+            memo[key] = (r.chance, r.hidden); return (r.chance, r.hidden)
+        }
+        var best: (cost: Double, k: Int, j: Int, chance: Double, hidden: Bool)? = nil
+        for k in 0..<n where okDir[k] {
+            for j in 1..<(powers.count - 1) where powers[j] >= 10 && powers[j] <= 60 {
+                guard let t = tries[k][j], let lo = tries[k][j - 1], let hi = tries[k][j + 1],
+                      lo.ball == t.ball, hi.ball == t.ball,
+                      let l = tries[(k + n - 1) % n][j], let r = tries[(k + 1) % n][j], l.ball == t.ball, r.ball == t.ball else { continue }
+                var worst = 0.0, allHidden = true
+                for x in [t, lo, hi, l, r] { let e = left(x); worst = max(worst, e.0); allHidden = allHidden && e.1 }
+                // least left for them; a snooker is worth a lot; gentle shots are easier to get right
+                let cost = worst * 10 + (allHidden ? 0 : 1.5) + Double(powers[j]) / 100
+                if best == nil || cost < best!.cost { best = (cost, k, j, worst, allHidden) }
+            }
+        }
+        guard let b = best, let t = tries[b.k][b.j] else { return nil }
+        let g = t.c.pts
+        return Safety(ball: t.ball, angle: Double(b.k) * step, power: powers[b.j], ghostX: g[g.count - 2], ghostY: g[g.count - 1],
+                      cuePts: t.c.pts, objPts: t.o.pts, cueStop: t.after.pts, hidden: b.hidden, oppChance: b.chance)
+    }
+
+    // MARK: ball in hand
+
+    /// Where to put the cue ball: the spot (24 px grid, then the best few checked with the full sweep) whose sure
+    /// shot leads the longest run. Returns the spot and its shot.
+    static func handSpot(balls: [Ball], legal: Set<Int>) -> (x: Double, y: Double, pick: Found)? {
+        let others = balls.filter { $0.id != 0 }
+        var cands: [(Double, Double, Double)] = []
+        var y = yMin + 2
+        while y <= yMax - 2 {
+            var x = xMin + 2
+            while x <= xMax - 2 {
+                if !others.contains(where: { ($0.x - x) * ($0.x - x) + ($0.y - y) * ($0.y - y) < (2 * R + 4) * (2 * R + 4) }),
+                   let s = shots(cueX: x, cueY: y, balls: others, legal: legal, placed: true, banks: false).filter({ !$0.scratch }).first {
+                    cands.append((x, y, score(s)))
+                }
+                x += 24
+            }
+            y += 24
+        }
+        var best: (x: Double, y: Double, pick: Found, v: Double)? = nil
+        for c in cands.sorted(by: { $0.2 > $1.2 }).prefix(6) {
+            let found = sweep(cueX: c.0, cueY: c.1, balls: [Ball(id: 0, x: c.0, y: c.1)] + others, legal: legal)
+            guard let f0 = found.first else { continue }
+            var pick = f0, v = dropChance(f0.width / 2)
+            if let r = runOut(balls: others, legal: legal, firsts: found) { pick = r.pick; v = r.chance * (Double(r.count) + (r.wins ? 4 : 0)) }
+            if best == nil || v > best!.v { best = (c.0, c.1, pick, v) }
+        }
+        return best.map { ($0.x, $0.y, $0.pick) }
+    }
+
     // MARK: every way a ball can reach each pocket (the guide lines)
 
     /// For one ball: the straight line into each pocket it can reach unblocked, and for each pocket the one-cushion

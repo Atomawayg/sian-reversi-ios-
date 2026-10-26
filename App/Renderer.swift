@@ -543,6 +543,7 @@ struct PoolView: Equatable {
     var options: [PoolEngine.Shot] = []        // (no longer filled: see `found`)
     var found: [PoolEngine.Found] = []         // every sure pot from here: a thin line along the ball's way to its pocket
     var pick: PoolEngine.Found? = nil          // the one suggested: drawn in gold with the cue ball's way and where it stops
+    var safe: PoolEngine.Safety? = nil         // no sure pot: the safety (gold), where both balls stop
     var objPathFull: [Double] = []             // your line at the power to use (always into the pocket when it drops)
     var powerTarget: Int? = nil, powerNow: Int? = nil
     var breakSpotX: Double? = nil, breakSpotY: Double? = nil
@@ -626,6 +627,26 @@ extension Renderer {
                 UIColor.white.setStroke(); let r = UIBezierPath(ovalIn: CGRect(x: e.x - br, y: e.y - br, width: br * 2, height: br * 2)); r.lineWidth = 2; r.setLineDash([3, 3], count: 2, phase: 0); r.stroke()
             }
         }
+        // the safety: the cue ball's way to the ball (gold), where the hit ball stops (dashed, small ring), and the cue
+        // ball's stop as a solid gold ring — that ring and the ghost ring stay up while you aim, to line your ring up with
+        if let sf = v.safe {
+            if !aiming {
+                poly(sf.cuePts, gold, 2)
+                poly(sf.objPts, gold.withAlphaComponent(0.8), 1.5, dash: true)
+                poly(sf.cueStop, UIColor.white.withAlphaComponent(0.7), 1.5, dash: true)
+            }
+            if sf.objPts.count >= 2 {
+                let e = pt(sf.objPts[sf.objPts.count - 2], sf.objPts[sf.objPts.count - 1])
+                gold.withAlphaComponent(0.8).setStroke(); let r = UIBezierPath(ovalIn: CGRect(x: e.x - br, y: e.y - br, width: br * 2, height: br * 2)); r.lineWidth = 1.5; r.setLineDash([3, 3], count: 2, phase: 0); r.stroke()
+            }
+            let g = pt(sf.ghostX, sf.ghostY)
+            gold.withAlphaComponent(aiming ? 0.7 : 1).setStroke(); let gr = UIBezierPath(ovalIn: CGRect(x: g.x - br, y: g.y - br, width: br * 2, height: br * 2)); gr.lineWidth = 1.5; gr.stroke()
+            if sf.cueStop.count >= 2 {
+                let e = pt(sf.cueStop[sf.cueStop.count - 2], sf.cueStop[sf.cueStop.count - 1])
+                UIColor.black.withAlphaComponent(0.6).setStroke(); let r0 = UIBezierPath(ovalIn: CGRect(x: e.x - br - 1, y: e.y - br - 1, width: br * 2 + 2, height: br * 2 + 2)); r0.lineWidth = 4.5; r0.stroke()
+                gold.setStroke(); let r = UIBezierPath(ovalIn: CGRect(x: e.x - br - 1, y: e.y - br - 1, width: br * 2 + 2, height: br * 2 + 2)); r.lineWidth = 2.5; r.stroke()
+            }
+        }
         let sg = aiming ? gold.withAlphaComponent(0.35) : gold
         if let s = v.shot {
             let cue = pt(s.cueX, s.cueY), g = pt(s.ghostX, s.ghostY)
@@ -704,6 +725,7 @@ extension Renderer {
         }
         // the ball to play now: a "1" on it (only ever 1 — once it drops, the 1 moves to the next ball)
         if let f = v.pick, let b = v.balls.first(where: { $0.id == f.ball }) { label("1", b) }
+        else if let sf = v.safe, let b = v.balls.first(where: { $0.id == sf.ball }) { label("1", b) }
         if let s = v.shot, let b = v.balls.first(where: { $0.id == s.ball }) { label("1", b) }
         if let n = v.next, let b = v.balls.first(where: { $0.id == n.ball }) { label("2", b) }
         if let ex = v.cueEndX, let ey = v.cueEndY, !aiming {
