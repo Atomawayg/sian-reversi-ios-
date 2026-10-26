@@ -1034,10 +1034,13 @@ final class GameModel: ObservableObject {
             // one line only: the plan's (its gold line, ball → pocket); none of the thin ones to every pocket
             view.found = []; view.guides = []; view.guideMatch = nil
             if let pk = view.pick, pk.ball != ps.ball { view.pick = nil }
-            view.zoomPocket = ps.pocket
-            if view.breakSpotX == nil { view.breakSpotX = PoolEngine.pockets[ps.pocket].x; view.breakSpotY = PoolEngine.pockets[ps.pocket].y }
             let name = "ลูก \(ps.ball) → \(PoolEngine.pockets[ps.pocket].name)"
             let onPlan = aimHit.map { $0.ball == ps.ball && $0.pocket == ps.pocket } ?? false
+            // aiming elsewhere: your line rules — the plan's pocket mark, zoom and spin step aside (3.33, replay test)
+            if aimHit == nil || onPlan {
+                view.zoomPocket = ps.pocket
+                if view.breakSpotX == nil { view.breakSpotX = PoolEngine.pockets[ps.pocket].x; view.breakSpotY = PoolEngine.pockets[ps.pocket].y }
+            }
             // aiming at another ball: the app's own verdict on it stays in the title (3.32.1: it said "✓ 3" while 9 dropped)
             if aimHit == nil || onPlan {
                 title = (onPlan && view.pots ? "✓ " : "แผน: ") + name
@@ -1045,7 +1048,7 @@ final class GameModel: ObservableObject {
             }
             // how to hit it: the clip's spin, or the middle of the ball (both clips: none on most shots)
             let sp = ps.spin ?? (0, 0)
-            view.spinX = sp.0; view.spinY = sp.1
+            if aimHit == nil || onPlan { view.spinX = sp.0; view.spinY = sp.1 }
             let how = sp.1 < 0.05 ? "แทงกลาง" : "สปินล่าง " + (sp.1 >= 0.7 ? "เต็ม" : (sp.1 >= 0.35 ? "ครึ่ง" : "นิด")) + (sp.0 < -0.05 ? " ค่อนซ้าย" : "")
             if aimHit == nil || onPlan { line += (line.isEmpty ? "" : " · ") + how }
         }
