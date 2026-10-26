@@ -1026,6 +1026,8 @@ final class GameModel: ObservableObject {
             poolSound.set(.off); poolAims = []
             if poolZoom.pocket != nil && Date().timeIntervalSince(poolZoom.seen) > 1.0 { poolZoom = (nil, Date(), nil) }
         }
+        // aiming at something other than the suggested shot: your line is the one to go by, the suggestion's gold line goes (3.33)
+        if let ah = aimHit, let pk = view.pick, ah.ball != pk.ball || ah.pocket != pk.pocket { view.pick = nil }
         // the clip's plan (3.31.2, Atom: "it names the ball but not the pocket, too many lines"): one line ball → pocket,
         // that pocket marked and zoomed, and the title naming both the whole time
         if let ps = poolPlanStep, !PoolEngine.isBreak(others), others.contains(where: { $0.id == ps.ball }) {

@@ -682,11 +682,9 @@ extension Renderer {
         // Your own line is the thick one with a dark edge: green drops, orange only just, white misses
         let guideCol = UIColor(red: 0.95, green: 0.45, blue: 0.38, alpha: 1)
         // (3.28: thicker, and they stay up between aims)
-        for (i, g) in v.guides.enumerated() where i != v.guideMatch { poly(g.pts, guideCol.withAlphaComponent(0.85), 2) }
-        if let mi = v.guideMatch, mi < v.guides.count {
-            poly(v.guides[mi].pts, UIColor.black.withAlphaComponent(0.5), 5.5)
-            poly(v.guides[mi].pts, guideCol, 3.5)
-        }
+        // (3.33: Atom — no more thin lines to every pocket on the table; only the main line, or your own line when you aim
+        // elsewhere. They are still worked out: they pick the pocket close-up, which still draws the one you follow.)
+        _ = guideCol
         let mineCol = v.pots ? green : (v.risky ? orange : UIColor.white)
         poly(v.objPathFull, mineCol.withAlphaComponent(0.7), 2, dash: true)
         poly(v.objPath, UIColor.black.withAlphaComponent(0.7), 7.5)
