@@ -624,7 +624,6 @@ extension Renderer {
             let g = pt(f.ghostX, f.ghostY)
             col.setStroke(); let gr = UIBezierPath(ovalIn: CGRect(x: g.x - br, y: g.y - br, width: br * 2, height: br * 2)); gr.lineWidth = 1.5; gr.stroke()
             if f.cueStop.count >= 2 {
-                poly(f.cueStop, UIColor.white.withAlphaComponent(0.7), 1.5, dash: true)
                 let e = pt(f.cueStop[f.cueStop.count - 2], f.cueStop[f.cueStop.count - 1])
                 UIColor.white.setStroke(); let r = UIBezierPath(ovalIn: CGRect(x: e.x - br, y: e.y - br, width: br * 2, height: br * 2)); r.lineWidth = 2; r.setLineDash([3, 3], count: 2, phase: 0); r.stroke()
             }
@@ -672,14 +671,16 @@ extension Renderer {
         // guide lines (thin, coral): where the ball would have to go for each pocket; the one your line follows a bit bolder.
         // Your own line is the thick one with a dark edge: green drops, orange only just, white misses
         let guideCol = UIColor(red: 0.95, green: 0.45, blue: 0.38, alpha: 1)
-        if aiming {
-            for (i, g) in v.guides.enumerated() where i != v.guideMatch { poly(g.pts, guideCol.withAlphaComponent(0.55), 1) }
-            if let mi = v.guideMatch, mi < v.guides.count { poly(v.guides[mi].pts, guideCol, 2) }
+        // (3.28: thicker, and they stay up between aims)
+        for (i, g) in v.guides.enumerated() where i != v.guideMatch { poly(g.pts, guideCol.withAlphaComponent(0.85), 2) }
+        if let mi = v.guideMatch, mi < v.guides.count {
+            poly(v.guides[mi].pts, UIColor.black.withAlphaComponent(0.5), 5.5)
+            poly(v.guides[mi].pts, guideCol, 3.5)
         }
         let mineCol = v.pots ? green : (v.risky ? orange : UIColor.white)
-        poly(v.objPathFull, mineCol.withAlphaComponent(0.6), 1.5, dash: true)
-        poly(v.objPath, UIColor.black.withAlphaComponent(0.6), 6)
-        poly(v.objPath, mineCol, 3.5)
+        poly(v.objPathFull, mineCol.withAlphaComponent(0.7), 2, dash: true)
+        poly(v.objPath, UIColor.black.withAlphaComponent(0.7), 7.5)
+        poly(v.objPath, mineCol, 4.5)
         if let bx = v.bankX, let by = v.bankY {   // where to hit the cushion: a gold mark on the rail by the diamonds
             let c = pt(bx, by)
             var m = c
@@ -687,7 +688,7 @@ extension Renderer {
             else if by < PoolEngine.midY { m.y = box.minY - 3 } else { m.y = box.maxY + 3 }
             gold.setFill(); UIBezierPath(ovalIn: CGRect(x: m.x - 5, y: m.y - 5, width: 10, height: 10)).fill()
         }
-        poly(v.cuePath, UIColor.white.withAlphaComponent(0.8), 1.5, dash: true)
+        // (the cue ball's way after the hit is not drawn any more: only where it stops — 3.28, Atom)
         // where the balls stop: while pulling a full ring for your power; before, small marks for 25/50/75/100
         func stop(_ s: PoolStop, _ col: UIColor) {
             let e = pt(s.x, s.y)

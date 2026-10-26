@@ -730,6 +730,16 @@ final class GameModel: ObservableObject {
             }
         }
         view.found = poolFound; view.pick = poolPick
+        // the lines to every pocket stay up between aims: for the ball you last aimed at (if still there), else the "1" ball
+        if !hasAim && still {
+            let last = poolGuideKey.first.map { Int($0) }
+            if let id = (last.flatMap { l in others.contains(where: { $0.id == l }) ? l : nil }) ?? poolPick?.ball,
+               let t = others.first(where: { $0.id == id }) {
+                let key = [Double(t.id)] + others.flatMap { [Double($0.id), ($0.x / 4).rounded(), ($0.y / 4).rounded()] }
+                if key != poolGuideKey { poolGuideKey = key; poolGuides = PoolEngine.pocketLines(t, balls: others) }
+                view.guides = poolGuides
+            }
+        }
         if let f = poolPick {
             title = "\(f.ball) → \(PoolEngine.pockets[f.pocket].name)"
             var bits: [String] = []
