@@ -509,6 +509,23 @@ final class GameModel: ObservableObject {
     private var poolBalls: [PoolEngine.Ball] = []      // last cleanly read table
     private var poolMsgs = 0, poolRate = 0, poolRateSince = Date(), poolAppMs = 0.0
     private var poolInZone = false
+    // the opening book (3.30): this phone plays the same table the same way every time (two breaks matched to the px), so
+    // a shot that potted from a table is worth repeating exactly, and one that missed is worth not repeating
+    struct BookShot: Codable, Equatable { var aimX: Double; var aimY: Double; var dir: Double?; var power: Int }
+    struct BookNode: Codable { var state: [[Double]]; var good: BookShot?; var bad: [BookShot] }
+    private var book: [BookNode] = {
+        guard let d = UserDefaults.standard.data(forKey: "poolBook"), let b = try? JSONDecoder().decode([BookNode].self, from: d) else { return [] }
+        return b
+    }()
+    private var bookAim: (x: Double, y: Double, dir: Double?, state: [PoolEngine.Ball], legal: Set<Int>)? = nil   // the last steady aim on a resting table
+    private var bookPull: [Int] = []          // power readings while pulling (the release is where the fast slide back starts)
+    private var bookPending: (state: [PoolEngine.Ball], shot: BookShot, legal: Set<Int>)? = nil
+    private func bookSave() { if let d = try? JSONEncoder().encode(book) { UserDefaults.standard.set(d, forKey: "poolBook") } }
+    private func bookFind(_ balls: [PoolEngine.Ball]) -> Int? {
+        book.firstIndex { n in
+            n.state.count == balls.count && n.state.allSatisfy { e in balls.contains { $0.id == Int(e[0]) && abs($0.x - e[1]) <= 5 && abs($0.y - e[2]) <= 5 } }
+        }
+    }
     private var poolLastLog = ""
     private var poolSpin: (x: Double, y: Double) = (0, 0)
     private var poolZoom: (pocket: Int?, seen: Date, pending: (pocket: Int, since: Date)?) = (nil, Date(), nil)   // the steady pocket close-up
@@ -659,6 +676,30 @@ final class GameModel: ObservableObject {
         let legal = PoolEngine.legal(group: group)
         let groupName = ["โต๊ะเปิด", "คุณ: ลูกเต็ม", "คุณ: ลูกลาย", "คุณ: ลูก 8"][max(0, min(3, group))]
         var view = PoolView(balls: balls, shot: nil, legal: Array(legal))
+        // the book: a shot leaves the table (pulled within the last second, now rolling) → note it; when all is at rest
+        // again, it potted if one of your balls went down, the cue ball stayed up and it is still your turn
+        if pulling { bookPull.append(c[PoolCodec.power] * 14 + c[PoolCodec.power + 1]); if bookPull.count > 400 { bookPull.removeFirst(100) } }
+        if !still && !pulling && bookPending == nil, nowS.timeIntervalSince(poolLastPull) < 1.0, let ba = bookAim, !bookPull.isEmpty, !PoolEngine.isBreak(ba.state.filter { $0.id != 0 }) {
+            var k = bookPull.count - 1
+            while k > 0 && bookPull[k - 1] > bookPull[k] + 1 { k -= 1 }   // back up the slide to where it started
+            bookPending = (ba.state, BookShot(aimX: ba.x, aimY: ba.y, dir: ba.dir, power: bookPull[k]), ba.legal)
+            bookPull = []
+        }
+        if still && !pulling, let bp = bookPending {
+            bookPending = nil; bookAim = nil
+            let gone = Set(bp.state.map { $0.id }).subtracting(balls.map { $0.id })
+            let good = m.myTurn && balls.contains { $0.id == 0 } && !gone.contains(8) && !gone.isDisjoint(with: bp.legal.isEmpty ? Set(1...15) : bp.legal)
+            let st = bp.state.map { [Double($0.id), $0.x, $0.y] }
+            var i = bookFind(bp.state)
+            if i == nil { book.append(BookNode(state: st, good: nil, bad: [])); i = book.count - 1; if book.count > 400 { book.removeFirst(); i! -= 1 } }
+            if good { if book[i!].good == nil { book[i!].good = bp.shot } }
+            else if book[i!].good.map({ abs($0.aimX - bp.shot.aimX) <= 1.5 && abs($0.aimY - bp.shot.aimY) <= 1.5 }) ?? false {
+                // the book's own shot missed: it was not repeated exactly enough, or it never was a sure one — drop it
+                book[i!].bad.append(bp.shot); book[i!].good = nil
+            } else { book[i!].bad.append(bp.shot) }
+            bookSave()
+            if logOn { log(String(format: "book %@ aim=%.0f,%.0f pw=%d gone=%@ nodes=%d", good ? "good" : "bad", bp.shot.aimX, bp.shot.aimY, bp.shot.power, gone.sorted().map(String.init).joined(separator: ","), book.count)) }
+        }
         guard m.myTurn else {
             poolSound.set(.off); computedFor = []; poolAims = []
             var o = Overlay(game: .pool, title: "รอ…", line: "ตาคู่แข่ง · " + groupName); o.pool = view; show(o); return
@@ -900,6 +941,7 @@ final class GameModel: ObservableObject {
             let roomy = v.ball >= 0 && v.pocket >= 0 && !v.foul && !v.scratch && !v.bank
                 && (view.win.map { $0.sure && $0.pocket == v.pocket && $0.lo <= -0.3 && $0.hi >= 0.3 } ?? false)
             let good = (cleanPot || roomy) && dir != nil && steady && !hitsCue
+            if still && !pulling && steady { bookAim = (a.x, a.y, dir, balls, legal) }
             view.pots = good
             view.risky = !good && v.ball >= 0 && v.pocket >= 0 && !v.foul && !v.scratch
             // on the safety: the aim ring where the safety meets its ball
@@ -954,6 +996,32 @@ final class GameModel: ObservableObject {
         } else {
             poolSound.set(.off); poolAims = []
             if poolZoom.pocket != nil && Date().timeIntervalSince(poolZoom.seen) > 1.0 { poolZoom = (nil, Date(), nil) }
+        }
+        // the book: this very table was played before — the shot that potted, exactly (gold ring + power)
+        if !PoolEngine.isBreak(others), let bi = bookFind(balls) {
+            let n = book[bi]
+            if let g = n.good {
+                view.breakSpotX = g.aimX; view.breakSpotY = g.aimY; view.powerTarget = g.power
+                var on = false
+                if hasAim {
+                    let a = PoolCodec.get(c, PoolCodec.aim), d = PoolCodec.dir(c)
+                    let dOk = g.dir.flatMap { gd in d.map { abs(atan2(sin($0 - gd), cos($0 - gd))) * 180 / Double.pi <= 0.2 } } ?? true
+                    on = abs(a.x - g.aimX) <= 1.5 && abs(a.y - g.aimY) <= 1.5 && dOk
+                }
+                title = on ? "✓ ตำรา แรง \(g.power)" : "ตำรา: เล็งวงทอง"; line = "แรง \(g.power) เป๊ะ"
+                if on || pulling {
+                    if pulling {
+                        poolSound.set(.off)
+                        let pp = c[PoolCodec.power] * 14 + c[PoolCodec.power + 1]
+                        let inZone = abs(pp - g.power) <= 1
+                        if inZone && !poolInZone { poolSound.ding() }
+                        poolInZone = inZone
+                    } else { poolInZone = false; poolSound.set(.tone(660)) }
+                } else { poolSound.set(.off); poolInZone = false }
+            } else if hasAim {
+                let a = PoolCodec.get(c, PoolCodec.aim)
+                if n.bad.contains(where: { abs($0.aimX - a.x) <= 3 && abs($0.aimY - a.y) <= 3 }) { line = "ช็อตนี้เคยพลาด ลองอันอื่น" }
+            }
         }
         var o = Overlay(game: .pool, title: title, line: line, mine: true); o.pool = view
         show(o)
