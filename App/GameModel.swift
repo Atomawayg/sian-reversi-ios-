@@ -628,6 +628,9 @@ final class GameModel: ObservableObject {
     static let poolSafetyOn = false
     private var poolGuideKey: [Double] = [], poolGuides: [PoolEngine.Guide] = []
 
+    /// for the replay test (Tests/PoolReplayTests): feed a pool reading as if it came from the screen
+    func replayPool(_ m: BoardMessage) { handlePool(m) }
+
     private func handlePool(_ m: BoardMessage) {
         let started = Date()
         defer {

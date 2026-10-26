@@ -32,6 +32,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.atomawayg.sianreversi
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    scheme:
+      testTargets: [SianTests]
     dependencies:
       - target: SianBroadcast
         embed: true
@@ -57,3 +59,14 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.atomawayg.sianreversi.broadcast
     dependencies:
       - sdk: ReplayKit.framework
+  SianTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [Tests/PoolReplayTests.swift]
+    dependencies:
+      - target: SianReversi
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SianReversi.app/SianReversi"
+        BUNDLE_LOADER: "$(TEST_HOST)"

@@ -1,0 +1,36 @@
+name: Pool replay
+# Plays Atom's pool logs (Tests/logs) through the real app code on the iOS simulator and keeps what the PiP showed.
+on:
+  push:
+    branches: ['replay/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  replay:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project
+        run: xcodegen generate
+      - name: Replay
+        run: |
+          set -o pipefail
+          UDID=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(next(x['udid'] for k,v in d.items() if 'iOS' in k for x in v if x['name'].startswith('iPhone')))")
+          echo "simulator $UDID"
+          xcodebuild test -project SianReversi.xcodeproj -scheme SianReversi -destination "id=$UDID" \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO 2>&1 | tee test.log | grep -E "error:|Test Case|passed|failed|TEST" || true
+          ls Tests/out || true
+      - name: Report errors
+        if: always()
+        run: grep -E "error:" test.log | sort -u | head -30 | sed 's/^/::error::/' || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: replay-out
+          path: |
+            Tests/out
+            test.log
