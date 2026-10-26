@@ -1,0 +1,723 @@
+13:55:29.0  รอลูกหยุด | โต๊ะเปิด | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 1]
+13:55:31.9  ✓ เบรก |  | pick=- guides=0 found=0 tgt=100 spin=- zoom=- ring=- pots=true
+      [pic 2]
+13:55:32.7  เบรก |  | pick=- guides=0 found=0 tgt=100 spin=- zoom=- ring=606,1771 pots=false
+      [pic 3]
+13:55:32.9  รอลูกหยุด | โต๊ะเปิด | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+13:55:41.3  แผน: ลูก 5 → มุมขวาบน | แรง 65 · แทงกลาง | pick=5>1@65 guides=0 found=0 tgt=65 spin=0.00 zoom=1 ring=975,581 pots=false
+      [pic 4]
+13:55:41.6  รอลูกหยุด | โต๊ะเปิด | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+13:55:42.2  แผน: ลูก 5 → มุมขวาบน | แรง 65 · แทงกลาง | pick=5>1@65 guides=0 found=0 tgt=65 spin=0.00 zoom=1 ring=975,581 pots=false
+      [pic 5]
+13:55:46.1  1 → กลางซ้าย? |  | pick=5>1@65 guides=0 found=0 tgt=- spin=0.00 zoom=1 ring=975,581 pots=false
+      [pic 6]
+13:55:46.1  5 → มุมขวาบน | แผนคลิป 2 | pick=5>1@65 guides=0 found=0 tgt=- spin=0.00 zoom=1 ring=975,581 pots=false
+13:55:46.5  1 → กลางซ้าย? |  | pick=5>1@65 guides=0 found=0 tgt=- spin=0.00 zoom=1 ring=975,581 pots=false
+13:55:46.5  5 → มุมขวาบน | แผนคลิป 2 | pick=5>1@65 guides=0 found=0 tgt=- spin=0.00 zoom=1 ring=975,581 pots=false
+13:55:46.6  1 → กลางซ้าย? |  | pick=5>1@65 guides=0 found=0 tgt=- spin=0.00 zoom=1 ring=975,581 pots=false
+      [pic 7]
+13:55:46.6  5 → มุมขวาบน | แผนคลิป 2 | pick=5>1@65 guides=0 found=0 tgt=- spin=0.00 zoom=1 ring=975,581 pots=false
+13:55:46.8  1 → กลางซ้าย? |  | pick=5>1@65 guides=0 found=0 tgt=- spin=0.00 zoom=1 ring=975,581 pots=false
+13:55:46.8  5 → มุมขวาบน | แผนคลิป 2 | pick=5>1@65 guides=0 found=0 tgt=- spin=0.00 zoom=1 ring=975,581 pots=false
+13:55:46.8  1 → กลางซ้าย? |  | pick=5>1@65 guides=0 found=0 tgt=- spin=0.00 zoom=1 ring=975,581 pots=false
+13:55:46.9  แผน: ลูก 5 → มุมขวาบน | แรง 65 · แทงกลาง | pick=5>1@65 guides=0 found=0 tgt=65 spin=0.00 zoom=1 ring=975,581 pots=false
+13:55:46.9  ✓ ลูก 5 → มุมขวาบน | แรง 65 · แทงกลาง | pick=5>1@65 guides=0 found=0 tgt=65 spin=0.00 zoom=1 ring=975,581 pots=true
+13:55:47.0  แผน: ลูก 5 → มุมขวาบน | แรง 65 · แทงกลาง | pick=5>1@65 guides=0 found=0 tgt=65 spin=0.00 zoom=1 ring=975,581 pots=false
+13:55:47.0  ✓ ลูก 5 → มุมขวาบน | แรง 65 · แทงกลาง | pick=5>1@65 guides=0 found=0 tgt=65 spin=0.00 zoom=1 ring=975,581 pots=true
+13:55:47.0  แผน: ลูก 5 → มุมขวาบน | แรง 65 · แทงกลาง | pick=5>1@65 guides=0 found=0 tgt=65 spin=0.00 zoom=1 ring=975,581 pots=false
+13:55:47.5  ✓ ลูก 5 → มุมขวาบน | แรง 65 · แทงกลาง | pick=5>1@65 guides=0 found=0 tgt=65 spin=0.00 zoom=1 ring=975,581 pots=true
+      [pic 8]
+13:55:47.5  แผน: ลูก 5 → มุมขวาบน | แรง 65 · แทงกลาง | pick=5>1@65 guides=0 found=0 tgt=65 spin=0.00 zoom=1 ring=975,581 pots=false
+13:55:47.5  ✓ ลูก 5 → มุมขวาบน | แรง 65 · แทงกลาง | pick=5>1@65 guides=0 found=0 tgt=65 spin=0.00 zoom=1 ring=975,581 pots=true
+13:55:47.6  แผน: ลูก 5 → มุมขวาบน | แรง 65 · แทงกลาง | pick=5>1@65 guides=0 found=0 tgt=65 spin=0.00 zoom=1 ring=975,581 pots=false
+13:55:47.6  ✓ ลูก 5 → มุมขวาบน | แรง 65 · แทงกลาง | pick=5>1@65 guides=0 found=0 tgt=65 spin=0.00 zoom=1 ring=975,581 pots=true
+13:55:51.6  รอลูกหยุด | โต๊ะเปิด | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 9]
+13:55:57.5  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=30 spin=- zoom=- ring=- pots=false
+      [pic 10]
+13:55:57.7  3 → มุมขวาบน? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:55:57.8  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:57.8  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:57.8  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:57.8  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:57.8  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:57.8  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:57.8  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:57.8  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:57.8  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:57.8  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:57.8  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:57.9  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:57.9  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:57.9  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:57.9  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:57.9  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:57.9  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.0  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+      [pic 11]
+13:55:58.0  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.0  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.0  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.0  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.0  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.1  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.1  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.1  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.1  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.1  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.1  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.2  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.2  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.2  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.2  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.2  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.2  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.3  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.3  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.3  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.3  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.3  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.3  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.4  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.4  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.4  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.4  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.4  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.4  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.5  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+      [pic 12]
+13:55:58.5  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.5  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.5  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.5  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.5  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.6  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.6  3 → มุมขวาล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.6  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.6  3 → มุมขวาล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.6  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.6  3 → มุมขวาล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.7  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:55:58.7  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:00.7  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+      [pic 13]
+13:56:00.7  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:00.7  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:00.7  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:00.7  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:00.8  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:00.8  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:00.8  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:00.8  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:00.8  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:00.8  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:00.9  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:00.9  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:00.9  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:00.9  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:00.9  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:00.9  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.0  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.0  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.0  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.0  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.0  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.0  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.1  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.1  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.1  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.1  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.1  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.1  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.2  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+      [pic 14]
+13:56:01.2  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.2  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.2  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.2  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.2  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.3  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.3  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.3  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.3  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.3  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.3  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.4  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.4  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.4  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.4  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.4  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.4  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.5  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.5  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.5  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.5  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.5  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.5  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.6  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.6  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.6  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.6  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.6  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.6  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.7  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+      [pic 15]
+13:56:01.7  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.7  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.7  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.7  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.7  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.8  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.8  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.8  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.8  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.8  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.8  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.9  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.9  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.9  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.9  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.9  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:01.9  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.0  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.0  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.0  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.0  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.0  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.0  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.1  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.1  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.1  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.1  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.1  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.1  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.2  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+      [pic 16]
+13:56:02.2  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.2  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.2  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.2  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.2  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.3  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.3  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.3  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.3  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.3  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.3  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.4  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.4  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.4  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.4  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.4  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.4  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.5  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.5  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.5  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.5  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.5  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.5  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.6  3 → มุมขวาล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.6  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.6  3 → มุมขวาล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.6  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.6  3 → มุมขวาล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.6  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.7  3 → มุมขวาล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+      [pic 17]
+13:56:02.7  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.7  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.7  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.7  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.7  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.8  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.8  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.8  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.8  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.8  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.8  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.9  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.9  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.9  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.9  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.9  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:02.9  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:03.0  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:03.0  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:03.0  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:03.0  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:03.0  3 → มุมซ้ายล่าง เสี่ยง |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:03.0  3 → กลางซ้าย? |  | pick=7>0@30 guides=6 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:03.1  7 → กลางซ้าย? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=2 ring=- pots=false
+13:56:04.5  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 18]
+13:56:05.4  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 19]
+13:56:05.4  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:05.4  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:05.5  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:05.7  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:05.8  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:05.8  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:05.8  7 → มุมซ้ายบน |  | pick=7>0@30 guides=5 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:07.3  7 → มุมซ้ายบน |  | pick=7>0@30 guides=8 found=1 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 20]
+13:56:07.3  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=8 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:07.3  7 → มุมซ้ายบน |  | pick=7>0@30 guides=8 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:07.4  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=8 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:07.4  7 → มุมซ้ายบน |  | pick=7>0@30 guides=8 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:07.8  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=8 found=1 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 21]
+13:56:07.9  7 → มุมซ้ายบน |  | pick=7>0@30 guides=8 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:07.9  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=8 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:07.9  7 → มุมซ้ายบน |  | pick=7>0@30 guides=8 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:08.0  7 → มุมซ้ายบน |  | pick=7>0@30 guides=5 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:08.7  7 → มุมซ้ายบน |  | pick=7>0@30 guides=8 found=1 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 22]
+13:56:08.8  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=8 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:08.8  7 → มุมซ้ายบน |  | pick=7>0@30 guides=8 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:08.8  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=8 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:08.8  7 → มุมซ้ายบน |  | pick=7>0@30 guides=8 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:09.4  7 → มุมซ้ายบน |  | pick=7>0@30 guides=5 found=1 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 23]
+13:56:10.4  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 24]
+13:56:10.6  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:10.6  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:10.9  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 25]
+13:56:10.9  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:11.0  7 → มุมซ้ายบน |  | pick=7>0@30 guides=5 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:13.9  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 26]
+13:56:13.9  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:14.0  ลูกขาวจะตกตาม |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:14.0  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:14.0  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:14.1  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:14.1  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:14.1  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:14.1  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:14.1  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:14.8  7 → มุมซ้ายบน เสี่ยง |  | pick=7>0@30 guides=7 found=1 tgt=30 spin=- zoom=0 ring=- pots=false
+      [pic 27]
+13:56:14.8  ✓ 7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=30 spin=- zoom=0 ring=- pots=true
+13:56:14.9  7 → มุมซ้ายบน เสี่ยง |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=0 ring=- pots=false
+13:56:14.9  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=0 ring=- pots=false
+13:56:15.9  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 28]
+13:56:16.7  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 29]
+13:56:16.8  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:16.9  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:17.2  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 30]
+13:56:17.3  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:17.4  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:17.8  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 31]
+13:56:18.0  7 → กลางขวา? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:18.1  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:18.8  7 → กลางขวา? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 32]
+13:56:18.8  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:19.0  7 → กลางขวา? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:19.0  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:19.0  7 → กลางขวา? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:19.1  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:19.1  7 → กลางขวา? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:19.2  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:19.4  1 → กลางขวา? |  | pick=7>0@30 guides=15 found=1 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 33]
+13:56:19.7  7 → กลางขวา? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:20.6  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 34]
+13:56:21.0  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:21.0  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:21.1  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 35]
+13:56:21.2  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:21.4  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:21.4  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:21.7  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 36]
+13:56:21.7  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:21.7  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:21.8  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:21.8  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:21.9  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:21.9  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:22.0  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:22.2  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 37]
+13:56:22.2  7 → กลางขวา? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:22.2  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:22.5  7 → กลางขวา? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:22.5  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:22.5  7 → กลางขวา? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:23.5  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 38]
+13:56:23.5  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:23.6  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:23.6  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:23.7  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:23.7  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:23.7  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:23.7  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:23.7  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:23.8  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:23.8  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:23.8  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:23.8  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:23.9  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:23.9  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:23.9  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:24.0  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 39]
+13:56:24.1  7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:24.1  7 → มุมซ้ายบน? |  | pick=7>0@30 guides=7 found=1 tgt=- spin=- zoom=- ring=- pots=false
+13:56:25.9  7 → มุมขวาบน เสี่ยง |  | pick=7>0@30 guides=7 found=1 tgt=30 spin=- zoom=0 ring=- pots=false
+      [pic 40]
+13:56:25.9  7 → มุมซ้ายบน เสี่ยง |  | pick=7>0@30 guides=7 found=1 tgt=30 spin=- zoom=0 ring=- pots=false
+13:56:26.0  ✓ 7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=30 spin=- zoom=0 ring=- pots=true
+13:56:26.0  7 → มุมซ้ายบน เสี่ยง |  | pick=7>0@30 guides=7 found=1 tgt=30 spin=- zoom=0 ring=- pots=false
+13:56:26.4  ✓ 7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=30 spin=- zoom=0 ring=- pots=true
+      [pic 41]
+13:56:26.4  7 → มุมซ้ายบน เสี่ยง |  | pick=7>0@30 guides=7 found=1 tgt=30 spin=- zoom=0 ring=- pots=false
+13:56:26.5  ✓ 7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=30 spin=- zoom=0 ring=- pots=true
+13:56:26.5  7 → มุมซ้ายบน เสี่ยง |  | pick=7>0@30 guides=7 found=1 tgt=30 spin=- zoom=0 ring=- pots=false
+13:56:26.5  ✓ 7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=30 spin=- zoom=0 ring=- pots=true
+13:56:26.5  7 → มุมซ้ายบน เสี่ยง |  | pick=7>0@30 guides=7 found=1 tgt=30 spin=- zoom=0 ring=- pots=false
+13:56:26.5  ✓ 7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=30 spin=- zoom=0 ring=- pots=true
+13:56:26.5  7 → มุมซ้ายบน เสี่ยง |  | pick=7>0@30 guides=7 found=1 tgt=30 spin=- zoom=0 ring=- pots=false
+13:56:26.6  ✓ 7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=30 spin=- zoom=0 ring=- pots=true
+13:56:26.6  7 → มุมซ้ายบน เสี่ยง |  | pick=7>0@30 guides=7 found=1 tgt=30 spin=- zoom=0 ring=- pots=false
+13:56:26.6  ✓ 7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=30 spin=- zoom=0 ring=- pots=true
+13:56:26.6  7 → มุมซ้ายบน เสี่ยง |  | pick=7>0@30 guides=7 found=1 tgt=30 spin=- zoom=0 ring=- pots=false
+13:56:26.6  ✓ 7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=30 spin=- zoom=0 ring=- pots=true
+13:56:26.6  7 → มุมซ้ายบน เสี่ยง |  | pick=7>0@30 guides=7 found=1 tgt=30 spin=- zoom=0 ring=- pots=false
+13:56:26.7  ✓ 7 → มุมซ้ายบน |  | pick=7>0@30 guides=7 found=1 tgt=30 spin=- zoom=0 ring=- pots=true
+13:56:27.3  7 → มุมซ้ายบน |  | pick=7>0@30 guides=0 found=1 tgt=- spin=- zoom=0 ring=- pots=false
+      [pic 42]
+13:56:27.4  รอลูกหยุด | คุณ: ลูกเต็ม | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+13:56:34.8  4 → มุมซ้ายบน? |  | pick=- guides=9 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 43]
+13:56:35.3  4 → มุมซ้ายล่าง? |  | pick=- guides=9 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 44]
+13:56:36.9  4 → มุมซ้ายล่าง เสี่ยง |  | pick=- guides=9 found=0 tgt=100 spin=- zoom=4 ring=- pots=false
+      [pic 45]
+13:56:36.9  4 → มุมซ้ายล่าง? |  | pick=- guides=9 found=0 tgt=- spin=- zoom=4 ring=- pots=false
+13:56:37.1  ลูกขาวจะตกตาม |  | pick=- guides=9 found=0 tgt=- spin=- zoom=4 ring=- pots=false
+13:56:37.5  6 → มุมซ้ายล่าง? |  | pick=- guides=9 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 46]
+13:56:38.8  ลูกขาวจะตกตาม |  | pick=- guides=9 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 47]
+13:56:38.9  4 → มุมซ้ายล่าง? |  | pick=- guides=9 found=0 tgt=- spin=- zoom=- ring=- pots=false
+13:56:39.0  ลูกขาวจะตกตาม |  | pick=- guides=9 found=0 tgt=- spin=- zoom=- ring=- pots=false
+13:56:39.0  6 → มุมซ้ายล่าง? |  | pick=- guides=9 found=0 tgt=- spin=- zoom=- ring=- pots=false
+13:56:39.0  4 → มุมซ้ายล่าง? |  | pick=- guides=9 found=0 tgt=- spin=- zoom=- ring=- pots=false
+13:56:39.1  6 → มุมซ้ายล่าง? |  | pick=- guides=9 found=0 tgt=- spin=- zoom=- ring=- pots=false
+13:56:39.1  4 → มุมซ้ายล่าง? |  | pick=- guides=9 found=0 tgt=- spin=- zoom=- ring=- pots=false
+13:56:39.8  4 → มุมซ้ายล่าง เสี่ยง |  | pick=- guides=9 found=0 tgt=100 spin=- zoom=4 ring=- pots=false
+      [pic 48]
+13:56:39.8  4 → มุมซ้ายล่าง? |  | pick=- guides=9 found=0 tgt=- spin=- zoom=4 ring=- pots=false
+13:56:40.3  4 → มุมซ้ายล่าง? |  | pick=- guides=9 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 49]
+13:56:40.8  4 → มุมซ้ายล่าง เสี่ยง |  | pick=- guides=9 found=0 tgt=100 spin=- zoom=4 ring=- pots=false
+      [pic 50]
+13:56:40.8  4 → มุมซ้ายล่าง? |  | pick=- guides=9 found=0 tgt=- spin=- zoom=4 ring=- pots=false
+13:56:41.1  6 → มุมซ้ายล่าง? |  | pick=- guides=9 found=0 tgt=- spin=- zoom=4 ring=- pots=false
+13:56:41.1  4 → มุมซ้ายล่าง? |  | pick=- guides=9 found=0 tgt=- spin=- zoom=4 ring=- pots=false
+13:56:41.6  4 → มุมซ้ายล่าง? |  | pick=- guides=9 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 51]
+13:56:41.7  ลูกขาวจะตกตาม |  | pick=- guides=9 found=0 tgt=- spin=- zoom=- ring=- pots=false
+13:56:41.9  6 → มุมซ้ายล่าง? |  | pick=- guides=9 found=0 tgt=- spin=- zoom=- ring=- pots=false
+13:56:44.0  6 → มุมซ้ายล่าง? |  | pick=- guides=9 found=0 tgt=- spin=- zoom=4 ring=- pots=false
+      [pic 52]
+13:56:44.4  6 → มุมซ้ายล่าง เสี่ยง |  | pick=- guides=9 found=0 tgt=- spin=- zoom=4 ring=- pots=false
+13:56:44.4  6 → มุมซ้ายล่าง? |  | pick=- guides=9 found=0 tgt=- spin=- zoom=4 ring=- pots=false
+13:56:44.6  6 → มุมซ้ายล่าง เสี่ยง |  | pick=- guides=9 found=0 tgt=- spin=- zoom=4 ring=- pots=false
+      [pic 53]
+13:56:44.8  6 → มุมซ้ายล่าง? |  | pick=- guides=9 found=0 tgt=- spin=- zoom=4 ring=- pots=false
+13:56:44.9  6 → มุมซ้ายล่าง เสี่ยง |  | pick=- guides=9 found=0 tgt=- spin=- zoom=4 ring=- pots=false
+13:56:44.9  6 → มุมซ้ายล่าง? |  | pick=- guides=9 found=0 tgt=- spin=- zoom=4 ring=- pots=false
+13:56:45.3  ลูกขาวจะตกตาม |  | pick=- guides=9 found=0 tgt=- spin=- zoom=4 ring=- pots=false
+      [pic 54]
+13:56:45.6  4 → มุมซ้ายล่าง? |  | pick=- guides=9 found=0 tgt=- spin=- zoom=4 ring=- pots=false
+13:56:45.7  4 → มุมซ้ายล่าง? |  | pick=- guides=9 found=0 tgt=- spin=- zoom=- ring=- pots=false
+13:56:46.5  4 → มุมซ้ายล่าง เสี่ยง |  | pick=- guides=9 found=0 tgt=100 spin=- zoom=4 ring=- pots=false
+      [pic 55]
+13:56:46.6  4 → มุมซ้ายล่าง? |  | pick=- guides=9 found=0 tgt=- spin=- zoom=4 ring=- pots=false
+13:56:47.3  4 → มุมซ้ายล่าง? |  | pick=- guides=9 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 56]
+13:56:50.8  4 → มุมซ้ายล่าง? |  | pick=- guides=5 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 57]
+13:56:50.8  ไม่มีลูกชัวร์ |  | pick=- guides=9 found=0 tgt=- spin=- zoom=- ring=- pots=false
+13:56:50.8  ไม่มีลูกชัวร์ |  | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+13:56:51.0  รอลูกหยุด | คุณ: ลูกเต็ม | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+13:57:30.1  ไม่มีลูกชัวร์ |  | pick=- guides=9 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 58]
+13:57:30.3  รอลูกหยุด | คุณ: ลูกเต็ม | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+13:57:48.7  ไม่มีลูกชัวร์ |  | pick=- guides=14 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 59]
+13:57:48.8  รอลูกหยุด | คุณ: ลูกเต็ม | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+13:57:49.7  ไม่มีลูกชัวร์ |  | pick=- guides=12 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 60]
+13:57:51.1  รอลูกหยุด | คุณ: ลูกเต็ม | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 61]
+13:57:58.3  วางลูกขาว | กำลังหาจุดวาง… | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 62]
+13:58:13.5  รอลูกหยุด | คุณ: ลูกเต็ม | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 63]
+13:58:13.9  11 ไม่ใช่ของคุณ |  | pick=- guides=8 found=0 tgt=- spin=- zoom=- ring=- pots=false
+13:58:14.9  รอลูกหยุด | คุณ: ลูกเต็ม | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 64]
+13:58:15.3  6 → กลางซ้าย? |  | pick=- guides=15 found=0 tgt=- spin=- zoom=- ring=- pots=false
+13:58:15.6  6 → กลางซ้าย? |  | pick=- guides=15 found=0 tgt=- spin=- zoom=- ring=809,1090 pots=false
+      [pic 65]
+13:58:15.8  6 → มุมซ้ายบน เสี่ยง |  | pick=- guides=15 found=0 tgt=40 spin=- zoom=0 ring=809,1090 pots=false
+13:58:15.8  6 → มุมซ้ายบน? |  | pick=- guides=15 found=0 tgt=- spin=- zoom=0 ring=809,1090 pots=false
+13:58:15.9  6 → มุมซ้ายล่าง เสี่ยง |  | pick=- guides=15 found=0 tgt=- spin=- zoom=0 ring=809,1090 pots=false
+13:58:15.9  6 → มุมซ้ายบน? |  | pick=- guides=15 found=0 tgt=- spin=- zoom=0 ring=809,1090 pots=false
+13:58:16.1  วางขาวที่วงทอง | แล้วยิง 4 → มุมซ้ายบน | pick=- guides=0 found=0 tgt=- spin=- zoom=0 ring=809,1090 pots=false
+      [pic 66]
+13:58:16.2  วางขาวที่วงทอง | แล้วยิง 4 → มุมซ้ายบน | pick=- guides=15 found=0 tgt=- spin=- zoom=- ring=809,1090 pots=false
+13:58:16.6  วางขาวที่วงทอง | แล้วยิง 4 → มุมซ้ายบน | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=809,1090 pots=false
+      [pic 67]
+13:58:16.6  6 → กลางซ้าย? |  | pick=- guides=15 found=0 tgt=- spin=- zoom=- ring=809,1090 pots=false
+13:58:17.4  6 → มุมซ้ายล่าง? |  | pick=- guides=15 found=0 tgt=- spin=- zoom=4 ring=809,1090 pots=false
+      [pic 68]
+13:58:17.5  6 → มุมซ้ายล่าง เสี่ยง |  | pick=- guides=15 found=0 tgt=- spin=- zoom=4 ring=809,1090 pots=false
+13:58:17.5  6 → มุมซ้ายล่าง? |  | pick=- guides=15 found=0 tgt=- spin=- zoom=4 ring=809,1090 pots=false
+13:58:19.4  6 → มุมซ้ายบน เสี่ยง |  | pick=- guides=15 found=0 tgt=40 spin=- zoom=4 ring=809,1090 pots=false
+      [pic 69]
+13:58:19.4  6 → มุมซ้ายล่าง? |  | pick=- guides=15 found=0 tgt=- spin=- zoom=4 ring=809,1090 pots=false
+13:58:19.7  6 → มุมซ้ายบน? |  | pick=- guides=15 found=0 tgt=- spin=- zoom=- ring=809,1090 pots=false
+13:58:20.1  6 → มุมซ้ายบน? |  | pick=- guides=15 found=0 tgt=- spin=- zoom=0 ring=809,1090 pots=false
+      [pic 70]
+13:58:20.9  6 → มุมซ้ายบน เสี่ยง |  | pick=- guides=15 found=0 tgt=55 spin=- zoom=0 ring=809,1090 pots=false
+      [pic 71]
+13:58:21.0  6 → มุมขวาบน เสี่ยง |  | pick=- guides=15 found=0 tgt=45 spin=- zoom=0 ring=809,1090 pots=false
+13:58:21.1  6 → มุมซ้ายบน เสี่ยง |  | pick=- guides=15 found=0 tgt=45 spin=- zoom=0 ring=809,1090 pots=false
+13:58:21.2  6 → มุมซ้ายบน เสี่ยง |  | pick=- guides=15 found=0 tgt=40 spin=- zoom=0 ring=809,1090 pots=false
+13:58:21.4  ✓ 6 → มุมซ้ายบน |  | pick=- guides=15 found=0 tgt=40 spin=- zoom=0 ring=809,1090 pots=true
+      [pic 72]
+13:58:21.4  6 → มุมซ้ายบน เสี่ยง |  | pick=- guides=15 found=0 tgt=40 spin=- zoom=0 ring=809,1090 pots=false
+13:58:22.9  6 → มุมซ้ายบน เสี่ยง |  | pick=- guides=15 found=0 tgt=100 spin=- zoom=0 ring=809,1090 pots=false
+      [pic 73]
+13:58:22.9  6 → มุมซ้ายบน? |  | pick=- guides=15 found=0 tgt=- spin=- zoom=0 ring=809,1090 pots=false
+13:58:24.0  6 → มุมซ้ายบน เสี่ยง |  | pick=- guides=15 found=0 tgt=40 spin=- zoom=0 ring=809,1090 pots=false
+      [pic 74]
+13:58:25.1  6 → มุมซ้ายบน? |  | pick=- guides=15 found=0 tgt=- spin=- zoom=0 ring=809,1090 pots=false
+      [pic 75]
+13:58:25.2  6 → มุมซ้ายบน เสี่ยง |  | pick=- guides=15 found=0 tgt=100 spin=- zoom=0 ring=809,1090 pots=false
+13:58:25.2  6 → มุมซ้ายบน? |  | pick=- guides=15 found=0 tgt=- spin=- zoom=0 ring=809,1090 pots=false
+13:58:25.5  6 → มุมซ้ายบน เสี่ยง |  | pick=- guides=15 found=0 tgt=100 spin=- zoom=0 ring=809,1090 pots=false
+13:58:25.5  6 → มุมซ้ายบน? |  | pick=- guides=15 found=0 tgt=- spin=- zoom=0 ring=809,1090 pots=false
+13:58:25.5  6 → มุมซ้ายบน เสี่ยง |  | pick=- guides=15 found=0 tgt=45 spin=- zoom=0 ring=809,1090 pots=false
+13:58:25.6  6 → มุมซ้ายบน เสี่ยง |  | pick=- guides=15 found=0 tgt=40 spin=- zoom=0 ring=809,1090 pots=false
+      [pic 76]
+13:58:29.3  รอลูกหยุด | คุณ: ลูกเต็ม | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 77]
+13:58:35.7  แผน: ลูก 6 → มุมซ้ายบน | แรง 30 · แทงกลาง | pick=6>0@30 guides=0 found=0 tgt=30 spin=0.00 zoom=0 ring=203,581 pots=false
+      [pic 78]
+13:58:35.7  รอลูกหยุด | คุณ: ลูกเต็ม | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+13:59:36.3  6 → มุมซ้ายบน? |  | pick=6>0@35 guides=0 found=0 tgt=- spin=0.00 zoom=0 ring=203,581 pots=false
+      [pic 79]
+13:59:36.7  แผน: ลูก 6 → มุมซ้ายบน | แรง 35 · แทงกลาง | pick=6>0@35 guides=0 found=0 tgt=35 spin=0.00 zoom=0 ring=203,581 pots=false
+13:59:36.8  6 → มุมซ้ายบน? |  | pick=6>0@35 guides=0 found=0 tgt=- spin=0.00 zoom=0 ring=203,581 pots=false
+      [pic 80]
+13:59:36.8  6 → มุมซ้ายล่าง เสี่ยง |  | pick=6>0@35 guides=0 found=0 tgt=- spin=0.00 zoom=0 ring=203,581 pots=false
+13:59:36.9  6 → มุมซ้ายบน? |  | pick=6>0@35 guides=0 found=0 tgt=- spin=0.00 zoom=0 ring=203,581 pots=false
+13:59:37.5  6 → มุมซ้ายล่าง? |  | pick=6>0@35 guides=0 found=0 tgt=- spin=0.00 zoom=0 ring=203,581 pots=false
+      [pic 81]
+13:59:37.7  6 → มุมซ้ายล่าง เสี่ยง |  | pick=6>0@35 guides=0 found=0 tgt=- spin=0.00 zoom=0 ring=203,581 pots=false
+13:59:37.7  6 → มุมซ้ายล่าง? |  | pick=6>0@35 guides=0 found=0 tgt=- spin=0.00 zoom=0 ring=203,581 pots=false
+13:59:38.3  6 → มุมซ้ายบน? |  | pick=6>0@35 guides=0 found=0 tgt=- spin=0.00 zoom=0 ring=203,581 pots=false
+      [pic 82]
+13:59:40.3  แผน: ลูก 6 → มุมซ้ายบน | แรง 35 · แทงกลาง | pick=6>0@35 guides=0 found=0 tgt=35 spin=0.00 zoom=0 ring=203,581 pots=false
+      [pic 83]
+13:59:42.8  ✓ ลูก 6 → มุมซ้ายบน | แรง 35 · แทงกลาง | pick=6>0@35 guides=0 found=0 tgt=35 spin=0.00 zoom=0 ring=203,581 pots=true
+      [pic 84]
+13:59:42.9  รอลูกหยุด | คุณ: ลูกเต็ม | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+13:59:48.3  ไม่มีลูกชัวร์ |  | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 85]
+13:59:48.6  รอลูกหยุด | คุณ: ลูกเต็ม | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+13:59:49.4  ไม่มีลูกชัวร์ |  | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 86]
+13:59:49.5  1 → มุมซ้ายบน? |  | pick=- guides=11 found=0 tgt=- spin=- zoom=- ring=- pots=false
+13:59:49.6  รอลูกหยุด | คุณ: ลูกเต็ม | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+13:59:50.0  1 → มุมซ้ายบน? |  | pick=- guides=11 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 87]
+13:59:50.2  1 → มุมซ้ายบน เสี่ยง |  | pick=- guides=11 found=0 tgt=100 spin=- zoom=0 ring=- pots=false
+13:59:50.2  1 → มุมซ้ายบน? |  | pick=- guides=11 found=0 tgt=- spin=- zoom=0 ring=- pots=false
+13:59:51.0  1 → มุมซ้ายบน? |  | pick=- guides=11 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 88]
+13:59:52.1  1 → กลางซ้าย เสี่ยง |  | pick=- guides=11 found=0 tgt=80 spin=- zoom=2 ring=- pots=false
+      [pic 89]
+13:59:52.1  1 → กลางซ้าย? |  | pick=- guides=11 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+13:59:52.8  1 → มุมซ้ายบน? |  | pick=- guides=11 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 90]
+13:59:53.2  1 → กลางขวา? |  | pick=- guides=11 found=0 tgt=- spin=- zoom=3 ring=- pots=false
+13:59:53.3  1 → มุมขวาล่าง เสี่ยง |  | pick=- guides=11 found=0 tgt=55 spin=- zoom=3 ring=- pots=false
+      [pic 91]
+13:59:53.3  1 → กลางขวา? |  | pick=- guides=11 found=0 tgt=- spin=- zoom=3 ring=- pots=false
+13:59:53.9  1 → กลางซ้าย เสี่ยง |  | pick=- guides=11 found=0 tgt=- spin=- zoom=3 ring=- pots=false
+      [pic 92]
+13:59:54.0  1 → กลางขวา เสี่ยง |  | pick=- guides=11 found=0 tgt=- spin=- zoom=3 ring=- pots=false
+13:59:54.0  1 → กลางขวา? |  | pick=- guides=11 found=0 tgt=- spin=- zoom=3 ring=- pots=false
+13:59:55.8  1 → กลางขวา เสี่ยง |  | pick=- guides=11 found=0 tgt=35 spin=- zoom=3 ring=- pots=false
+      [pic 93]
+13:59:58.9  1 → กลางขวา เสี่ยง |  | pick=- guides=11 found=0 tgt=30 spin=- zoom=3 ring=- pots=false
+      [pic 94]
+13:59:59.1  รอลูกหยุด | คุณ: ลูกเต็ม | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:00:05.6  ไม่มีลูกชัวร์ |  | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 95]
+14:00:06.0  3 → กลางขวา? |  | pick=- guides=14 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:00:06.5  3 → มุมขวาล่าง? |  | pick=- guides=14 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 96]
+14:00:07.6  3 → มุมขวาล่าง เสี่ยง |  | pick=- guides=14 found=0 tgt=- spin=- zoom=5 ring=- pots=false
+      [pic 97]
+14:00:08.0  3 → มุมขวาล่าง? |  | pick=- guides=14 found=0 tgt=- spin=- zoom=5 ring=- pots=false
+14:00:08.7  3 → มุมขวาล่าง? |  | pick=- guides=14 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 98]
+14:00:09.4  3 → มุมซ้ายล่าง? |  | pick=- guides=14 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 99]
+14:00:09.9  3 → มุมซ้ายล่าง เสี่ยง |  | pick=- guides=14 found=0 tgt=- spin=- zoom=4 ring=- pots=false
+      [pic 100]
+14:00:09.9  3 → มุมซ้ายล่าง? |  | pick=- guides=14 found=0 tgt=- spin=- zoom=4 ring=- pots=false
+14:00:09.9  3 → มุมขวาล่าง เสี่ยง |  | pick=- guides=14 found=0 tgt=100 spin=- zoom=4 ring=- pots=false
+14:00:09.9  3 → มุมขวาบน เสี่ยง |  | pick=- guides=14 found=0 tgt=100 spin=- zoom=4 ring=- pots=false
+14:00:09.9  3 → มุมขวาล่าง เสี่ยง |  | pick=- guides=14 found=0 tgt=100 spin=- zoom=4 ring=- pots=false
+14:00:10.0  3 → มุมซ้ายล่าง เสี่ยง |  | pick=- guides=14 found=0 tgt=100 spin=- zoom=4 ring=- pots=false
+14:00:10.0  3 → มุมซ้ายล่าง? |  | pick=- guides=14 found=0 tgt=- spin=- zoom=4 ring=- pots=false
+14:00:10.7  3 → มุมซ้ายล่าง? |  | pick=- guides=14 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 101]
+14:00:10.7  3 → มุมขวาบน? |  | pick=- guides=14 found=0 tgt=- spin=- zoom=1 ring=- pots=false
+14:00:11.0  3 → มุมซ้ายบน เสี่ยง |  | pick=- guides=14 found=0 tgt=- spin=- zoom=1 ring=- pots=false
+14:00:11.1  3 → มุมขวาบน เสี่ยง |  | pick=- guides=14 found=0 tgt=45 spin=- zoom=1 ring=- pots=false
+14:00:11.1  3 → มุมซ้ายบน เสี่ยง |  | pick=- guides=14 found=0 tgt=- spin=- zoom=1 ring=- pots=false
+14:00:11.1  3 → มุมขวาบน เสี่ยง |  | pick=- guides=14 found=0 tgt=45 spin=- zoom=1 ring=- pots=false
+14:00:11.1  3 → มุมซ้ายบน เสี่ยง |  | pick=- guides=14 found=0 tgt=- spin=- zoom=1 ring=- pots=false
+14:00:11.7  3 → มุมขวาบน เสี่ยง |  | pick=- guides=14 found=0 tgt=40 spin=- zoom=1 ring=- pots=false
+      [pic 102]
+14:00:15.6  3 → มุมขวาบน เสี่ยง |  | pick=- guides=14 found=0 tgt=35 spin=- zoom=1 ring=- pots=false
+      [pic 103]
+14:00:15.7  รอลูกหยุด | คุณ: ลูกเต็ม | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:00:22.0  4 → มุมขวาบน? |  | pick=- guides=20 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 104]
+14:00:23.4  4 → มุมขวาบน เสี่ยง |  | pick=- guides=20 found=0 tgt=- spin=- zoom=1 ring=- pots=false
+      [pic 105]
+14:00:23.5  4 → มุมขวาบน? |  | pick=- guides=20 found=0 tgt=- spin=- zoom=1 ring=- pots=false
+14:00:23.7  4 → มุมขวาบน เสี่ยง |  | pick=- guides=20 found=0 tgt=- spin=- zoom=1 ring=- pots=false
+14:00:23.7  4 → มุมขวาบน? |  | pick=- guides=20 found=0 tgt=- spin=- zoom=1 ring=- pots=false
+14:00:24.2  4 → มุมขวาบน? |  | pick=- guides=20 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 106]
+14:00:24.7  4 → กลางขวา เสี่ยง |  | pick=- guides=20 found=0 tgt=- spin=- zoom=3 ring=- pots=false
+      [pic 107]
+14:00:24.8  4 → กลางขวา? |  | pick=- guides=20 found=0 tgt=- spin=- zoom=3 ring=- pots=false
+14:00:24.8  4 → กลางขวา เสี่ยง |  | pick=- guides=20 found=0 tgt=- spin=- zoom=3 ring=- pots=false
+14:00:24.8  4 → กลางขวา? |  | pick=- guides=20 found=0 tgt=- spin=- zoom=3 ring=- pots=false
+14:00:24.9  4 → กลางขวา เสี่ยง |  | pick=- guides=20 found=0 tgt=- spin=- zoom=3 ring=- pots=false
+14:00:24.9  4 → กลางขวา? |  | pick=- guides=20 found=0 tgt=- spin=- zoom=3 ring=- pots=false
+14:00:25.4  4 → กลางซ้าย? |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+      [pic 108]
+14:00:25.4  4 → กลางซ้าย เสี่ยง |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.5  4 → กลางซ้าย? |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.5  4 → กลางซ้าย เสี่ยง |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.5  4 → กลางซ้าย? |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.5  4 → กลางซ้าย เสี่ยง |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.6  4 → กลางซ้าย? |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.6  4 → กลางซ้าย เสี่ยง |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.6  4 → กลางซ้าย? |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.6  4 → กลางซ้าย เสี่ยง |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.6  4 → กลางซ้าย? |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.6  4 → กลางซ้าย เสี่ยง |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.7  4 → กลางซ้าย? |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.7  4 → กลางซ้าย เสี่ยง |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.7  4 → กลางซ้าย? |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.7  4 → กลางซ้าย เสี่ยง |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.7  4 → กลางซ้าย? |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.7  4 → กลางซ้าย เสี่ยง |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.8  4 → กลางซ้าย? |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.8  4 → กลางซ้าย เสี่ยง |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.8  4 → กลางซ้าย? |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.8  4 → กลางซ้าย เสี่ยง |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.8  4 → กลางซ้าย? |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.9  4 → กลางซ้าย เสี่ยง |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+      [pic 109]
+14:00:25.9  4 → กลางซ้าย? |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.9  4 → กลางซ้าย เสี่ยง |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.9  4 → กลางซ้าย? |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.9  4 → กลางซ้าย เสี่ยง |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.9  4 → กลางซ้าย? |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:25.9  4 → กลางซ้าย เสี่ยง |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:26.0  4 → กลางซ้าย? |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:26.0  4 → กลางซ้าย เสี่ยง |  | pick=- guides=20 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:30.0  ไม่มีลูกชัวร์ |  | pick=- guides=17 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+      [pic 110]
+14:00:30.0  ไม่มีลูกชัวร์ |  | pick=- guides=0 found=0 tgt=- spin=- zoom=2 ring=- pots=false
+14:00:30.1  รอลูกหยุด | คุณ: ลูกเต็ม | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:00:36.1  8 → มุมซ้ายล่าง | จบได้ในไม้นี้ | pick=8>4@40 guides=17 found=3 tgt=40 spin=- zoom=- ring=- pots=false
+      [pic 111]
+14:00:36.4  รอลูกหยุด | คุณ: ลูกเต็ม | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:00:37.1  ไม่มีลูกชัวร์ |  | pick=- guides=17 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 112]
+14:00:37.5  วางลูกขาว | กำลังหาจุดวาง… | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:00:38.5  8 → มุมขวาล่าง | จบได้ในไม้นี้ | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 113]
+14:00:42.9  8 → กลางซ้าย? |  | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 114]
+14:00:43.0  8 → มุมขวาล่าง | จบได้ในไม้นี้ | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:43.0  8 → กลางซ้าย? |  | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:43.1  8 → มุมขวาล่าง | จบได้ในไม้นี้ | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:43.1  8 → กลางซ้าย? |  | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:43.2  8 → มุมขวาล่าง | จบได้ในไม้นี้ | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:43.3  8 → กลางซ้าย? |  | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:43.6  8 → มุมขวาล่าง | จบได้ในไม้นี้ | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 115]
+14:00:43.6  8 → กลางซ้าย? |  | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:43.6  8 → มุมขวาล่าง | จบได้ในไม้นี้ | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:43.6  8 → กลางซ้าย? |  | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:43.7  8 → มุมขวาล่าง | จบได้ในไม้นี้ | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:43.7  8 → กลางซ้าย? |  | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:43.7  8 → มุมขวาล่าง | จบได้ในไม้นี้ | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:43.7  8 → กลางซ้าย? |  | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:43.7  8 → มุมขวาล่าง | จบได้ในไม้นี้ | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:43.7  8 → กลางซ้าย? |  | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:43.8  8 → มุมขวาล่าง | จบได้ในไม้นี้ | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:43.8  8 → มุมขวาบน? |  | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:43.8  8 → มุมขวาล่าง | จบได้ในไม้นี้ | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:43.8  8 → มุมขวาบน? |  | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:43.8  8 → มุมขวาล่าง | จบได้ในไม้นี้ | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:43.8  8 → มุมขวาบน? |  | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:43.9  8 → มุมขวาล่าง | จบได้ในไม้นี้ | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:43.9  8 → มุมขวาบน? |  | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:43.9  8 → มุมขวาล่าง | จบได้ในไม้นี้ | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:43.9  8 → มุมขวาบน? |  | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:44.0  8 → มุมขวาล่าง | จบได้ในไม้นี้ | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:44.0  8 → มุมขวาบน? |  | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:44.0  8 → มุมขวาล่าง | จบได้ในไม้นี้ | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:44.1  8 → มุมขวาบน? |  | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 116]
+14:00:44.1  8 → มุมขวาล่าง | จบได้ในไม้นี้ | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:44.1  8 → มุมขวาบน? |  | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=- ring=- pots=false
+14:00:44.7  8 → มุมซ้ายล่าง? |  | pick=8>5@40 guides=17 found=3 tgt=- spin=- zoom=4 ring=- pots=false
+      [pic 117]
+14:00:45.6  8 → มุมซ้ายล่าง เสี่ยง |  | pick=8>5@40 guides=17 found=3 tgt=45 spin=- zoom=4 ring=- pots=false
+      [pic 118]
+14:00:45.8  ✓ 8 → มุมซ้ายล่าง |  | pick=8>5@40 guides=17 found=3 tgt=40 spin=- zoom=4 ring=- pots=true
+14:00:47.2  8 → มุมซ้ายล่าง เสี่ยง |  | pick=8>5@40 guides=17 found=3 tgt=45 spin=- zoom=4 ring=- pots=false
+      [pic 119]
+14:00:47.3  ✓ 8 → มุมซ้ายล่าง |  | pick=8>5@40 guides=17 found=3 tgt=40 spin=- zoom=4 ring=- pots=true
+14:00:48.9  8 → มุมขวาล่าง | จบได้ในไม้นี้ | pick=8>5@40 guides=0 found=3 tgt=- spin=- zoom=4 ring=- pots=false
+      [pic 120]
+14:00:49.1  รอลูกหยุด | คุณ: ลูก 8 | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:00:55.3  ไม่มีลูกชัวร์ |  | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 121]
+14:00:55.5  รอลูกหยุด | คุณ: ลูก 8 | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:00:56.3  ไม่มีลูกชัวร์ |  | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 122]
+14:00:56.5  วางลูกขาว | กำลังหาจุดวาง… | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:00:57.5  ไม่มีลูกชัวร์ |  | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 123]
