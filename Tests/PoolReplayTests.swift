@@ -18,6 +18,20 @@ final class PoolReplayTests: XCTestCase {
         }
     }
 
+    /// the fruit log's checks: a merge is not a loss, a pushed fruit is not a loss, a vanished one is; the real count survives
+    func testSuikaLost() {
+        let before = [SK.Fruit(t: 2, x: 300, y: 2200), SK.Fruit(t: 2, x: 430, y: 2200), SK.Fruit(t: 5, x: 800, y: 2150)]
+        // the two grapes merged into a dekopon, the apple stayed
+        XCTAssertEqual(GameModel.skLost(before, [SK.Fruit(t: 3, x: 365, y: 2240), SK.Fruit(t: 5, x: 800, y: 2150)]).count, 0)
+        // the apple was pushed 150 px
+        XCTAssertEqual(GameModel.skLost(before, [SK.Fruit(t: 2, x: 300, y: 2200), SK.Fruit(t: 2, x: 430, y: 2200), SK.Fruit(t: 5, x: 950, y: 2150)]).count, 0)
+        // the apple vanished
+        XCTAssertEqual(GameModel.skLost(before, [SK.Fruit(t: 2, x: 300, y: 2200), SK.Fruit(t: 2, x: 430, y: 2200)]).map { $0.t }, [5])
+        let many = (0..<45).map { SK.Fruit(t: 0, x: 150 + Double($0 % 12) * 70, y: 1500 + Double($0 / 12) * 70) }
+        let st = SK.decode(SK.encode(held: 1, heldX: 500, next: 2, fruits: many))!
+        XCTAssertEqual(st.total, 45); XCTAssertEqual(st.fruits.count, SK.maxFruits)
+    }
+
     func time(_ s: Substring) -> Double? {
         let p = s.prefix(10).split(separator: ":")
         guard p.count == 3, let h = Double(p[0]), let m = Double(p[1]), let x = Double(p[2]) else { return nil }

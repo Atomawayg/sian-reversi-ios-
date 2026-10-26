@@ -34,7 +34,7 @@ enum SK {
     static func uy(_ q: Int) -> Double { top + Double(q) / 195 * (floor + 7 - top) }
 
     struct Fruit: Equatable { var t: Int; var x: Double; var y: Double }
-    struct State { var held: Int; var heldX: Double; var next: Int; var fruits: [Fruit] }
+    struct State { var held: Int; var heldX: Double; var next: Int; var fruits: [Fruit]; var total = 0 }
 
     static func encode(held h: Int, heldX hxPos: Double, next nx: Int, fruits fl: [Fruit]) -> [Int] {
         var c = [Int](repeating: 0, count: count)
@@ -42,7 +42,8 @@ enum SK {
         c[SK.next] = nx >= 0 ? nx + 1 : 0
         let hx = qx(hxPos); c[SK.heldX] = hx / 14; c[SK.heldX + 1] = hx % 14
         let fs = Array(fl.prefix(maxFruits))
-        c[n] = fs.count / 14; c[n + 1] = fs.count % 14
+        let total = min(195, fl.count)   // the real count (only the first maxFruits are listed): shows when the jar holds more
+        c[n] = total / 14; c[n + 1] = total % 14
         for (k, f) in fs.enumerated() {
             let b = SK.fruits + 5 * k
             let x = qx(f.x), y = qy(f.y)
@@ -61,7 +62,7 @@ enum SK {
             if t < 0 || t >= types { continue }
             fs.append(Fruit(t: t, x: ux(c[b + 1] * 14 + c[b + 2]), y: uy(c[b + 3] * 14 + c[b + 4])))
         }
-        return State(held: c[held] - 1, heldX: ux(c[heldX] * 14 + c[heldX + 1]), next: c[next] - 1, fruits: fs)
+        return State(held: c[held] - 1, heldX: ux(c[heldX] * 14 + c[heldX + 1]), next: c[next] - 1, fruits: fs, total: c[n] * 14 + c[n + 1])
     }
 
     /// Same jar (and same held / next fruit) give or take a couple of steps of position: the reading jitters a little.

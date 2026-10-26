@@ -1107,6 +1107,24 @@ final class GameModel: ObservableObject {
     // MARK: Fruit game (WePlay Frog Watermelon)
     private let suika = SuikaEngine()
     private var skComputed: [Int] = []
+    // the fruit log (3.34, like the pool's): the jar at each rest, the suggestion, where you dropped, and fruits that vanish
+    private var skLogJar: [SK.Fruit] = [], skLogKey: [Int] = [], skLastHeld: (t: Int, x: Double)? = nil, skLastSuggest: Double? = nil
+    private func skJarText(_ fs: [SK.Fruit]) -> String { fs.map { "\($0.t):\(Int($0.x)),\(Int($0.y))" }.joined(separator: " ") }
+    /// fruits of the last resting jar with nothing left where they were: not the same kind nearby, nor the next kind up
+    /// (a merge) — they were missed by the reader, or the game really lost them
+    static func skLost(_ before: [SK.Fruit], _ after: [SK.Fruit]) -> [SK.Fruit] {
+        var used = [Bool](repeating: false, count: after.count)
+        var lost: [SK.Fruit] = []
+        for f in before.sorted(by: { $0.t > $1.t }) {
+            let r = SK.radius[f.t]
+            if let j = after.indices.first(where: { !used[$0] && after[$0].t == f.t && hypot(after[$0].x - f.x, after[$0].y - f.y) < max(60, r) }) { used[j] = true; continue }
+            let up = f.t + 1 < SK.types ? SK.radius[f.t + 1] : r
+            if after.contains(where: { $0.t == f.t + 1 && hypot($0.x - f.x, $0.y - f.y) < r + up + 40 }) { continue }
+            if after.indices.contains(where: { !used[$0] && after[$0].t == f.t && hypot(after[$0].x - f.x, after[$0].y - f.y) < 3 * r + 80 }) { continue }   // pushed aside
+            lost.append(f)
+        }
+        return lost
+    }
     private var skAnswer: (x: Double, line: String, land: [Int])? = nil
 
     /// The answer for this jar, with a title that follows the held fruit: which way to move it, or "drop now".
@@ -1122,6 +1140,21 @@ final class GameModel: ObservableObject {
 
     private func handleSuika(_ m: BoardMessage) {
         guard let st = SK.decode(m.cells) else { return }
+        if logOn {
+            if st.held >= 0 { skLastHeld = (st.held, st.heldX) }
+            else if let h = skLastHeld {   // the held fruit is gone: it was dropped here
+                log(String(format: "D t=%d x=%.0f suggest=%@", h.t, h.x, skLastSuggest.map { String(format: "%.0f", $0) } ?? "-"))
+                skLastHeld = nil
+            }
+            // a new resting jar (you hold the next fruit): log it, and anything that vanished since the last one
+            if st.held >= 0 && !(skLogKey.count == m.cells.count && SK.same(skLogKey, m.cells, tol: 3)) {
+                let lost = Self.skLost(skLogJar, st.fruits)
+                if !skLogJar.isEmpty && !lost.isEmpty { log("LOST " + skJarText(lost) + " | before " + skJarText(skLogJar)) }
+                if st.total > st.fruits.count { log("FULL total=\(st.total) listed=\(st.fruits.count)") }
+                log("S held=\(st.held) next=\(st.next) n=\(st.total) jar=" + skJarText(st.fruits))
+                skLogJar = st.fruits; skLogKey = m.cells
+            }
+        }
         guard m.myTurn, st.held >= 0 else {
             computedFor = []; skComputed = []; skAnswer = nil; gen += 1
             show(Overlay(game: .suika, cells: m.cells, title: "รอ…", line: "รอผลไม้หยุดกลิ้ง"))
@@ -1150,6 +1183,8 @@ final class GameModel: ObservableObject {
                 if r.fill > 0.85 { line += "\nระวัง ใกล้เส้นแล้ว" }
                 else if st.next >= 0 { line += "\nลูกต่อไป: " + SK.names[st.next] }
                 self.skAnswer = (r.x, line, r.land.map { [Int($0.x), Int($0.y)] } ?? [])
+                self.skLastSuggest = r.x
+                if self.logOn { self.log(String(format: "A x=%.0f land=%@ fill=%.2f merges=%@", r.x, r.land.map { String(format: "%.0f,%.0f", $0.x, $0.y) } ?? "-", r.fill, r.merges.map(String.init).joined(separator: ","))) }
                 self.show(self.skOverlay(self.skComputed))
             }
         }

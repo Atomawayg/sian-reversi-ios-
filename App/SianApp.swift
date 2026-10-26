@@ -174,7 +174,7 @@ struct ContentView: View {
                         .font(.footnote.weight(.semibold))
                 }
                 Toggle(isOn: $model.logOn) {
-                    Text("บันทึกเกมพูล (ไว้ส่งให้ตรวจ)").font(.footnote.weight(.semibold))
+                    Text("บันทึกเกม พูล / ผลไม้ (ไว้ส่งให้ตรวจ)").font(.footnote.weight(.semibold))
                 }.tint(Theme.gold)
                 Toggle(isOn: $model.clipOn) {
                     Text("อัดคลิป (เซฟลงรูปภาพ · สูงสุด 3 นาที)").font(.footnote.weight(.semibold))
