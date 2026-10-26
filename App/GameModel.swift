@@ -512,8 +512,8 @@ final class GameModel: ObservableObject {
     // the two tables a break leaves (3.31, from Atom's two clips): which ball into which pocket, in order, and the power the
     // clip used. Told apart by where the cue ball rests after the break. The clips play solids.
     static let clipPlans: [(cue: (Double, Double), steps: [(ball: Int, pocket: Int, power: Int?)])] = [
-        ((489, 1144), [(3, 5, 37), (1, 5, 39), (5, 0, 30), (2, 2, 60), (6, 0, 27), (7, 3, 19), (4, 1, nil), (8, 2, 27)]),
-        ((723, 1144), [(5, 1, 21), (6, 0, 22), (4, 2, 49), (1, 3, 28), (2, 2, 31), (3, 1, 41), (7, 0, 44), (8, 1, 42)])]
+        ((489, 1144), [(3, 5, 37), (1, 5, 39), (5, 0, 30), (2, 2, 60), (6, 0, 27), (7, 3, 20), (4, 1, nil), (8, 2, 27)]),
+        ((723, 1144), [(5, 1, 21), (6, 0, 25), (4, 2, 50), (1, 3, 30), (2, 2, 33), (3, 1, 42), (7, 0, 44), (8, 1, 43)])]   // the peak just before the bar slides back (3.31.3)
     private var poolPattern: Int? = nil, poolSawRack = false, poolPlanNote = "", poolPlanStep: (ball: Int, pocket: Int, power: Int?)? = nil, poolPlanGuide: PoolEngine.Guide? = nil
     // the opening book (3.30): this phone plays the same table the same way every time (two breaks matched to the px), so
     // a shot that potted from a table is worth repeating exactly, and one that missed is worth not repeating
