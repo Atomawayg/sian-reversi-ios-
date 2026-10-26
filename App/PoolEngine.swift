@@ -80,7 +80,19 @@ enum PoolEngine {
     /// The direction off a cushion. 34 clean object-ball bounces read off the logs (Oct 25–26): tan(out) ≈ 1.40·tan(in)
     /// + 0.11 — shallow hits come off ~1.75× flatter, steep ones only ~1.3× (the old flat 1.85 sent banks ~5° wide).
     /// Pace kept: `keepAlong`/`keepInto` as before. `flat` scales tan(out).
-    static let bounceA = 1.5, bounceB = 0.0   // (3.27: the +0.11 sent a near-square 8 bank 4° too wide; plain ×1.5 has no bias on the 34)
+    static let bounceA = 1.5, bounceB = 0.0
+    /// 3.28: 50 clean object-ball bounces (all logs + the 09:27 clip at 60 fps): how much flatter the ball comes off,
+    /// tan(out)/tan(in), by the angle it comes in at (degrees from square-on) — most around 20–30°, less when steep
+    /// or square — and a ball that hits the cushion in its first 140 px (still sliding) comes off ~10 % less flat,
+    /// later ~4 % flatter. Leaves about ±4° of scatter per cushion the model can't foresee.
+    static let bounceTable: [(Double, Double)] = [(0, 1.4), (12, 1.45), (20, 1.65), (30, 1.62), (40, 1.45), (50, 1.38), (90, 1.3)]
+    static func bounceRatio(_ deg: Double) -> Double {
+        for k in 1..<bounceTable.count where deg <= bounceTable[k].0 {
+            let (a0, r0) = bounceTable[k - 1], (a1, r1) = bounceTable[k]
+            return r0 + (r1 - r0) * (deg - a0) / (a1 - a0)
+        }
+        return bounceTable.last!.1
+    }   // (3.27: the +0.11 sent a near-square 8 bank 4° too wide; plain ×1.5 has no bias on the 34)
     /// a cushion hit this close to a pocket's centre is where the game's jaws behave unlike the model: never "sure"
     static let mouthNear = 90.0
 
@@ -169,7 +181,7 @@ enum PoolEngine {
     static func run(_ x0: Double, _ y0: Double, _ ux0: Double, _ uy0: Double, balls: [Ball], skip: Int, maxLen: Double = 3000, maxRails: Int = 2, gap: Double = 2 * R, pad: Double = 0, speed: Double? = nil, flat: Double = bounceFlatten) -> Run {
         var r = Run(pts: [x0, y0])
         let start = speed.map { rollDistance($0) } ?? maxLen
-        var x = x0, y = y0, ux = ux0, uy = uy0, left = start
+        var x = x0, y = y0, ux = ux0, uy = uy0, left = start, trav = 0.0
         for _ in 0..<10 {
             var best = left, kind = 0, which = -1, nx = 0.0, ny = 0.0, isJaw = false
             for (k, h) in holes.enumerated() { if let t = rayCircle(x, y, ux, uy, h.x, h.y, h.r), t < best { best = t; kind = 1; which = k } }
@@ -178,7 +190,7 @@ enum PoolEngine {
                 if let t = rayCircle(x, y, ux, uy, b.x, b.y, gap), t > 1e-6, t < best { best = t; kind = 3; which = b.id }
             }
             let along = alongRail(x, y, ux, uy)
-            x += ux * best; y += uy * best; left -= best; r.pts += [x, y]
+            x += ux * best; y += uy * best; left -= best; trav += best; r.pts += [x, y]
             if kind == 1 {
                 r.pocket = which
                 // how central: the last leg's line against the hole centre (0 middle … 1 by the jaw);
@@ -200,7 +212,8 @@ enum PoolEngine {
             let an = abs(vn), tm = (tx * tx + ty * ty).squareRoot()
             let l = ((tm * keepAlong) * (tm * keepAlong) + (an * keepInto) * (an * keepInto)).squareRoot()
             let tanIn = tm / max(an, 1e-6)
-            let tanOut = flat * (bounceA * tanIn + bounceB * min(1, tanIn / 0.3))
+            let slid = trav < 140 ? 0.9 : 1.04
+            let tanOut = flat * tanIn * bounceRatio(atan(tanIn) * 180 / Double.pi) * slid
             let co = 1 / (1 + tanOut * tanOut).squareRoot(), so = tanOut * co
             if tm > 1e-9 { ux = tx / tm * so + nx * co; uy = ty / tm * so + ny * co } else { ux = nx; uy = ny }
             if speed != nil && (isJaw || abs(vn) >= sin(12 * Double.pi / 180)) { left = rollDistance(l * speedFor(distance: left)) }
