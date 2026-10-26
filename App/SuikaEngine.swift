@@ -176,6 +176,7 @@ final class SuikaEngine {
         if top < SK.dead + 4 { v -= 5000 + 100 * (SK.dead + 4 - top) }          // over the line: game over soon
         v -= 240 * pow(max(0, fill - 0.5), 2)                                      // the closer to the line the worse
         v -= 0.4 * Double(b.count)                                                 // fewer fruits = more room
+        for f in b where f.t <= 2 { v -= 0.6 }   // small ones strewn about the jar block it (3.37, Atom's screenshot)
         var bigT = -1, bigI = 0
         for i in b.indices where b[i].t > bigT { bigT = b[i].t; bigI = i }
         for i in b.indices {
@@ -254,7 +255,8 @@ final class SuikaEngine {
         // a spot is only as good as its neighbours: you can't drop to the exact pixel
         func robust(_ k: Int, _ v: Double) -> Double {
             var r = v
-            for n in [k - 1, k + 1] where n >= 0 && n < tries.count { r += 0.5 * min(0, tries[n].v1 - tries[k].v1) }
+            // ±2 steps (~±45 px): Atom drops by eye, not to the pixel (3.37)
+            for (n, w) in [(k - 2, 0.3), (k - 1, 0.5), (k + 1, 0.5), (k + 2, 0.3)] where n >= 0 && n < tries.count { r += w * min(0, tries[n].v1 - tries[k].v1) }
             return r
         }
         var best = 0

@@ -213,17 +213,29 @@ extension BoardReader {
                 let sc = score(ci, cj, rr, m)
                 if sc.all < 0.6 || sc.rim < 0.45 { continue }
                 if !lookAlikeOK(t, ci, cj, rr, m) { continue }
+                // a "cherry" whose colour carries on past a cherry's edge is a strawberry the bigger disc missed (its leaf and
+                // pale seeds break the disc): Atom's log read 10 cherries where the screen had 8 strawberries (3.37)
+                var tt = t, rr2 = rr
+                if t == 0 {
+                    let rs = SK.radius[1] / S
+                    var h = 0
+                    for a in 0..<36 {
+                        let th = 2 * Double.pi * Double(a) / 36
+                        if on(Int((ci + 0.86 * rs * cos(th)).rounded()), Int((cj + 0.86 * rs * sin(th)).rounded()), BoardReader.skMask[1]) { h += 1 }
+                    }
+                    if Double(h) / 36 >= 0.45 { tt = 1; rr2 = rs }
+                }
                 var px = X0 + ci * S + S / 2, py = Y0 + cj * S + S / 2
-                px = min(max(px, SK.left + SK.radius[t]), SK.right - SK.radius[t])
-                py = min(py, SK.floor - SK.radius[t])
+                px = min(max(px, SK.left + SK.radius[tt]), SK.right - SK.radius[tt])
+                py = min(py, SK.floor - SK.radius[tt])
                 // two fruits never overlap much
-                if found.contains(where: { hypot($0.x - px, $0.y - py) < 0.7 * (SK.radius[$0.t] + SK.radius[t]) }) { continue }
-                found.append((t, px, py, sc.all))
-                let C = Int(rr + 2)
+                if found.contains(where: { hypot($0.x - px, $0.y - py) < 0.7 * (SK.radius[$0.t] + SK.radius[tt]) }) { continue }
+                found.append((tt, px, py, sc.all))
+                let C = Int(rr2 + 2)
                 for y in max(0, Int(cj) - C)...min(gh - 1, Int(cj) + C) {
                     for x in max(0, Int(ci) - C)...min(gw - 1, Int(ci) + C) {
                         let dx = Double(x) - ci, dy = Double(y) - cj
-                        if dx * dx + dy * dy <= (rr + 1.5) * (rr + 1.5) { claimed[y * gw + x] = true }
+                        if dx * dx + dy * dy <= (rr2 + 1.5) * (rr2 + 1.5) { claimed[y * gw + x] = true }
                     }
                 }
             }

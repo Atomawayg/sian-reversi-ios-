@@ -1143,6 +1143,7 @@ final class GameModel: ObservableObject {
 
     // the held fruit as locked for this jar (3.35: cherry and strawberry flicked back and forth under the finger, and each
     // flick threw the answer away and thought again — the line jumped between two spots and lagged while dragging)
+    private var skPrior = -1, skLastNext = -1
     private var skLockJar: [Int] = [], skVotes = [Int](repeating: 0, count: SK.types), skLockT = -1, skHeldGone: Date? = nil
     /// the jar's cells with the held and next fruit blanked: "the same jar" whatever the held fruit reads as
     static func skJarOnly(_ c: [Int]) -> [Int] { var x = c; if x.count == SK.count { x[SK.held] = 0; x[SK.next] = 0 }; return x }
@@ -1152,10 +1153,15 @@ final class GameModel: ObservableObject {
         guard var st = SK.decode(m.cells) else { return }
         let jar = Self.skJarOnly(m.cells)
         if !(skLockJar.count == jar.count && SK.same(skLockJar, jar, tol: 4)) {
+            // the wheel's "next" from the last jar is what you hold now: Atom's log, next strawberry → held read as cherry 52
+            // times out of 54 (the held fruit is half under Will). Trust the wheel for those two (3.37)
+            skPrior = skLastNext
             skLockJar = jar; skVotes = [Int](repeating: 0, count: SK.types); skLockT = -1
         }
+        if st.next >= 0 && st.held >= 0 { skLastNext = st.next }   // (while falling, the wheel already shows the one after)
         if st.held >= 0 {
             skHeldGone = nil
+            if st.held <= 1 && (skPrior == 0 || skPrior == 1) { st.held = skPrior; m.cells[SK.held] = skPrior + 1 }
             skVotes[st.held] += 1
             // keep the locked kind unless another clearly outvotes it (it takes ~10 readings, a sixth of a second)
             if skLockT < 0 || skVotes[st.held] >= max(10, 2 * skVotes[skLockT]) { skLockT = st.held }
