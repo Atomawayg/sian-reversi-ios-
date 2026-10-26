@@ -87,11 +87,14 @@ final class PoolReplayTests: XCTestCase {
             let rg = SK.dropRange(t)
             XCTAssert(r.x >= rg.lo - 0.5 && r.x <= rg.hi + 0.5, "kind \(t) at \(r.x) outside \(rg)")
         }
-        var b = [SuikaEngine.Body(t: 0, x: SK.left + 10, y: SK.floor - 10)]
-        var made: [Int] = []
-        SuikaEngine.simulate(&b, created: &made, maxT: 1)
-        let cx = SK.left + SK.corner, cy = SK.floor - SK.corner
-        XCTAssertLessThanOrEqual(hypot(b[0].x - cx, b[0].y - cy), SK.corner - b[0].r + 1)
+        // a cherry dropped into the corner never ends up inside the glass's curve
+        for dx in [0.0, 5, 10] {
+            var b = [SuikaEngine.Body(t: 0, x: SK.left + SK.radius[0] + dx, y: SK.floor - 300)]
+            var made: [Int] = []
+            SuikaEngine.simulate(&b, created: &made, maxT: 0.25)
+            let cx = SK.left + SK.corner, cy = SK.floor - SK.corner
+            if b[0].x < cx && b[0].y > cy { XCTAssertLessThanOrEqual(hypot(b[0].x - cx, b[0].y - cy), SK.corner - b[0].r + 1) }
+        }
     }
 
     func time(_ s: Substring) -> Double? {
