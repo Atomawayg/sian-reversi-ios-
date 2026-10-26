@@ -775,16 +775,9 @@ final class GameModel: ObservableObject {
                 poolPlanNote = ""; poolPlanStep = nil; poolPlanGuide = nil
                 if let pt = poolPattern, group == 0 || group == 1 || group == 3,
                    let st = Self.clipPlans[pt].steps.first(where: { s in others.contains { $0.id == s.ball } }), legal.contains(st.ball) {
-                    let pw = ""   // (3.31.4: the clip's power didn't carry over — the table is a few px off from the first shot on)
-                    poolPlanStep = st
-                    if let t = others.first(where: { $0.id == st.ball }) {
-                        let gs = PoolEngine.pocketLines(t, balls: others).filter { $0.pocket == st.pocket }
-                        poolPlanGuide = gs.first(where: { !$0.bank }) ?? gs.first
-                    }
+                    // only while the clip's shot is a sure one here; off the plan, the app plays as usual (3.32.1)
                     if let f = poolFound.first(where: { $0.ball == st.ball && $0.pocket == st.pocket }) {
-                        poolPick = f; poolPlanNote = "แผนคลิป \(pt + 1)" + pw
-                    } else {
-                        poolPlanNote = "คลิป: \(st.ball) → \(PoolEngine.pockets[st.pocket].name) (ไม่ชัวร์)" + pw
+                        poolPick = f; poolPlanNote = "แผนคลิป \(pt + 1)"; poolPlanStep = st
                     }
                 }
                 poolRunWins = bestRun?.wins ?? false
@@ -876,6 +869,7 @@ final class GameModel: ObservableObject {
                 view.pick = h.pick
             }
         }
+        var aimHit: (ball: Int, pocket: Int)? = nil
         // your aim: draw where the balls go; one long tone when it pots one of your balls cleanly
         if breakShot {
             // handled above
@@ -891,6 +885,7 @@ final class GameModel: ObservableObject {
             poolAims.append((a.x, a.y)); if poolAims.count > 3 { poolAims.removeFirst() }
             let steady = pulling || (poolAims.count == 3 && poolAims.allSatisfy { abs($0.0 - a.x) <= 4 && abs($0.1 - a.y) <= 4 })
             let v = PoolEngine.judge(cueX: cue.x, cueY: cue.y, aimX: a.x, aimY: a.y, balls: others, legal: legal, dir: dir)
+            aimHit = (v.ball, v.pocket)
             // where both balls go, every cushion included, as far as the pace carries them. The power to use is the
             // least that drops the ball (simulated) plus a margin; your line is drawn all the way into the pocket at that
             // power, and while you pull, the part your power really reaches is drawn bold
@@ -1031,20 +1026,23 @@ final class GameModel: ObservableObject {
         // the clip's plan (3.31.2, Atom: "it names the ball but not the pocket, too many lines"): one line ball → pocket,
         // that pocket marked and zoomed, and the title naming both the whole time
         if let ps = poolPlanStep, !PoolEngine.isBreak(others), others.contains(where: { $0.id == ps.ball }) {
-            view.guides = poolPlanGuide.map { [$0] } ?? []
-            view.guideMatch = view.guides.isEmpty ? nil : 0
-            view.found = []
+            // one line only: the plan's (its gold line, ball → pocket); none of the thin ones to every pocket
+            view.found = []; view.guides = []; view.guideMatch = nil
             if let pk = view.pick, pk.ball != ps.ball { view.pick = nil }
             view.zoomPocket = ps.pocket
             if view.breakSpotX == nil { view.breakSpotX = PoolEngine.pockets[ps.pocket].x; view.breakSpotY = PoolEngine.pockets[ps.pocket].y }
             let name = "ลูก \(ps.ball) → \(PoolEngine.pockets[ps.pocket].name)"
-            title = (view.pots ? "✓ " : "แผน: ") + name
-            line = view.powerTarget.map { "แรง \($0)" } ?? ""
-            if let sp = ps.spin {
-                view.spinX = sp.0; view.spinY = sp.1
-                let amt = sp.1 >= 0.7 ? "เต็ม" : (sp.1 >= 0.35 ? "ครึ่ง" : "นิด")
-                line += (line.isEmpty ? "" : " · ") + "สปินล่าง \(amt)" + (sp.0 < -0.05 ? " ค่อนซ้าย" : "")
+            let onPlan = aimHit.map { $0.ball == ps.ball && $0.pocket == ps.pocket } ?? false
+            // aiming at another ball: the app's own verdict on it stays in the title (3.32.1: it said "✓ 3" while 9 dropped)
+            if aimHit == nil || onPlan {
+                title = (onPlan && view.pots ? "✓ " : "แผน: ") + name
+                line = view.powerTarget.map { "แรง \($0)" } ?? ""
             }
+            // how to hit it: the clip's spin, or the middle of the ball (both clips: none on most shots)
+            let sp = ps.spin ?? (0, 0)
+            view.spinX = sp.0; view.spinY = sp.1
+            let how = sp.1 < 0.05 ? "แทงกลาง" : "สปินล่าง " + (sp.1 >= 0.7 ? "เต็ม" : (sp.1 >= 0.35 ? "ครึ่ง" : "นิด")) + (sp.0 < -0.05 ? " ค่อนซ้าย" : "")
+            if aimHit == nil || onPlan { line += (line.isEmpty ? "" : " · ") + how }
         }
                 // the book: this very table was played before — the shot that potted, exactly (gold ring + power)
         if !PoolEngine.isBreak(others), let bi = bookFind(balls) {
