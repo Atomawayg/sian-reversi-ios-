@@ -5,7 +5,7 @@ on:
     branches: ['replay/**']
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   replay:
     runs-on: macos-15
@@ -34,3 +34,15 @@ jobs:
           path: |
             Tests/out
             test.log
+      - name: Push results to a branch (artifact downloads are blocked where they are read)
+        if: always()
+        run: |
+          git config user.name "replay-bot"; git config user.email "replay-bot@users.noreply.github.com"
+          B="replay-out/${GITHUB_RUN_ID}"
+          git checkout --orphan "$B"
+          git rm -rq --cached . >/dev/null
+          cp test.log Tests/out/ 2>/dev/null || true
+          git add -f Tests/out
+          git commit -qm "replay results $GITHUB_RUN_ID"
+          git push -q origin "$B"
+          echo "::notice title=replay::$B"
