@@ -547,6 +547,8 @@ struct PoolView: Equatable {
     var objPathFull: [Double] = []             // your line at the power to use (always into the pocket when it drops)
     var powerTarget: Int? = nil, powerNow: Int? = nil
     var breakSpotX: Double? = nil, breakSpotY: Double? = nil
+    var guides: [PoolEngine.Guide] = []        // from the ball you aim at to every pocket (straight and off one cushion)
+    var guideMatch: Int? = nil                 // the one your line runs along (its pocket is the one zoomed)
     var guideLines: [[Double]] = []            // from the ball you aim at to every pocket (straight and one-cushion banks)   // the break: where to put the cue ball   // the power bar: where to pull to, and where you are
     var target: Int? = nil                     // the ball your aim hits
     var legal: [Int] = []
@@ -667,9 +669,17 @@ extension Renderer {
         // (guide lines to every pocket dropped in 3.22: Atom found them cluttered and of little use)
         // your line all the way in at the power to use (thin), then what your pull really reaches (bold)
         // main line (your ball's way) 3 px solid with a thin dark edge; everything else thin and dashed
-        poly(v.objPathFull, (v.pots ? green : (v.risky ? orange : red)).withAlphaComponent(0.6), 1.5, dash: true)
-        poly(v.objPath, UIColor.black.withAlphaComponent(0.5), 5)
-        poly(v.objPath, v.pots ? green : (v.risky ? orange : red), 3)
+        // guide lines (thin, coral): where the ball would have to go for each pocket; the one your line follows a bit bolder.
+        // Your own line is the thick one with a dark edge: green drops, orange only just, white misses
+        let guideCol = UIColor(red: 0.95, green: 0.45, blue: 0.38, alpha: 1)
+        if aiming {
+            for (i, g) in v.guides.enumerated() where i != v.guideMatch { poly(g.pts, guideCol.withAlphaComponent(0.55), 1) }
+            if let mi = v.guideMatch, mi < v.guides.count { poly(v.guides[mi].pts, guideCol, 2) }
+        }
+        let mineCol = v.pots ? green : (v.risky ? orange : UIColor.white)
+        poly(v.objPathFull, mineCol.withAlphaComponent(0.6), 1.5, dash: true)
+        poly(v.objPath, UIColor.black.withAlphaComponent(0.6), 6)
+        poly(v.objPath, mineCol, 3.5)
         if let bx = v.bankX, let by = v.bankY {   // where to hit the cushion: a gold mark on the rail by the diamonds
             let c = pt(bx, by)
             var m = c
@@ -812,11 +822,16 @@ extension Renderer {
             let g = UIBezierPath(); g.move(to: p(mid[0], mid[1])); var i = 2; while i + 1 < mid.count { g.addLine(to: p(mid[i], mid[i + 1])); i += 2 }
             g.lineWidth = 2; g.setLineDash([6, 5], count: 2, phase: 0); UIColor(red: 0.95, green: 0.76, blue: 0.31, alpha: 1).setStroke(); g.stroke()
         }
+        if let mi = v.guideMatch, mi < v.guides.count, v.guides[mi].pocket == pocket {
+            let gp = v.guides[mi].pts
+            let g = UIBezierPath(); g.move(to: p(gp[0], gp[1])); var i = 2; while i + 1 < gp.count { g.addLine(to: p(gp[i], gp[i + 1])); i += 2 }
+            g.lineWidth = 1.5; UIColor(red: 0.95, green: 0.45, blue: 0.38, alpha: 1).setStroke(); g.stroke()
+        }
         if v.objPath.count >= 4 {
             let l = UIBezierPath(); l.move(to: p(v.objPath[0], v.objPath[1])); var i = 2
             while i + 1 < v.objPath.count { l.addLine(to: p(v.objPath[i], v.objPath[i + 1])); i += 2 }
             l.lineWidth = 2
-            (pots ? UIColor(red: 0.30, green: 0.95, blue: 0.45, alpha: 1) : (risky ? UIColor(red: 1.0, green: 0.62, blue: 0.15, alpha: 1) : UIColor(red: 1.0, green: 0.35, blue: 0.30, alpha: 1))).setStroke(); l.stroke()
+            (pots ? UIColor(red: 0.30, green: 0.95, blue: 0.45, alpha: 1) : (risky ? UIColor(red: 1.0, green: 0.62, blue: 0.15, alpha: 1) : UIColor.white)).setStroke(); l.stroke()
             // the ball where it ends up on your line
             let e = p(v.objPath[v.objPath.count - 2], v.objPath[v.objPath.count - 1])
             let o = UIBezierPath(ovalIn: CGRect(x: e.x - br, y: e.y - br, width: br * 2, height: br * 2)); o.lineWidth = 2; o.stroke()

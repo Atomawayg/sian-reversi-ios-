@@ -598,6 +598,10 @@ final class GameModel: ObservableObject {
         }
     }
 
+    /// Safeties are worked out but not suggested (3.27: Atom found them confusing and plays safeties himself).
+    static let poolSafetyOn = false
+    private var poolGuideKey: [Double] = [], poolGuides: [PoolEngine.Guide] = []
+
     private func handlePool(_ m: BoardMessage) {
         let started = Date()
         defer {
@@ -712,7 +716,7 @@ final class GameModel: ObservableObject {
                 poolPick = bestRun?.pick ?? poolFound.first
                 poolRunWins = bestRun?.wins ?? false
                 // nothing sure: look for a safety in the background (a few hundred ms) and show it when it's ready
-                if poolPick == nil {
+                if Self.poolSafetyOn && poolPick == nil {
                     let gen = poolThinkGen, cx = cue.x, cy = cue.y, all = balls, lg = legal, opp = poolOpp(group, others)
                     poolThinking = true
                     work.async { [weak self] in
@@ -741,8 +745,7 @@ final class GameModel: ObservableObject {
             if !hasAim { view.powerTarget = sf.power }
         } else if cue != nil && !PoolEngine.isBreak(others) {
             title = "ไม่มีลูกชัวร์"
-            line = poolThinking ? "กำลังหาไม้เซฟ…" : ""
-            if !poolThinking, let cue, let sb = PoolEngine.safety(cueX: cue.x, cueY: cue.y, balls: others, legal: legal) { line = "แตะลูก \(sb.id) ก่อน" }
+            line = ""
         }
         // the break (the clips' pattern): cue ball in the middle of the line, dead straight into the front ball, full power
         var breakShot = false
@@ -807,9 +810,11 @@ final class GameModel: ObservableObject {
             let tgt = others.first(where: { $0.id == v.ball })
             // every way the ball you aim at can go into each pocket (straight, and off one cushion), worked out once per
             // ball and table
+            // (3.27: back by request — thin lines from the ball to every pocket, straight and off one cushion)
             if let t = tgt {
                 let key = [Double(t.id)] + others.flatMap { [Double($0.id), ($0.x / 4).rounded(), ($0.y / 4).rounded()] }
-                _ = key   // guide lines to every pocket: no longer drawn (3.22)
+                if key != poolGuideKey { poolGuideKey = key; poolGuides = PoolEngine.pocketLines(t, balls: others) }
+                view.guides = poolGuides
             }
             func paths(_ p: Int) -> (obj: [Double], cue: [Double], cueStop: (Double, Double), objDrops: Bool, cueDrops: Bool) {
                 PoolEngine.powerPaths(cueX: cue.x, cueY: cue.y, aimX: a.x, aimY: a.y, target: tgt, balls: balls, dir: dir, power: p)
@@ -840,29 +845,35 @@ final class GameModel: ObservableObject {
             // the pocket close-up: the pocket your line ends at (into it, or the nearest within reach of where it ends).
             // It must not flicker: a new pocket takes over only after 0.3 s, and the last one stays for 1 s after
             // your line leaves every pocket
-            var want: Int? = nil
-            if v.ball >= 0 {
-                if v.pocket >= 0 { want = v.pocket }
-                else {
-                    let line = view.objPathFull.count >= 4 ? view.objPathFull : view.objPath
-                    if line.count >= 4 {
-                        let ex = line[line.count - 2], ey = line[line.count - 1]
-                        if let k = PoolEngine.holes.indices.min(by: { hypot(PoolEngine.holes[$0].x - ex, PoolEngine.holes[$0].y - ey) < hypot(PoolEngine.holes[$1].x - ex, PoolEngine.holes[$1].y - ey) }),
-                           hypot(PoolEngine.holes[k].x - ex, PoolEngine.holes[k].y - ey) < 160 { want = k }
-                    }
+            // Which pocket: the guide line your ball's line runs along (its first leg within 4° of your ball's direction).
+            // The pocket shown stays while its line is still within 4° and no other line is 1.5° closer.
+            var want: Int? = nil, match: Int? = nil
+            if let t = tgt, !poolGuides.isEmpty {
+                let od = dir ?? atan2(t.y - a.y, t.x - a.x)
+                func diff(_ g: PoolEngine.Guide) -> Double {
+                    var d = abs(g.dir - od).truncatingRemainder(dividingBy: 2 * Double.pi); if d > Double.pi { d = 2 * Double.pi - d }
+                    return d * 180 / Double.pi
                 }
+                let ds = poolGuides.map(diff)
+                if let bi = ds.indices.min(by: { ds[$0] < ds[$1] }) {
+                    let cur = poolZoom.pocket.flatMap { p in ds.indices.filter { poolGuides[$0].pocket == p }.min(by: { ds[$0] < ds[$1] }) }
+                    if let ci = cur, ds[ci] <= 4, ds[ci] <= ds[bi] + 1.5 { match = ci } else if ds[bi] <= 4 { match = bi }
+                }
+                if let mi = match { want = poolGuides[mi].pocket }
             }
+            if want == nil && v.ball >= 0 && v.pocket >= 0 { want = v.pocket }
             let nowT = Date()
             if let w = want {
                 if w == poolZoom.pocket { poolZoom.seen = nowT; poolZoom.pending = nil }
                 else if poolZoom.pocket == nil { poolZoom = (w, nowT, nil) }
                 else if let pd = poolZoom.pending, pd.pocket == w {
-                    if nowT.timeIntervalSince(pd.since) >= 0.3 { poolZoom = (w, nowT, nil) }
+                    if nowT.timeIntervalSince(pd.since) >= 0.15 { poolZoom = (w, nowT, nil) }
                 } else { poolZoom.pending = (w, nowT) }
-            } else if poolZoom.pocket != nil && nowT.timeIntervalSince(poolZoom.seen) > 1.0 {
+            } else if poolZoom.pocket != nil && nowT.timeIntervalSince(poolZoom.seen) > 0.6 {
                 poolZoom = (nil, nowT, nil)
             }
             if let k = poolZoom.pocket { view.zoomPocket = k; if v.ball >= 0 { view.target = v.ball } }
+            if let mi = match, poolGuides[mi].pocket == poolZoom.pocket { view.guideMatch = mi }
             let cleanPot = v.ball >= 0 && v.pocket >= 0 && !v.foul && !v.scratch && v.off < 0.75   // the game's own line makes the edge of the mouth trustworthy
             // never a sure pot on a guessed direction: on a thin cut the game's line is too short to read, and a few px
             // of ring error then turn the ball by 10° or more (an 8 shown as dropping went wide by 14°)
@@ -886,7 +897,7 @@ final class GameModel: ObservableObject {
                 else if poolTitlePocket.pending == w.pocket { if nowT.timeIntervalSince(poolTitlePocket.since) >= 0.4 { poolTitlePocket = (w.pocket, nil, nowT) } }
                 else { poolTitlePocket.pending = w.pocket; poolTitlePocket.since = nowT }
             }
-            let namePocket = view.win.map { v.pocket >= 0 ? $0.pocket : (poolTitlePocket.pocket >= 0 ? poolTitlePocket.pocket : $0.pocket) }
+            let namePocket = view.win.map { v.pocket >= 0 ? $0.pocket : (poolZoom.pocket ?? $0.pocket) }
 
             if good {
                 title = "✓ \(v.ball) → \(PoolEngine.pockets[v.pocket].name)"

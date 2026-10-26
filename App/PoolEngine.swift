@@ -80,7 +80,7 @@ enum PoolEngine {
     /// The direction off a cushion. 34 clean object-ball bounces read off the logs (Oct 25–26): tan(out) ≈ 1.40·tan(in)
     /// + 0.11 — shallow hits come off ~1.75× flatter, steep ones only ~1.3× (the old flat 1.85 sent banks ~5° wide).
     /// Pace kept: `keepAlong`/`keepInto` as before. `flat` scales tan(out).
-    static let bounceA = 1.40, bounceB = 0.11
+    static let bounceA = 1.5, bounceB = 0.0   // (3.27: the +0.11 sent a near-square 8 bank 4° too wide; plain ×1.5 has no bias on the 34)
     /// a cushion hit this close to a pocket's centre is where the game's jaws behave unlike the model: never "sure"
     static let mouthNear = 90.0
 
@@ -864,14 +864,16 @@ enum PoolEngine {
 
     /// For one ball: the straight line into each pocket it can reach unblocked, and for each pocket the one-cushion
     /// bank off each cushion (searched around the mirror line with the cushion law). Paths as x,y pairs.
-    static func pocketLines(_ b: Ball, balls: [Ball]) -> [[Double]] {
+    struct Guide: Equatable { var pocket: Int; var pts: [Double]; var dir: Double; var bank: Bool }
+    static func pocketLines(_ b: Ball, balls: [Ball]) -> [Guide] {
         let others = balls.filter { $0.id != 0 && $0.id != b.id }
-        var out: [[Double]] = []
+        var out: [Guide] = []
+        func guide(_ pi: Int, _ pts: [Double], _ bank: Bool) -> Guide { Guide(pocket: pi, pts: pts, dir: atan2(pts[3] - pts[1], pts[2] - pts[0]), bank: bank) }
         for (pi, p) in pockets.enumerated() {
             var ux = p.x - b.x, uy = p.y - b.y
             let d = (ux * ux + uy * uy).squareRoot(); ux /= d; uy /= d
             let r = run(b.x, b.y, ux, uy, balls: others, skip: b.id, maxRails: 0, gap: 2 * R - 3)
-            if r.pocket == pi { out.append(r.pts) }
+            if r.pocket == pi, r.pts.count >= 4 { out.append(guide(pi, r.pts, false)) }
             for (mx, my) in [(2 * xMin - p.x, p.y), (2 * xMax - p.x, p.y), (p.x, 2 * yMin - p.y), (p.x, 2 * yMax - p.y)] {
                 let a0 = atan2(my - b.y, mx - b.x)
                 var best: Run? = nil
@@ -880,7 +882,7 @@ enum PoolEngine {
                     let t = run(b.x, b.y, cos(a), sin(a), balls: others, skip: b.id, maxRails: 1, gap: 2 * R - 3)
                     if t.pocket == pi && t.rails == 1 && (best == nil || t.off < best!.off) { best = t }
                 }
-                if let t = best { out.append(t.pts) }
+                if let t = best, t.pts.count >= 4 { out.append(guide(pi, t.pts, true)) }
             }
         }
         return out
