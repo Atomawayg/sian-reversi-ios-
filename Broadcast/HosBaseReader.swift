@@ -35,25 +35,19 @@ enum HosBaseReader {
     static func read(_ s: BoardReader.Sampler) -> BoardMessage? {
         guard let bar = barBottom(s) else { return nil }
         let W = s.w, H = s.h
-        // board top: first row below the bar that is wood nearly all the way across, and stays so for a square
-        func woodFrac(_ y: Int) -> Double {
-            var n = 0
-            for k in 0..<40 { if wood(s.get(W * (2 * k + 1) / 80, y)) { n += 1 } }
-            return Double(n) / 40
-        }
-        var top = -1, y = bar + 4
-        while y < H * 9 / 10 {
-            if woodFrac(y) >= 0.9 && woodFrac(y + W / 20) >= 0.9 { top = y; break }
-            y += 2
-        }
-        if top < 0 { return nil }
-        // left/right edges of the wood, a square and a half down
-        let ry = top + W / 6
+        // the board's sides: wood across a row a little below the middle of the screen; its top: going up the
+        // first column from there until the wood stops (the white page above the board)
+        let ry = H * 55 / 100
         var x0 = 0, x1 = W - 1
         while x0 < W / 4 && !wood(s.get(x0, ry)) { x0 += 1 }
         while x1 > W * 3 / 4 && !wood(s.get(x1, ry)) { x1 -= 1 }
         let size = Double(x1 - x0 + 1)
-        if size < Double(W) * 0.7 || Double(top) + size > Double(H) { return nil }
+        if size < Double(W) * 0.7 { return nil }
+        let cx = Int(Double(x0) + size * 10 / 1170 + size / 16)
+        var top = ry, gap = 0
+        while top > bar && gap < 25 { top -= 1; gap = wood(s.get(cx, top)) ? 0 : gap + 1 }
+        top += gap
+        if top <= bar || Double(top) + size > Double(H) { return nil }
         let inset = size * 10 / 1170, C = (size - 2 * inset) / 8
         let gx = Double(x0) + inset, gy = Double(top) + inset * 0.6
 
