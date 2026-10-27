@@ -1,0 +1,37 @@
+name: SuikaSim
+# Whole fruit-game games in the app's physics, one job per strategy variant (Tools/SuikaSim/variants.txt).
+on:
+  push:
+    branches: ['sim/**']
+permissions:
+  contents: read
+jobs:
+  list:
+    runs-on: ubuntu-latest
+    outputs:
+      v: ${{ steps.v.outputs.v }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        run: echo "v=$(jq -R . Tools/SuikaSim/variants.txt | jq -sc 'map(select(length>0))')" >> $GITHUB_OUTPUT
+  sim:
+    needs: list
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        v: ${{ fromJson(needs.list.outputs.v) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          S=Tools/SuikaSim/Sources/SuikaSim
+          cp App/SuikaEngine.swift Shared/SuikaShared.swift $S/
+          swift build -c release --package-path Tools/SuikaSim 2>&1 | grep -vE "^\[[0-9]+/[0-9]+\]" | tail -40
+      - name: Play
+        run: |
+          B=$(swift build -c release --package-path Tools/SuikaSim --show-bin-path)/SuikaSim
+          N=${GAMES:-24}
+          $B "${{ matrix.v }}" $N 7 | tee out.txt
+          echo "::notice title=sim::$(grep RESULT out.txt)"

@@ -41,6 +41,13 @@ final class SuikaEngine {
     static let mu = 0.1             // fruits are slippery: piles slide more than they stick
     static let maxR = SK.radius.max()!
 
+    /// strategy weights (tuned offline by Tools/SuikaSim, which plays whole games in this physics)
+    struct Knobs {
+        var pair = 0.6, bury = 1.5, small = 0.6, count = 0.4, wall = 0.25, combo = 0.6
+        var fill = 240.0, fill0 = 0.5, ahead = 0.9, chain = 0.0, roll = 1.5
+    }
+    static var k = Knobs()
+
     /// value of making a fruit of kind k (the game scores roughly like this)
     static func made(_ k: Int) -> Double { Double(k * (k + 1)) / 2 }
 
@@ -175,9 +182,9 @@ final class SuikaEngine {
         let fill = (SK.floor - top) / (SK.floor - SK.dead)
         var v = 0.0
         if top < SK.dead + 4 { v -= 5000 + 100 * (SK.dead + 4 - top) }          // over the line: game over soon
-        v -= 240 * pow(max(0, fill - 0.5), 2)                                      // the closer to the line the worse
-        v -= 0.4 * Double(b.count)                                                 // fewer fruits = more room
-        for f in b where f.t <= 2 { v -= 0.6 }   // small ones strewn about the jar block it (3.37, Atom's screenshot)
+        v -= k.fill * pow(max(0, fill - k.fill0), 2)                                      // the closer to the line the worse
+        v -= k.count * Double(b.count)                                                 // fewer fruits = more room
+        for f in b where f.t <= 2 { v -= k.small }   // small ones strewn about the jar block it (3.37, Atom's screenshot)
         var bigT = -1, bigI = 0
         for i in b.indices where b[i].t > bigT { bigT = b[i].t; bigI = i }
         for i in b.indices {
@@ -186,20 +193,22 @@ final class SuikaEngine {
                 let d = (dx * dx + dy * dy).squareRoot(), rs = b[i].r + b[j].r
                 if b[i].t == b[j].t {
                     // two of a kind close together: one more fruit could join them
-                    if d < rs * 1.35 { v += 0.6 * made(b[i].t + 1) * (1.35 - d / rs) / 0.35 }   // (0.6, 3.36: set up chains)
+                    if d < rs * 1.35 { v += k.pair * made(b[i].t + 1) * (1.35 - d / rs) / 0.35 }   // (0.6, 3.36: set up chains)
                 } else if d < rs + 3 {
+                    // neighbours one size apart: a chain waiting to happen (big next to the next-smaller)
+                    if k.chain != 0 && abs(b[i].t - b[j].t) == 1 { v += k.chain * made(min(b[i].t, b[j].t) + 1) }
                     // a small fruit buried under a much bigger one is hard to reach
                     let (lo, hi) = b[i].y > b[j].y ? (i, j) : (j, i)
                     let gap = b[hi].t - b[lo].t
                     // (1.5, 3.40 — Atom: small fruits ended up buried along the floor under big ones, wasting room)
-                    if gap >= 2 && b[hi].y < b[lo].y - b[lo].r * 0.3 { v -= 1.5 * Double(gap) }
+                    if gap >= 2 && b[hi].y < b[lo].y - b[lo].r * 0.3 { v -= k.bury * Double(gap) }
                 }
             }
         }
         // keep the biggest fruit low and against a wall
         let f = b[bigI]
         let dWall = min(f.x - f.r - SK.left, SK.right - f.x - f.r)
-        v += 0.25 * made(bigT) * max(0, 1 - dWall / 300)
+        v += k.wall * made(bigT) * max(0, 1 - dWall / 300)
         return (v, fill)
     }
 
@@ -226,8 +235,8 @@ final class SuikaEngine {
         let travel = abs(end - x)
         // a chain (it bounces off one and rolls down into a merge, then that merges again) is worth more than its merges
         // one by one — Atom: the big combos are where the points are (3.35). A roll that ends in a merge isn't penalised.
-        let combo = created.count >= 2 ? gain * 0.6 * Double(created.count - 1) : 0
-        let rollCost = created.isEmpty ? 1.5 * travel / 100 : 0
+        let combo = created.count >= 2 ? gain * k.combo * Double(created.count - 1) : 0
+        let rollCost = created.isEmpty ? k.roll * travel / 100 : 0
         return Try(x: x, jar: b, created: created, v1: gain + combo + e.v - rollCost, fill: e.fill, land: landed.map { ($0.x, $0.y) }, travel: travel)
     }
 
@@ -304,7 +313,7 @@ final class SuikaEngine {
             for (n, k) in top.enumerated() {
                 guard let (bestV, bestX) = res[n] else { continue }
                 let gain1 = tries[k].created.reduce(0.0) { $0 + SuikaEngine.made($1) }
-                total[k] = gain1 + 0.9 * bestV + 0.1 * tries[k].v1
+                total[k] = gain1 + SuikaEngine.k.ahead * bestV + (1 - SuikaEngine.k.ahead) * tries[k].v1
                 nextX[k] = bestX
                 done.append(k)
             }
