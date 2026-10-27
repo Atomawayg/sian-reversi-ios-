@@ -44,9 +44,11 @@ enum HosBaseReader {
         while x1 > W * 3 / 4 && !wood(s.get(x1, ry)) { x1 -= 1 }
         let size = Double(x1 - x0 + 1)
         if size < Double(W) * 0.7 { return nil }
-        let cx = Int(Double(x0) + size * 10 / 1170 + size / 16)
+        // (up the board's own border, just outside the squares: no piece ever stands there)
+        let cx = Int(Double(x0) + size * 5 / 1170)
+        func rim(_ p: (Double, Double, Double)) -> Bool { p.0 - p.2 > 30 && p.0 > 110 }
         var top = ry, gap = 0
-        while top > bar && gap < 25 { top -= 1; gap = wood(s.get(cx, top)) ? 0 : gap + 1 }
+        while top > bar && gap < 25 { top -= 1; gap = rim(s.get(cx, top)) ? 0 : gap + 1 }
         top += gap
         if top <= bar || Double(top) + size > Double(H) { return nil }
         let inset = size * 10 / 1170, C = (size - 2 * inset) / 8
