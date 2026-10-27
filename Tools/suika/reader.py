@@ -117,7 +117,7 @@ def read(img, classify=None):
         for j in range(2, jHi, 2):
             for i in range(iLo, iHi, 2):
                 g = grid[j, i]
-                if not claimed[j, i] and g != 0 and (m >> int(g)) & 1:
+                if not claimed[j, i] and g != 0 and (m >> int(g)) & 1 and (t != 10 or g == 8):   # a watermelon starts from its green
                     a, r = score(i, j, rr, m)
                     nc = t <= 2 and near_corner(i, j)
                     if a >= (0.5 if nc else 0.62) and r >= (0.3 if nc else 0.5): cands.append((a, i, j))

@@ -192,7 +192,8 @@ extension BoardReader {
                 var i = iLo
                 while i < iHi {
                     let k = j * gw + i
-                    if !claimed[k] && grid[k] != 0 && m & (1 << UInt16(grid[k])) != 0 {
+                    // (a watermelon search starts only from its yellow-green: its broad colour mask made the search 3× slower)
+                    if !claimed[k] && grid[k] != 0 && m & (1 << UInt16(grid[k])) != 0 && (t != 10 || grid[k] == 8) {
                         let sc = score(Double(i), Double(j), rr, m)
                         // by the rounded bottom corners the curve of the glass covers part of a small fruit's rim (3.39: a cherry
                         // in the bottom-left corner came and went 8 times in one game)
