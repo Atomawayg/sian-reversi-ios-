@@ -112,13 +112,15 @@ enum HosBaseReader {
                 let ar = rowSum[1] / Double(reds), as_ = rowSum[2] / Double(silvers)
                 if abs(ar - as_) > 1.5 { me = ar > as_ ? 1 : 2; meSure = true }
             }
-            // whose turn: the side that just moved has a piece where it had none
+            // whose turn: the side that just moved has a piece where it had none.
+            // If BOTH sides have new pieces, the bot answered before your move settled on screen
+            // (Atom's log 27 Oct 22:46): two moves passed, so the turn is back with whoever had it.
             if !stable.isEmpty {
-                var moved = 0
+                var moved = Set<Int>()
                 for i in 0..<64 where cells[i] != 0 && (stable[i] == 0 || (stable[i] - 1) % 2 != (cells[i] - 1) % 2) {
-                    moved = (cells[i] - 1) % 2 + 1
+                    moved.insert((cells[i] - 1) % 2 + 1)
                 }
-                if moved != 0 { myTurn = moved != me }
+                if moved.count == 1, let side = moved.first { myTurn = side != me }
             }
             // more pieces than before: a new game (or a position set up by hand) — assume it's your move
             if reds + silvers > stable.filter({ $0 != 0 }).count { myTurn = true }
