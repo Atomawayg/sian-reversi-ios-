@@ -61,7 +61,7 @@ final class ReaderTests: XCTestCase {
             XCTAssertEqual(m!.me, 2, "\(name): silver at the bottom")
         }
         // not HosBase: the fruit game
-        XCTAssertFalse(HosBaseReader.looksLikeHosBase(try sampler("suika-1952.png")))
+        XCTAssertNil(HosBaseReader.read(try sampler("suika-1952.png")))   // its orange may pass the bar test, never the board
     }
 
     /// every saved screenshot against Atom's counts by hand (Tools/suika/truth.json), the fruit Will holds left out
