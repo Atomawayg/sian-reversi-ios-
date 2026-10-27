@@ -82,9 +82,10 @@ func ckOpening(_ rng: inout Rng, plies: Int) -> [Int] {
     return b
 }
 
-func makeCkA(trap: Bool = true, contempt: Int? = nil) -> CkPlayer {
+func makeCkA(trap: Bool = true, contempt: Int? = nil, tie: Bool = true, count: Bool = true) -> CkPlayer {
     let e = CheckersEngine()
-    e.trapMode = trap
+    e.trapMode = trap; e.humanTieBreak = tie
+    if !count { e.countLeft = -1 }
     if let c = contempt { e.contempt = c }
     if let d = try? Data(contentsOf: URL(fileURLWithPath: "hos-tb.bin")) { e.loadTB(d) }
     return { b, side in
@@ -137,14 +138,16 @@ let pairs = max(1, games / 2)
 var result: (a: Int, b: Int, d: Int) = (0, 0, 0)
 let t0 = Date()
 switch game {
-case "checkers", "checkers-notrap", "checkers-strict", "checkers-strict-c0", "checkers-strict-notrap", "checkers-strict-notrap-c0":
-    let trap = !game.contains("notrap")
+case _ where game.hasPrefix("checkers"):
+    // flags in the name: -strict (unfinished = draw, WePlay's count), -notrap, -c0 (no contempt), -c<N>, -notie, -nocount
+    let trap = !game.contains("notrap"), tie = !game.contains("notie"), count = !game.contains("nocount")
     strict = game.hasPrefix("checkers-strict")
-    let ct: Int? = game.hasSuffix("-c0") ? 0 : nil
+    var ct: Int? = nil
+    for part in game.split(separator: "-") where part.hasPrefix("c") && Int(part.dropFirst()) != nil { ct = Int(part.dropFirst()) }
     result = runPairs(pairs) { i in
         var rng = Rng(s: 0x9E3779B97F4A7C15 &+ UInt64(i) &* 0x632BE59BD9B4E019)
         let open = ckOpening(&rng, plies: 2 + rng.int(4))
-        let a = makeCkA(trap: trap, contempt: ct), b = makeCkB()
+        let a = makeCkA(trap: trap, contempt: ct, tie: tie, count: count), b = makeCkB()
         let g1 = ckGame(a, b, opening: open), g2 = ckGame(b, a, opening: open)
         return (g1 == 1 ? .a : (g1 == -1 ? .b : .draw), g2 == -1 ? .a : (g2 == 1 ? .b : .draw))
     }

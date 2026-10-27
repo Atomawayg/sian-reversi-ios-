@@ -1,4 +1,4 @@
-checkers-strict-c0 400 100
-checkers-strict 400 100
-checkers-strict-notrap-c0 400 100
-checkers-strict-notrap 400 100
+checkers-strict-notrap-notie-nocount-c0 400 100
+checkers-strict-notrap-notie-c60 400 100
+checkers-strict-notrap-notie-nocount-c60 400 100
+checkers-strict-notrap-notie-c150 400 100
