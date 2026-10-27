@@ -317,6 +317,12 @@ final class CheckersEngine {
     // 3.43: the search is the 23 Oct one exactly (arena: every later change measured weaker against it).
     // These remain so the app compiles; they no longer change how it plays.
     static let countMoves = 8
+    /// The side with king + man against a lone king (WePlay counts that ending), or 0.
+    private func countSide() -> Int {
+        if pc(P[0]) == 1 && pc(P[1]) == 1 && P[2] == 0 && pc(P[3]) == 1 { return 1 }
+        if pc(P[2]) == 1 && pc(P[3]) == 1 && P[0] == 0 && pc(P[1]) == 1 { return -1 }
+        return 0
+    }
     var countLeft = 0
     var trapMode = false
     var humanTieBreak = false
