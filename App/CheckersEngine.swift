@@ -325,6 +325,8 @@ final class CheckersEngine {
     /// Our moves still allowed under the count at the root (set by the app; 0 = the count is not running,
     /// −1 = ignore the count, for tests).
     var countLeft = 0
+    /// Score the count inside the search too (3.43: measured weaker — off; the root still obeys a running count).
+    var countInSearch = false
 
     private func negamax(_ side: Int, _ depth: Int, _ alphaIn: Int, _ betaIn: Int, _ ply: Int) -> Int {
         nodes += 1
@@ -336,7 +338,7 @@ final class CheckersEngine {
             if v >= 0 {
                 if v == 0 { return 0 }
                 // entering the counted ending: a win that needs more than 8 of the winner's moves is a draw
-                let cs = countSide()
+                let cs = countInSearch ? countSide() : 0
                 if cs != 0 {
                     let winner = v < 128 ? side : -side
                     let movesNeeded = v < 128 ? (v + 1) / 2 : (v - 128) / 2
@@ -546,10 +548,10 @@ final class CheckersEngine {
 
     /// Plays like a strong human: among moves within a hair of the best, prefer the one that leaves the
     /// opponent the most replies that LOOK fine at a glance (2-ply) but actually lose material (deep).
-    var trapMode = true
+    var trapMode = false   // (3.43: arena — trap picking cost ~30 Elo against the 23 Oct engine; off)
     /// Won table endings: prefer the win that is fastest on average over all replies (off = always the fastest
     /// against perfect defence).
-    var humanTieBreak = true
+    var humanTieBreak = false
     /// Legal moves (for tests).
     func moves(_ b64: [Int], side: Int) -> [CheckersMove] {
         var b32 = [Int](repeating: 0, count: 32)
