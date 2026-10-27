@@ -165,6 +165,11 @@ extension BoardReader {
             default: return true
             }
         }
+        /// grid cell within reach of a rounded bottom corner
+        func nearCorner(_ ci: Double, _ cj: Double) -> Bool {
+            let px = X0 + ci * S, py = Y0 + cj * S
+            return py > SK.floor - 110 && (px < SK.left + 110 || px > SK.right - 110)
+        }
         var found: [(t: Int, x: Double, y: Double, sc: Double)] = []
         // biggest first, except apples before the peach: a red apple beside a peach would be read as part of it
         for t in [10, 9, 8, 5, 7, 6, 4, 3, 2, 1, 0] {
@@ -180,7 +185,10 @@ extension BoardReader {
                     let k = j * gw + i
                     if !claimed[k] && grid[k] != 0 && m & (1 << UInt16(grid[k])) != 0 {
                         let sc = score(Double(i), Double(j), rr, m)
-                        if sc.all >= 0.62 && sc.rim >= 0.5 { cands.append((sc.all, i, j)) }
+                        // by the rounded bottom corners the curve of the glass covers part of a small fruit's rim (3.39: a cherry
+                        // in the bottom-left corner came and went 8 times in one game)
+                        let nc = t <= 2 && nearCorner(Double(i), Double(j))
+                        if sc.all >= (nc ? 0.5 : 0.62) && sc.rim >= (nc ? 0.3 : 0.5) { cands.append((sc.all, i, j)) }
                     }
                     i += 2
                 }
@@ -211,7 +219,8 @@ extension BoardReader {
                 } }
                 ci = bx; cj = by
                 let sc = score(ci, cj, rr, m)
-                if sc.all < 0.6 || sc.rim < 0.45 { continue }
+                let ncc = t <= 2 && nearCorner(ci, cj)
+                if sc.all < (ncc ? 0.48 : 0.6) || sc.rim < (ncc ? 0.28 : 0.45) { continue }
                 if !lookAlikeOK(t, ci, cj, rr, m) { continue }
                 // cherry or strawberry, by colour (3.37, Atom's screenshot): inside, a strawberry is ~85 % pink-red (group 2) with
                 // under 10 % deep red and no yellow; a cherry is ~40 % deep red with its yellow beak (~12 %). The disc test alone

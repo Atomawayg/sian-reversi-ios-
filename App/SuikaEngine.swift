@@ -208,11 +208,12 @@ final class SuikaEngine {
 
     struct Try { var x: Double; var jar: [Body]; var created: [Int]; var v1: Double; var fill: Double; var land: (Double, Double)?; var travel: Double }
 
-    static func drop(_ base: [Body], _ t: Int, _ x: Double) -> Try {
+    static func drop(_ base: [Body], _ t: Int, _ x: Double, inflate: Double = 1) -> Try {
         var b = base
         var me = Body(t: t, x: x, y: SK.dropY, tag: 1)
         me.fresh = true
         b.append(me)
+        if inflate != 1 { for i in b.indices { b[i].r *= inflate; b[i].im = 1 / (b[i].r * b[i].r) } }
         var created: [Int] = []
         var end = x
         simulate(&b, created: &created, tagX: &end)
@@ -250,8 +251,22 @@ final class SuikaEngine {
             lock.lock(); slots[k] = t; lock.unlock()
         }
         if cancel() { return nil }
-        let tries = slots.compactMap { $0 }
+        var tries = slots.compactMap { $0 }
         if tries.count != pos.count { return nil }
+        // 3.39 (Atom: a fruit sent through a small gap stuck at its mouth — the game's fruits collide a little bigger than
+        // ours there). Every drop that merges is tried again with all fruits 6 % bigger; if it then merges less, the
+        // bigger-fruit outcome is the one that counts. Gaps that really fit still win.
+        var tight = [Try?](repeating: nil, count: tries.count)
+        DispatchQueue.concurrentPerform(iterations: tries.count) { k in
+            if tries[k].created.isEmpty || cancel() { return }
+            let t = SuikaEngine.drop(base, st.held, pos[k], inflate: 1.06)
+            lock.lock(); tight[k] = t; lock.unlock()
+        }
+        for k in tries.indices {
+            if let t = tight[k], t.created.count < tries[k].created.count || t.created.max() ?? -1 < tries[k].created.max() ?? -1 {
+                var w = tries[k]; w.v1 = min(w.v1, t.v1); w.created = t.created; tries[k] = w
+            }
+        }
         // a spot is only as good as its neighbours: you can't drop to the exact pixel
         func robust(_ k: Int, _ v: Double) -> Double {
             var r = v
