@@ -97,6 +97,54 @@ final class PoolReplayTests: XCTestCase {
         }
     }
 
+    /// Each logged drop replayed in the engine (the jar before, the fruit held, dropped where the app said — Atom follows it to
+    /// ~9 px): does the biggest fruit it makes match what the next jar shows? Prints the score; the physics fit is judged by it.
+    func testSuikaOutcomes() throws {
+        for f in [false, true] { SuikaEngine.fitted = f; print("OUTCOME fitted=\(f)"); try outcomes() }
+        SuikaEngine.fitted = true
+    }
+    func outcomes() throws {
+        let here = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        let logs = try FileManager.default.contentsOfDirectory(at: here.appendingPathComponent("logs"), includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix("suika") }
+        var n = 0, hit = 0
+        for url in logs {
+            var prev: (held: Int, jar: [SK.Fruit])? = nil, sugg: Double? = nil
+            for raw in try String(contentsOf: url, encoding: .utf8).split(separator: "\n") {
+                let line = raw.dropFirst(11)
+                if line.hasPrefix("A x=") { sugg = Double(line.dropFirst(4).prefix { $0 != " " }); continue }
+                guard line.hasPrefix("S ") else { continue }
+                func field(_ k: String) -> Substring? { raw.range(of: " " + k + "=").map { r in raw[r.upperBound...].prefix { $0 != " " } } }
+                var jar: [SK.Fruit] = []
+                if let r = raw.range(of: "jar=") {
+                    for tok in raw[r.upperBound...].split(separator: " ") {
+                        let p = tok.split(separator: ":"); guard p.count == 2, let t = Int(p[0]) else { continue }
+                        let xy = p[1].split(separator: ","); guard xy.count == 2, let x = Double(xy[0]), let y = Double(xy[1]) else { continue }
+                        jar.append(SK.Fruit(t: t, x: x, y: y))
+                    }
+                }
+                let held = Int(field("held") ?? "-1") ?? -1
+                // a new jar with one fruit more or fewer than before: the last one was dropped
+                if let p = prev, let x = sugg, p.held >= 0, abs(jar.count - (p.jar.count + 1)) <= 6, jar.count != p.jar.count {
+                    var base = p.jar.map { SuikaEngine.Body(t: $0.t, x: $0.x, y: $0.y) }
+                    var none: [Int] = []
+                    SuikaEngine.simulate(&base, created: &none, merge: false, maxT: 1.5, damp: 0.6)
+                    for i in base.indices { base[i].vx = 0; base[i].vy = 0 }
+                    let tr = SuikaEngine.drop(base, p.held, x)
+                    var before = [Int](repeating: 0, count: SK.types), after = before
+                    for f in p.jar { before[f.t] += 1 }; before[p.held] += 1
+                    for f in jar { after[f.t] += 1 }
+                    let made = (0..<SK.types).filter { after[$0] > before[$0] }.max() ?? -1
+                    let said = tr.created.max() ?? -1
+                    n += 1; if made == said { hit += 1 }
+                }
+                if held >= 0 { prev = (held, jar) }
+                sugg = nil
+            }
+        }
+        print("OUTCOME drops \(n) biggest-made right \(hit) (\(n > 0 ? 100 * hit / n : 0) %)")
+    }
+
     func time(_ s: Substring) -> Double? {
         let p = s.prefix(10).split(separator: ":")
         guard p.count == 3, let h = Double(p[0]), let m = Double(p[1]), let x = Double(p[2]) else { return nil }

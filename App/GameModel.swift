@@ -1151,6 +1151,7 @@ final class GameModel: ObservableObject {
     private func handleSuika(_ raw: BoardMessage) {
         var m = raw
         guard var st = SK.decode(m.cells) else { return }
+        let rawHeld = st.held, rawHeldX = st.heldX   // as read (the lock and the grace below change st)
         let jar = Self.skJarOnly(m.cells)
         if !(skLockJar.count == jar.count && SK.same(skLockJar, jar, tol: 4)) {
             // the wheel's "next" from the last jar is what you hold now: Atom's log, next strawberry → held read as cherry 52
@@ -1175,7 +1176,7 @@ final class GameModel: ObservableObject {
             }
         }
         if logOn {
-            if st.held >= 0 { skLastHeld = (st.held, st.heldX) }
+            if rawHeld >= 0 { skLastHeld = (st.held, rawHeldX) }
             else if let h = skLastHeld {   // the held fruit is gone: it was dropped here
                 log(String(format: "D t=%d x=%.0f suggest=%@", h.t, h.x, skLastSuggest.map { String(format: "%.0f", $0) } ?? "-"))
                 skLastHeld = nil

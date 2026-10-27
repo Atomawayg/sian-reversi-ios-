@@ -31,6 +31,10 @@ enum SK {
 
     /// radius of each fruit type (cherry … watermelon), measured on the game screen
     static let radius: [Double] = [35, 48, 63, 75, 92, 121, 138, 168, 200, 235, 280]
+    /// how big each kind is to the game's physics (3.41): fitted from 266 pairs of touching fruits on 14 of Atom's screenshots
+    /// (distance between centres = the two collision radii). Grapes collide bigger than drawn, strawberries, dekopons and the
+    /// watermelon smaller; one scale for all (×1.03) sent fruits through gaps they stuck in, and rolled others into merges.
+    static let hit: [Double] = [36, 45.7, 67, 72, 92.5, 121.8, 140.3, 171.4, 195.2, 231.6, 266.2]
     static let names = ["เชอร์รี่", "สตรอว์เบอร์รี่", "องุ่น", "ส้มเหลือง", "ส้มจิ้งจอก", "แอปเปิ้ล", "สาลี่", "พีช", "สับปะรด", "เมลอน", "แตงโม"]
     static let types = 11
 

@@ -15,7 +15,7 @@ final class SuikaEngine {
         var alive = true
         init(t: Int, x: Double, y: Double, tag: Int = 0) {
             self.t = t; self.x = x; self.y = y; self.tag = tag
-            r = SK.radius[t] * SuikaEngine.hitScale; im = 1 / (r * r)
+            r = SuikaEngine.fitted ? SK.hit[t] : SK.radius[t] * SuikaEngine.hitScale; im = 1 / (r * r)
         }
     }
 
@@ -34,7 +34,8 @@ final class SuikaEngine {
     // measured on two screen recordings (129 drops replayed): gravity from a falling fruit's path at 60 fps,
     // the rest fitted so replayed drops land and merge where the game's did
     static let g = 3490.0
-    static let hitScale = 1.03      // fruits collide a little outside their drawn edge
+    static let hitScale = 1.03      // (before 3.41: one scale for every kind)
+    static var fitted = true        // per-kind collision sizes (SK.hit); false only to compare in the tests
     static let dt = 1.0 / 120
     static let iters = 10
     static let mu = 0.1             // fruits are slippery: piles slide more than they stick
