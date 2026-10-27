@@ -326,7 +326,7 @@ final class CheckersEngine {
     var countLeft = 0
     var trapMode = false
     var humanTieBreak = false
-    var countInSearch = true     // 3.44: on again, alone (Atom: K+M vs K ran out the count — the AI didn't know)
+    var countInSearch = false    // WePlay count in the search: still being measured (arena), off until it wins
     var contempt = 0
     func moves(_ b64: [Int], side: Int) -> [CheckersMove] {
         var b32 = [Int](repeating: 0, count: 32)
