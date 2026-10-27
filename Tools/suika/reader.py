@@ -133,11 +133,14 @@ def read(img, classify=None):
             if cnt == 0: continue
             ci, cj = sxs / cnt, sys_ / cnt
             bx, by, bh = ci, cj, edge(ci, cj, rr, m)
-            for dy in range(-8, 9):
-                for dx in range(-8, 9):
-                    x, y = ci + dx * 0.5, cj + dy * 0.5
-                    h = edge(x, y, rr, m)
-                    if h > bh or (h == bh and (x - ci) ** 2 + (y - cj) ** 2 < (bx - ci) ** 2 + (by - cj) ** 2): bx, by, bh = x, y, h
+            # coarse (1 cell) then fine (half a cell) around the best: 90 tries instead of 289
+            for step, span, ox, oy in ((1.0, 4, ci, cj), (0.5, 1, None, None)):
+                cx0, cy0 = (ox, oy) if ox is not None else (bx, by)
+                for dy in range(-span, span + 1):
+                    for dx in range(-span, span + 1):
+                        x, y = cx0 + dx * step, cy0 + dy * step
+                        h = edge(x, y, rr, m)
+                        if h > bh or (h == bh and (x - ci) ** 2 + (y - cj) ** 2 < (bx - ci) ** 2 + (by - cj) ** 2): bx, by, bh = x, y, h
             ci, cj = bx, by
             a, r = score(ci, cj, rr, m)
             ncc = t <= 2 and near_corner(ci, cj)

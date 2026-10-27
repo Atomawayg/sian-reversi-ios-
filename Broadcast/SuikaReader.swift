@@ -222,11 +222,16 @@ extension BoardReader {
                 var ci = sxs / cnt, cj = sys / cnt
                 // faces pull the middle of the colour off centre: nudge until the edge ring sits on the fruit
                 var bx = ci, by = cj, bh = edge(ci, cj, rr, m)
-                for dy in -8...8 { for dx in -8...8 {
-                    let x = ci + Double(dx) * 0.5, y = cj + Double(dy) * 0.5
-                    let h = edge(x, y, rr, m)
-                    if h > bh || (h == bh && (x - ci) * (x - ci) + (y - cj) * (y - cj) < (bx - ci) * (bx - ci) + (by - cj) * (by - cj)) { bx = x; by = y; bh = h }
-                } }
+                // coarse (1 cell) then fine (half a cell) around the best: 90 tries instead of 289 (3.42: the reader had
+                // grown 3× slower; same readings on all 20 saved screenshots)
+                for (step, span, fine) in [(1.0, 4, false), (0.5, 1, true)] {
+                    let x0 = fine ? bx : ci, y0 = fine ? by : cj
+                    for dy in -span...span { for dx in -span...span {
+                        let x = x0 + Double(dx) * step, y = y0 + Double(dy) * step
+                        let h = edge(x, y, rr, m)
+                        if h > bh || (h == bh && (x - ci) * (x - ci) + (y - cj) * (y - cj) < (bx - ci) * (bx - ci) + (by - cj) * (by - cj)) { bx = x; by = y; bh = h }
+                    } }
+                }
                 ci = bx; cj = by
                 let sc = score(ci, cj, rr, m)
                 let ncc = t <= 2 && nearCorner(ci, cj)
