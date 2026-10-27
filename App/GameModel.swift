@@ -233,12 +233,19 @@ final class GameModel: ObservableObject {
 
     private static func ckName(_ s: Int) -> String { "\(8 - s / 8)·\(s % 8 + 1)" }
 
+    private var ckLastLog = ""
     private var ckCount = 0                 // your moves so far in the counted ending
     private var ckCountBoard: [Int]? = nil
     private func handleCheckers(_ m: BoardMessage) {
         let (board, meC) = checkersBoard(m)
         let draw = board.map { $0 == 1 ? 1 : ($0 == 2 ? 2 : ($0 == -1 ? 3 : ($0 == -2 ? 4 : 0))) }
         let verdict = ckTrack.check(board) { b, p in CheckersRules.successors(b, side: p == 0 ? 1 : -1) }
+        // log (for checking games afterwards): each new board once — m/M yours, o/O theirs, top row first
+        if logOn {
+            let txt = board.map { $0 == 1 ? "m" : ($0 == 2 ? "M" : ($0 == -1 ? "o" : ($0 == -2 ? "O" : "."))) }.joined()
+            let line = "K turn=\(m.myTurn ? 1 : 0) me=\(meC)" + (verdict == .suspicious ? " odd" : "") + " board=" + stride(from: 0, to: 64, by: 8).map { i in String(Array(txt)[i..<i + 8]) }.joined(separator: "/")
+            if line != ckLastLog { ckLastLog = line; log(line) }
+        }
         guard verdict != .suspicious else { boardInDoubt(.checkers, meColor: meC, shown: ckTrack.trusted.map { t in t.map { $0 == 1 ? 1 : ($0 == 2 ? 2 : ($0 == -1 ? 3 : ($0 == -2 ? 4 : 0))) } }); return }
         guard m.myTurn else {
             computedFor = []; gen += 1
@@ -282,6 +289,7 @@ final class GameModel: ObservableObject {
                 if countLeft > 0 { verdict += " · นับ \(countLeft) ตา" }
                 let title = "\(GameModel.ckName(path[0]))→\(GameModel.ckName(path[path.count - 1]))"
                 let line = "\(what) · \(verdict)" + (r.trap > 0 ? " · วางกับดัก" : "") + (r.depth > 0 && r.depth < 99 ? " · ลึก \(r.depth)" : "")
+                if self.logOn { self.log("KA move=\(title) \(what) · \(verdict) score=\(r.score) depth=\(r.depth) tb=\(r.tb.map(String.init) ?? "-")") }
                 self.show(Overlay(game: .checkers, cells: draw, path: path, caps: caps, title: title, line: line, mine: true, meColor: meC))
             }
         }
