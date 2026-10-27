@@ -86,7 +86,7 @@ func makeCkA(trap: Bool = true, contempt: Int? = nil, tie: Bool = true, count: B
     let e = CheckersEngine()
     e.trapMode = trap; e.humanTieBreak = tie
     if !count { e.countLeft = -1 }
-    if let c = contempt { e.contempt = c }
+    _ = contempt
     if let d = try? Data(contentsOf: URL(fileURLWithPath: "hos-tb.bin")) { e.loadTB(d) }
     return { b, side in
         let r = e.search(b, side: side, maxMs: ms)
