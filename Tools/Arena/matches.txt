@@ -1,4 +1,3 @@
-checkers-strict-notrap-notie-nocount-c0 400 100
-checkers-strict-notrap-notie-c60 400 100
-checkers-strict-notrap-notie-nocount-c60 400 100
-checkers-strict-notrap-notie-c150 400 100
+checkers-strict-selfold 400 100
+checkers-strict-notrap-notie-nocount-c0-selfnew 400 100
+checkers-selfold 400 100

@@ -147,7 +147,9 @@ case _ where game.hasPrefix("checkers"):
     result = runPairs(pairs) { i in
         var rng = Rng(s: 0x9E3779B97F4A7C15 &+ UInt64(i) &* 0x632BE59BD9B4E019)
         let open = ckOpening(&rng, plies: 2 + rng.int(4))
-        let a = makeCkA(trap: trap, contempt: ct, tie: tie, count: count), b = makeCkB()
+        let selfOld = game.contains("selfold"), selfNew = game.contains("selfnew")
+        let a = selfOld ? makeCkB() : makeCkA(trap: trap, contempt: ct, tie: tie, count: count)
+        let b = selfNew ? makeCkA(trap: trap, contempt: ct, tie: tie, count: count) : makeCkB()
         let g1 = ckGame(a, b, opening: open), g2 = ckGame(b, a, opening: open)
         return (g1 == 1 ? .a : (g1 == -1 ? .b : .draw), g2 == -1 ? .a : (g2 == 1 ? .b : .draw))
     }
