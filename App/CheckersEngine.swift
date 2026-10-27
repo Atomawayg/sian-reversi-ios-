@@ -320,7 +320,8 @@ final class CheckersEngine {
     var countLeft = 0
     var trapMode = false
     var humanTieBreak = false
-    var countInSearch = false
+    var countInSearch = true     // 3.44: on again, alone (Atom: K+M vs K ran out the count — the AI didn't know)
+    var contempt = 0
     func moves(_ b64: [Int], side: Int) -> [CheckersMove] {
         var b32 = [Int](repeating: 0, count: 32)
         for s in 0..<32 { b32[s] = b64[S64[s]] }
@@ -336,7 +337,21 @@ final class CheckersEngine {
         let MATE = CheckersEngine.MATE
         if !TB.isEmpty && ply > 0 && pieces() <= 4 {
             let v = tbProbe(side)
-            if v >= 0 { if v == 0 { return 0 }; if v < 128 { return MATE - ply - v }; return -(MATE - ply - (v - 128)) }
+            if v >= 0 {
+                // a draw is worth a little less than nothing to the side we play for (contempt): prefer playing on
+                let draw = side == curSide ? -contempt : contempt
+                if v == 0 { return draw }
+                // WePlay's count: king + man vs king gets 8 more moves each — a longer win there is a draw
+                if countInSearch {
+                    let cs = countSide()
+                    if cs != 0 {
+                        let winner = v < 128 ? side : -side
+                        let movesNeeded = v < 128 ? (v + 1) / 2 : (v - 128) / 2
+                        if winner == cs && movesNeeded > CheckersEngine.countMoves { return draw }
+                    }
+                }
+                if v < 128 { return MATE - ply - v }; return -(MATE - ply - (v - 128))
+            }
         }
         if ply >= CheckersEngine.MAXPLY - 2 { return side * evaluate(side) }
         let n = gen(side, ply)
@@ -434,6 +449,8 @@ final class CheckersEngine {
         if !TB.isEmpty && kingRule == 0 && pieces() <= 4 {
             let tv = tbProbe(side)
             if tv >= 0 {
+                // our moves left under the count (a fresh 8 when the counted ending starts now)
+                let limit = !countInSearch || countLeft < 0 ? 0 : (countSide() == side ? (countLeft > 0 ? countLeft : CheckersEngine.countMoves) : 0)
                 for k in 0..<root.count {
                     let i = findIndex(root[k].m)
                     if i < 0 { continue }
@@ -443,12 +460,18 @@ final class CheckersEngine {
                     if opp == 0 { sc = MATE - 1 } else {
                         let v = tbProbe(-side)
                         sc = v < 0 ? 0 : (v == 0 ? 0 : (v < 128 ? -(MATE - 1 - v) : (MATE - 1 - (v - 128))))
+                        if limit > 0 && v >= 128 && 1 + (v - 128) / 2 > limit { sc = 0 }   // can't finish before the count runs out
+                        if countInSearch && countLeft >= 0 {
+                            let cs = countSide(), lim = countLeft > 0 ? countLeft : CheckersEngine.countMoves
+                            if limit == 0 && cs == side && v >= 128 && (v - 128) / 2 > lim { sc = 0 }      // we just entered it
+                            if cs == -side && v > 0 && v < 128 && (v + 1) / 2 > lim { sc = 0 }             // they can't finish us in time
+                        }
                     }
                     unmake(0)
                     root[k].score = sc
                 }
                 root.sort { $0.score > $1.score }
-                res.best = root[0].m; res.score = root[0].score; res.tb = tv; res.depth = 99; res.instant = "tb"
+                res.best = root[0].m; res.score = root[0].score; res.tb = root[0].score == 0 ? 0 : tv; res.depth = 99; res.instant = "tb"
                 return res
             }
         }
