@@ -41,7 +41,7 @@ extension BoardReader {
         1 << 4,                  // pear
         1 << 6 | 1 << 2 | 1 << 1 | 1 << 7 | 1 << 8, // peach (with its leaves, or its middle is read too high: 3.40)
         1 << 4,                  // pineapple
-        1 << 7,                  // melon
+        1 << 7 | 1 << 8,         // melon (its light stripes read as group 8: 3.43)
         1 << 8 | 1 << 1 | 1 << 2 | 1 << 6, // watermelon: yellow-green with its red mouth (3.42: the mouth alone read as an apple)
     ]
 
@@ -155,13 +155,13 @@ extension BoardReader {
             }
             if tot == 0 || Double(h) / Double(tot) < (t == 10 ? 0.6 : 0.35) { return false }   // (3.40: a melon with an apple beside it read as a watermelon)
             if t < 7 { return true }
-            var n = 0, pale = 0, red = 0, band = 0, bandOwn = 0, yg = 0
+            var n = 0, pale = 0, red = 0, band = 0, bandOwn = 0, yg = 0, gr = 0
             let R = Int(rr) + 1
             for y in max(0, Int(cj) - R)...min(gh - 1, Int(cj) + R) {
                 for x in max(0, Int(ci) - R)...min(gw - 1, Int(ci) + R) {
                     let d = ((Double(x) - ci) * (Double(x) - ci) + (Double(y) - cj) * (Double(y) - cj)).squareRoot()
                     let g = grid[y * gw + x]
-                    if d <= 0.85 * rr { n += 1; if g == 6 { pale += 1 }; if g == 1 || g == 2 { red += 1 }; if g == 8 { yg += 1 } }
+                    if d <= 0.85 * rr { n += 1; if g == 6 { pale += 1 }; if g == 1 || g == 2 { red += 1 }; if g == 8 { yg += 1 }; if g == 7 { gr += 1 } }
                     if d > 0.6 * rr && d < 0.95 * rr { band += 1; if on(x, y, m) { bandOwn += 1 } }
                 }
             }
@@ -169,7 +169,7 @@ extension BoardReader {
             switch t {
             case 7: return Double(pale) / f >= 0.2                       // a peach is mostly pale pink
             case 8: return Double(bandOwn) / Double(max(1, band)) >= 0.8 // a pineapple is a solid yellow ring
-            case 9: return Double(red) / f < 0.06                        // a melon has no red
+            case 9: return Double(gr) / f >= 0.35 && gr > 2 * yg && Double(red) / f < 0.25   // mostly melon green
             case 10: return Double(red) / f >= 0.06 && Double(yg) / f >= 0.3   // its red mouth, and mostly yellow-green
             default: return true
             }

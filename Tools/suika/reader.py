@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw
 LEFT, RIGHT, FLOOR, DEAD, TOP = 108.0, 1070.0, 2323.0, 1002.0, 800.0
 RADIUS = [35, 48, 63, 75, 92, 121, 138, 168, 200, 235, 280]
 NAMES = ['cherry', 'straw', 'grape', 'dekopon', 'persim', 'apple', 'pear', 'peach', 'pine', 'melon', 'wmelon']
-MASK = [1 << 1 | 1 << 2, 1 << 2 | 1 << 1, 1 << 3, 1 << 4, 1 << 5, 1 << 1 | 1 << 2, 1 << 4, 1 << 6 | 1 << 2 | 1 << 1 | 1 << 7 | 1 << 8, 1 << 4, 1 << 7, 1 << 8 | 1 << 1 | 1 << 2 | 1 << 6]
+MASK = [1 << 1 | 1 << 2, 1 << 2 | 1 << 1, 1 << 3, 1 << 4, 1 << 5, 1 << 1 | 1 << 2, 1 << 4, 1 << 6 | 1 << 2 | 1 << 1 | 1 << 7 | 1 << 8, 1 << 4, 1 << 7 | 1 << 8, 1 << 8 | 1 << 1 | 1 << 2 | 1 << 6]
 CORNER = 52.0
 CLAIM = 0.95
 LEAVES = True
@@ -90,19 +90,19 @@ def read(img, classify=None):
             tot += 1; h += on(x, y, m)
         if tot == 0 or h / tot < (0.6 if t == 10 else 0.35): return False
         if t < 7: return True
-        n = pale = red = band = bown = yg = 0
+        n = pale = red = band = bown = yg = gr = 0
         R = int(rr) + 1
         for y in range(max(0, int(cj) - R), min(gh - 1, int(cj) + R) + 1):
             for x in range(max(0, int(ci) - R), min(gw - 1, int(ci) + R) + 1):
                 d = math.hypot(x - ci, y - cj); g = grid[y, x]
                 if d <= 0.85 * rr:
-                    n += 1; pale += g == 6; red += g in (1, 2); yg += g == 8
+                    n += 1; pale += g == 6; red += g in (1, 2); yg += g == 8; gr += g == 7
                 if 0.6 * rr < d < 0.95 * rr:
                     band += 1; bown += on(x, y, m)
         f = max(1, n)
         if t == 7: return pale / f >= 0.2
         if t == 8: return bown / max(1, band) >= 0.8
-        if t == 9: return red / f < 0.06
+        if t == 9: return gr / f >= 0.35 and gr > 2 * yg and red / f < 0.25   # melon green (3.43: 'no red' failed when a red fruit lay across it)
         if t == 10: return red / f >= 0.06 and yg / f >= 0.3   # the frog is mostly yellow-green
         return True
     def near_corner(ci, cj):
