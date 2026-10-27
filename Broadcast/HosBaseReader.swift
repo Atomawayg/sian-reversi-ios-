@@ -13,19 +13,17 @@ enum HosBaseReader {
     static var info = ""   // last frame's numbers (tests)
 
     private static func orange(_ p: (Double, Double, Double)) -> Bool { p.0 > 170 && p.1 > 90 && p.1 < 160 && p.2 < 95 }
-    private static func wood(_ p: (Double, Double, Double)) -> Bool { p.0 - p.2 > 40 && p.0 > 110 }
 
     /// y of the bottom of the orange title bar, or nil
+    /// y of the site's orange title bar, or nil. It can sit under the status bar (time, island and icons cover
+    /// half of it when the page is scrolled: Atom's screenshot 21:30), so 40 % of a row is enough.
     static func barBottom(_ s: BoardReader.Sampler) -> Int? {
         let W = s.w, H = s.h
-        func frac(_ y: Int, _ f: ((Double, Double, Double)) -> Bool) -> Double {
-            var n = 0
-            for k in 0..<40 { if f(s.get(W * (2 * k + 1) / 80, y)) { n += 1 } }
-            return Double(n) / 40
-        }
-        var y = H / 20, found = -1
+        var y = 0, found = -1
         while y < H * 2 / 5 {
-            if frac(y, orange) >= 0.8 { found = y } else if found >= 0 { return found }
+            var n = 0
+            for k in 0..<40 { if orange(s.get(W * (2 * k + 1) / 80, y)) { n += 1 } }
+            if n >= 16 { found = y } else if found >= 0 { return found }
             y += 2
         }
         return nil
@@ -33,24 +31,26 @@ enum HosBaseReader {
 
     static func looksLikeHosBase(_ s: BoardReader.Sampler) -> Bool { barBottom(s) != nil }
 
+    private static func rim(_ p: (Double, Double, Double)) -> Bool { p.0 - p.2 > 30 && p.0 > 110 }
+
     static func read(_ s: BoardReader.Sampler) -> BoardMessage? {
         guard let bar = barBottom(s) else { return nil }
         let W = s.w, H = s.h
-        // the board's sides: wood across a row a little below the middle of the screen; its top: going up the
-        // first column from there until the wood stops (the white page above the board)
+        // The board's left edge: its border, found across a row a little below the middle of the screen.
+        // Top and bottom: up and down that border until it stops (no piece ever stands on it). The right edge
+        // can hide under Safari's scroll bar, so the size comes from the height.
         let ry = H * 55 / 100
-        var x0 = 0, x1 = W - 1
-        while x0 < W / 4 && !wood(s.get(x0, ry)) { x0 += 1 }
-        while x1 > W * 3 / 4 && !wood(s.get(x1, ry)) { x1 -= 1 }
-        let size = Double(x1 - x0 + 1)
-        if size < Double(W) * 0.7 { return nil }
-        // (up the board's own border, just outside the squares: no piece ever stands there)
-        let cx = Int(Double(x0) + size * 5 / 1170)
-        func rim(_ p: (Double, Double, Double)) -> Bool { p.0 - p.2 > 30 && p.0 > 110 }
-        var top = ry, gap = 0
+        var x0 = 0
+        while x0 < W / 4 && !rim(s.get(x0, ry)) { x0 += 1 }
+        if x0 >= W / 4 { return nil }
+        let cx = x0 + max(1, W * 4 / 1180)
+        var top = ry, bot = ry, gap = 0
         while top > bar && gap < 25 { top -= 1; gap = rim(s.get(cx, top)) ? 0 : gap + 1 }
-        top += gap
-        if top <= bar || Double(top) + size > Double(H) { return nil }
+        top += gap; gap = 0
+        while bot < H - 1 && gap < 25 { bot += 1; gap = rim(s.get(cx, bot)) ? 0 : gap + 1 }
+        bot -= gap
+        let size = Double(bot - top + 1)
+        if top <= bar || size < Double(W) * 0.8 || size > Double(W) * 1.05 { return nil }
         let inset = size * 10 / 1170, C = (size - 2 * inset) / 8
         let gx = Double(x0) + inset, gy = Double(top) + inset * 0.6
 
@@ -88,8 +88,15 @@ enum HosBaseReader {
             }
             cells[r * 8 + c] = v
         } }
+        // every light square is light wood (pieces only stand on the dark ones): this really is the board
+        var light = 0
+        for r in 0..<8 { for c in 0..<8 where (r + c) & 1 == 0 {
+            let p = avg(gx + C * (Double(c) + 0.5), gy + C * (Double(r) + 0.5), 2)
+            if p.0 > 210 && p.0 - p.2 > 60 { light += 1 }
+        } }
+        if light < 28 { return nil }
         let valid = reds + silvers >= 2 && reds <= 12 && silvers <= 12 && odd <= 2
-        info = "reds \(reds) silvers \(silvers) odd \(odd) bar \(bar) top \(top) x \(x0)…\(x1) C \(Int(C))"
+        info = "reds \(reds) silvers \(silvers) odd \(odd) light \(light) bar \(bar) top \(top) x0 \(x0) size \(Int(size))"
 
         lock.lock(); defer { lock.unlock() }
         if !valid {
