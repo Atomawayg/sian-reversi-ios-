@@ -190,7 +190,8 @@ final class SuikaEngine {
                     // a small fruit buried under a much bigger one is hard to reach
                     let (lo, hi) = b[i].y > b[j].y ? (i, j) : (j, i)
                     let gap = b[hi].t - b[lo].t
-                    if gap >= 2 && b[hi].y < b[lo].y - b[lo].r * 0.3 { v -= 0.35 * Double(gap) }
+                    // (1.5, 3.40 — Atom: small fruits ended up buried along the floor under big ones, wasting room)
+                    if gap >= 2 && b[hi].y < b[lo].y - b[lo].r * 0.3 { v -= 1.5 * Double(gap) }
                 }
             }
         }

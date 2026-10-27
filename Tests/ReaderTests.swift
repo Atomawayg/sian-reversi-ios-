@@ -41,4 +41,18 @@ final class ReaderTests: XCTestCase {
             XCTAssertEqual(st.next, 1, "\(name) next")
         }
     }
+
+    /// every saved screenshot against Atom's counts by hand (Tools/suika/truth.json), the fruit Will holds left out
+    func testAllFramesMatchHandCounts() throws {
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../Tools/suika/truth.json")
+        let truth = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as! [String: [Int]]
+        var total = 0
+        for (name, want) in truth.sorted(by: { $0.key < $1.key }) {
+            let st = SK.decode(BoardReader.readSuika(try sampler(name)).cells)!
+            let got = (0..<SK.types).map { t in st.fruits.filter { $0.t == t }.count }
+            let err = zip(got, want).map { abs($0 - $1) }.reduce(0, +); total += err
+            print("READER \(name) err \(err) got \(got) want \(want)")
+        }
+        XCTAssertLessThanOrEqual(total, 1, "fruits misread across the saved screenshots")
+    }
 }

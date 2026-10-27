@@ -37,7 +37,7 @@ extension BoardReader {
         1 << 5,                  // persimmon
         1 << 1 | 1 << 2,         // apple
         1 << 4,                  // pear
-        1 << 6 | 1 << 2 | 1 << 1, // peach
+        1 << 6 | 1 << 2 | 1 << 1 | 1 << 7, // peach (with its leaves, or its middle is read too high: 3.40)
         1 << 4,                  // pineapple
         1 << 7,                  // melon
         1 << 7,                  // watermelon
@@ -144,7 +144,7 @@ extension BoardReader {
                 let th = 2 * Double.pi * Double(a) / 32
                 if on(Int((ci + 0.93 * rr * cos(th)).rounded()), Int((cj + 0.93 * rr * sin(th)).rounded()), m) { h += 1 }
             }
-            if Double(h) / 32 < 0.35 { return false }
+            if Double(h) / 32 < (t == 10 ? 0.6 : 0.35) { return false }   // (3.40: a melon with an apple beside it read as a watermelon)
             if t < 7 { return true }
             var n = 0, pale = 0, red = 0, band = 0, bandOwn = 0
             let R = Int(rr) + 1
@@ -238,6 +238,9 @@ extension BoardReader {
                         }
                     }
                     let straw = n > 0 && red / n < 0.22 && yel / n < 0.05 && pink / n > 0.55
+                    let cherry = n > 0 && yel / n >= 0.03 && red / n >= 0.2   // its yellow beak
+                    // (3.40: neither = a piece of something red, e.g. an apple half behind a melon read as 3 cherries)
+                    if !straw && !cherry { continue }
                     tt = straw ? 1 : 0
                     rr2 = SK.radius[tt] / S
                 }
@@ -251,7 +254,7 @@ extension BoardReader {
                 for y in max(0, Int(cj) - C)...min(gh - 1, Int(cj) + C) {
                     for x in max(0, Int(ci) - C)...min(gw - 1, Int(ci) + C) {
                         let dx = Double(x) - ci, dy = Double(y) - cj
-                        if dx * dx + dy * dy <= (rr2 + 1.5) * (rr2 + 1.5) { claimed[y * gw + x] = true }
+                        if dx * dx + dy * dy <= (rr2 * 0.95) * (rr2 * 0.95) { claimed[y * gw + x] = true }   // (3.40: a little inside the edge, so a small neighbour keeps its rim)
                     }
                 }
             }
