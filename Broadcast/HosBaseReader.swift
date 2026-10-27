@@ -10,6 +10,7 @@ enum HosBaseReader {
     private static var last: [Int] = [], same = 0
     private static var stable: [Int] = [], sent: BoardMessage? = nil
     private static var me = 2, meSure = false, myTurn = true
+    static var info = ""   // last frame's numbers (tests)
 
     private static func orange(_ p: (Double, Double, Double)) -> Bool { p.0 > 170 && p.1 > 90 && p.1 < 160 && p.2 < 95 }
     private static func wood(_ p: (Double, Double, Double)) -> Bool { p.0 - p.2 > 40 && p.0 > 110 }
@@ -86,6 +87,7 @@ enum HosBaseReader {
             cells[r * 8 + c] = v
         } }
         let valid = reds + silvers >= 2 && reds <= 12 && silvers <= 12 && odd <= 2
+        info = "reds \(reds) silvers \(silvers) odd \(odd) bar \(bar) top \(top) x \(x0)…\(x1) C \(Int(C))"
 
         lock.lock(); defer { lock.unlock() }
         if !valid {

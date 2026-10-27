@@ -53,7 +53,7 @@ final class ReaderTests: XCTestCase {
             for _ in 0..<3 { m = BoardReader.read(s) }   // a board counts once it is read three frames running
             let got = m!.cells.map { String(Array(".rwRW")[$0]) }.joined()
             let g = stride(from: 0, to: 64, by: 8).map { i in String(Array(got)[i..<i + 8]) }.joined(separator: " ")
-            print("READER \(name): \(g) me \(m!.me)")
+            print("READER \(name): \(g) me \(m!.me) · \(HosBaseReader.info)")
             XCTAssertTrue(m!.valid, name)
             XCTAssertEqual(g, board, name)
             XCTAssertEqual(m!.me, 2, "\(name): silver at the bottom")
