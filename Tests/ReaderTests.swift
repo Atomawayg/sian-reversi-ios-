@@ -42,6 +42,26 @@ final class ReaderTests: XCTestCase {
         }
     }
 
+    /// HosBase in Safari (Atom's recording 27 Oct 20:07): the start of a game, and a red king (a turned-over piece) late on
+    func testHosBase() throws {
+        let want = ["hosbase-start.png": ".r.r.r.r r.r.r... .....r.. ........ ........ ........ .w.w.w.w w.w.w.w.",
+                    "hosbase-king.png": ".r.r.... ......r. .....r.r ........ .r...w.. ......w. .....w.. w...R..."]
+        for (name, board) in want.sorted(by: { $0.key < $1.key }) {
+            let s = try sampler(name)
+            XCTAssertTrue(HosBaseReader.looksLikeHosBase(s), name)
+            var m: BoardMessage? = nil
+            for _ in 0..<3 { m = BoardReader.read(s) }   // a board counts once it is read three frames running
+            let got = m!.cells.map { String(Array(".rwRW")[$0]) }.joined()
+            let g = stride(from: 0, to: 64, by: 8).map { i in String(Array(got)[i..<i + 8]) }.joined(separator: " ")
+            print("READER \(name): \(g) me \(m!.me)")
+            XCTAssertTrue(m!.valid, name)
+            XCTAssertEqual(g, board, name)
+            XCTAssertEqual(m!.me, 2, "\(name): silver at the bottom")
+        }
+        // not HosBase: the fruit game
+        XCTAssertFalse(HosBaseReader.looksLikeHosBase(try sampler("suika-1952.png")))
+    }
+
     /// every saved screenshot against Atom's counts by hand (Tools/suika/truth.json), the fruit Will holds left out
     func testAllFramesMatchHandCounts() throws {
         let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../Tools/suika/truth.json")

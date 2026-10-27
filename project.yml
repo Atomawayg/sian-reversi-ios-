@@ -80,6 +80,7 @@ targets:
       - Broadcast/PoolReader.swift
       - Broadcast/JackarooReader.swift
       - Broadcast/PlatoBoardReader.swift
+      - Broadcast/HosBaseReader.swift
       - Broadcast/PlatoChessData.swift
       - Shared
     settings:

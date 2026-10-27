@@ -65,6 +65,11 @@ enum BoardReader {
             }
         }
         guard let s = sampler else { return nil }
+        return read(s)
+    }
+
+    /// Which game is on screen, and its reading.
+    static func read(_ s: Sampler) -> BoardMessage {
         let W = Double(s.w), H = Double(s.h)
         // Portrait only. A landscape frame is not the game screen we expect.
         if W > H { return BoardMessage(valid: false, cells: [], me: 0, myTurn: false) }
@@ -72,6 +77,8 @@ enum BoardReader {
         if looksLikeSuika(s) { return readSuika(s) }
         // WePlay Pool: felt in the middle, dark pockets, wooden rail
         if PoolReader.looksLikePool(s) { return PoolReader.read(s) }
+        // HosBase in Safari: the site's orange title bar over a wooden board (before Plato, whose wood test it could pass)
+        if HosBaseReader.looksLikeHosBase(s), let m = HosBaseReader.read(s) { return m }
         // Plato chess / checkers: wooden frame on both sides of the board.
         if PlatoBoardReader.looksLikeBoard(s), let m = PlatoBoardReader.read(s) { return m }
         // Jackaroo has a green table under the board; the others differ in the top-left corner.
