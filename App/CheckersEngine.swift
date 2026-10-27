@@ -10,7 +10,7 @@ struct CheckersResult {
     var depth = 0
     var tb: Int? = nil
     var instant: String? = nil
-    var trap = 0   // replies that look fine to the opponent but lose
+    var trap = 0   // kept for the app's display; the 23 Oct search never sets traps
 }
 
 final class CheckersEngine {
@@ -314,19 +314,21 @@ final class CheckersEngine {
     }
     private func pieces() -> Int { pc(P[0] | P[1] | P[2] | P[3]) }
 
-    /// WePlay's count: when one side has exactly 1 king + 1 man and the other a lone king, each side gets 8
-    /// more moves, then the game is a draw. Returns the side with the king + man, or 0.
+    // 3.43: the search is the 23 Oct one exactly (arena: every later change measured weaker against it).
+    // These remain so the app compiles; they no longer change how it plays.
     static let countMoves = 8
-    private func countSide() -> Int {
-        if pc(P[0]) == 1 && pc(P[1]) == 1 && P[2] == 0 && pc(P[3]) == 1 { return 1 }
-        if pc(P[2]) == 1 && pc(P[3]) == 1 && P[0] == 0 && pc(P[1]) == 1 { return -1 }
-        return 0
-    }
-    /// Our moves still allowed under the count at the root (set by the app; 0 = the count is not running,
-    /// −1 = ignore the count, for tests).
     var countLeft = 0
-    /// Score the count inside the search too (3.43: measured weaker — off; the root still obeys a running count).
-    var countInSearch = false
+    var trapMode = false
+    var humanTieBreak = false
+    var countInSearch = true     // 3.44: on again, alone (Atom: K+M vs K ran out the count — the AI didn't know)
+    var contempt = 0
+    func moves(_ b64: [Int], side: Int) -> [CheckersMove] {
+        var b32 = [Int](repeating: 0, count: 32)
+        for s in 0..<32 { b32[s] = b64[S64[s]] }
+        setFrom32(b32, side); curSide = side
+        let n = gen(side, 0)
+        return (0..<n).map { CheckersMove(from: MF[$0], to: MT[$0], caps: MC[$0], promo: MP[$0]) }
+    }
 
     private func negamax(_ side: Int, _ depth: Int, _ alphaIn: Int, _ betaIn: Int, _ ply: Int) -> Int {
         nodes += 1
@@ -336,13 +338,17 @@ final class CheckersEngine {
         if !TB.isEmpty && ply > 0 && pieces() <= 4 {
             let v = tbProbe(side)
             if v >= 0 {
-                if v == 0 { return 0 }
-                // entering the counted ending: a win that needs more than 8 of the winner's moves is a draw
-                let cs = countInSearch ? countSide() : 0
-                if cs != 0 {
-                    let winner = v < 128 ? side : -side
-                    let movesNeeded = v < 128 ? (v + 1) / 2 : (v - 128) / 2
-                    if winner == cs && movesNeeded > CheckersEngine.countMoves { return 0 }
+                // a draw is worth a little less than nothing to the side we play for (contempt): prefer playing on
+                let draw = side == curSide ? -contempt : contempt
+                if v == 0 { return draw }
+                // WePlay's count: king + man vs king gets 8 more moves each — a longer win there is a draw
+                if countInSearch {
+                    let cs = countSide()
+                    if cs != 0 {
+                        let winner = v < 128 ? side : -side
+                        let movesNeeded = v < 128 ? (v + 1) / 2 : (v - 128) / 2
+                        if winner == cs && movesNeeded > CheckersEngine.countMoves { return draw }
+                    }
                 }
                 if v < 128 { return MATE - ply - v }; return -(MATE - ply - (v - 128))
             }
@@ -443,9 +449,8 @@ final class CheckersEngine {
         if !TB.isEmpty && kingRule == 0 && pieces() <= 4 {
             let tv = tbProbe(side)
             if tv >= 0 {
-                var trapOf = [Int](repeating: 0, count: root.count), avgOf = [Int](repeating: 0, count: root.count)
-                // our moves left under the count (fresh 8 when the counted ending starts now)
-                let limit = countLeft < 0 ? 0 : (countSide() == side ? (countLeft > 0 ? countLeft : CheckersEngine.countMoves) : 0)
+                // our moves left under the count (a fresh 8 when the counted ending starts now)
+                let limit = !countInSearch || countLeft < 0 ? 0 : (countSide() == side ? (countLeft > 0 ? countLeft : CheckersEngine.countMoves) : 0)
                 for k in 0..<root.count {
                     let i = findIndex(root[k].m)
                     if i < 0 { continue }
@@ -455,49 +460,22 @@ final class CheckersEngine {
                     if opp == 0 { sc = MATE - 1 } else {
                         let v = tbProbe(-side)
                         sc = v < 0 ? 0 : (v == 0 ? 0 : (v < 128 ? -(MATE - 1 - v) : (MATE - 1 - (v - 128))))
-                        // the count is running: a win that takes more of our moves than are left is a draw
-                        if limit > 0 && v >= 128 && 1 + (v - 128) / 2 > limit { sc = 0 }
-                        // Look at every reply. Won ending: our average remaining distance (a human rarely finds the
-                        // longest defence, and WePlay ends the game as a draw after a few moves). Drawn ending: how
-                        // many replies lose, so the AI keeps setting the trap that is easiest to fall into.
-                        if sc >= 0 {
-                            let n2 = gen(-side, 1)
-                            var tot = 0, bad = 0
-                            for j in 0..<n2 {
-                                make(CheckersEngine.MAXM + j, 1)
-                                let theirs = side == 1 ? (P[2] | P[3]) : (P[0] | P[1]), mine = side == 1 ? (P[0] | P[1]) : (P[2] | P[3])
-                                if theirs == 0 { bad += 1 }
-                                else if mine == 0 { tot += 200 }
-                                else {
-                                    let w = tbProbe(side)
-                                    if w > 0 && w < 128 && (limit == 0 || (w + 1) / 2 <= limit - 1) { tot += w; bad += 1 } else { tot += 200 }
-                                }
-                                unmake(1)
-                            }
-                            if n2 > 0 { avgOf[k] = tot * 10 / n2; trapOf[k] = bad * 1000 / n2 + bad }
+                        if limit > 0 && v >= 128 && 1 + (v - 128) / 2 > limit { sc = 0 }   // can't finish before the count runs out
+                        if countInSearch && countLeft >= 0 {
+                            let cs = countSide(), lim = countLeft > 0 ? countLeft : CheckersEngine.countMoves
+                            if limit == 0 && cs == side && v >= 128 && (v - 128) / 2 > lim { sc = 0 }      // we just entered it
+                            if cs == -side && v > 0 && v < 128 && (v + 1) / 2 > lim { sc = 0 }             // they can't finish us in time
                         }
                     }
                     unmake(0)
                     root[k].score = sc
                 }
-                var bestK = 0
-                for k in root.indices where root[k].score > root[bestK].score { bestK = k }
-                let top = root[bestK].score
-                if top > 0 && humanTieBreak {
-                    // among wins at most 4 plies longer than the fastest, take the one that is fastest on average
-                    func cost(_ k: Int) -> Int { avgOf[k] + (top - root[k].score) * 5 }
-                    for k in root.indices where root[k].score > 0 && top - root[k].score <= 4 && cost(k) < cost(bestK) { bestK = k }
-                } else if top == 0 {
-                    for k in root.indices where root[k].score == 0 && trapOf[k] > trapOf[bestK] { bestK = k }
-                    if trapOf[bestK] > 0 { res.trap = trapOf[bestK] % 1000 }
-                }
-                res.best = root[bestK].m; res.score = top; res.tb = top == 0 ? 0 : tv; res.depth = 99; res.instant = "tb"
+                root.sort { $0.score > $1.score }
+                res.best = root[0].m; res.score = root[0].score; res.tb = root[0].score == 0 ? 0 : tv; res.depth = 99; res.instant = "tb"
                 return res
             }
         }
-        // original iterative deepening (measured: my "smarter" time rules lost ~50 Elo); when trap-picking
-        // is on, the main search keeps 15% of the time back for it
-        deadline = t0 + UInt64(Double(maxMs) * (trapMode ? 0.85 : 1.0)) * 1_000_000
+        deadline = t0 + UInt64(maxMs) * 1_000_000
         var list = root
         var stable = 0
         var prevBest = ""
@@ -538,66 +516,7 @@ final class CheckersEngine {
             if el > Double(maxMs) * 0.5 { break }
         }
         if res.best == nil { res.best = list[0].m }
-        if trapMode && abs(res.score) < MATE - 1000 && list.count > 1 && res.depth >= 4 {
-            deadline = t0 + UInt64(Double(maxMs) * 0.97) * 1_000_000
-            stop = false
-            if let t = pickTrap(list, side: side, depth: res.depth) { res.best = t.m; res.trap = t.traps }
-        }
         return res
-    }
-
-    /// Plays like a strong human: among moves within a hair of the best, prefer the one that leaves the
-    /// opponent the most replies that LOOK fine at a glance (2-ply) but actually lose material (deep).
-    var trapMode = false   // (3.43: arena — trap picking cost ~30 Elo against the 23 Oct engine; off)
-    /// Won table endings: prefer the win that is fastest on average over all replies (off = always the fastest
-    /// against perfect defence).
-    var humanTieBreak = false
-    /// Legal moves (for tests).
-    func moves(_ b64: [Int], side: Int) -> [CheckersMove] {
-        var b32 = [Int](repeating: 0, count: 32)
-        for s in 0..<32 { b32[s] = b64[S64[s]] }
-        setFrom32(b32, side); curSide = side
-        let n = gen(side, 0)
-        return (0..<n).map { CheckersMove(from: MF[$0], to: MT[$0], caps: MC[$0], promo: MP[$0]) }
-    }
-    private func pickTrap(_ list: [(m: CheckersMove, score: Int)], side: Int, depth: Int) -> (m: CheckersMove, traps: Int)? {
-        // Only the first move's score is exact (the others are bounds from a null-window search), so every
-        // candidate is re-scored below at the same depth before it may be chosen.
-        let cands = Array(list.prefix(4))
-        if cands.count < 2 { return nil }
-        let deep = max(3, min(depth - 2, 9))
-        var counts: [(m: CheckersMove, traps: Int, value: Int)] = []
-        for c in cands {
-            let i = findIndex(c.m); if i < 0 { continue }
-            make(i, 0)
-            let n = gen(-side, 1), base = CheckersEngine.MAXM
-            var replies: [(Int, UInt32, Int)] = []   // from, caps, to of each reply
-            for j in 0..<n { replies.append((MF[base + j], MC[base + j], MT[base + j])) }
-            var glance: [Int] = [], real: [Int] = []
-            for (f, cp, t) in replies {
-                var k = -1
-                let n2 = gen(-side, 1)
-                for j in 0..<n2 where MF[base + j] == f && MT[base + j] == t && MC[base + j] == cp { k = base + j; break }
-                if k < 0 { continue }
-                make(k, 1)
-                let g = negamax(side, 1, -INF, INF, 2)        // what the opponent sees at a glance (their loss = my gain)
-                let r = negamax(side, deep, -INF, INF, 2)     // what really happens
-                unmake(1)
-                if stop { unmake(0); return nil }
-                glance.append(-g); real.append(-r)
-            }
-            unmake(0)
-            guard let gBest = glance.max(), let rBest = real.max() else { continue }
-            var traps = 0
-            for q in 0..<glance.count where glance[q] >= gBest - 30 && real[q] <= rBest - 120 { traps += 1 }
-            counts.append((c.m, traps, -rBest))   // my value = what's left after their best reply
-        }
-        guard let first = counts.first, first.m.from == list[0].m.from && first.m.to == list[0].m.to && first.m.caps == list[0].m.caps else { return nil }
-        let top = counts.map { $0.value }.max()!
-        // never give up value: candidates must be as good as the best at this depth (and as good as the main pick)
-        let ok = counts.filter { $0.value >= top - 8 && $0.value >= first.value - 8 }
-        guard let pick = ok.max(by: { $0.traps < $1.traps }), pick.traps > first.traps else { return nil }
-        return (pick.m, pick.traps)
     }
 
     // MARK: full path of a move (for drawing), squares in 0..63

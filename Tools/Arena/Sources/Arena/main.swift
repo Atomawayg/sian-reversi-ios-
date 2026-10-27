@@ -82,11 +82,39 @@ func ckOpening(_ rng: inout Rng, plies: Int) -> [Int] {
     return b
 }
 
+/// A random ending where white is a piece up (n+1 vs n, some kings), white to move, not decided at once.
+func ckEnding(_ rng: inout Rng) -> [Int] {
+    while true {
+        var b = [Int](repeating: 0, count: 64)
+        let n = 2 + rng.int(3)
+        var dark: [Int] = []
+        for r in 0..<8 { for c in 0..<8 where (r + c) & 1 == 1 { dark.append(r * 8 + c) } }
+        func place(_ side: Int) {
+            while true {
+                let sq = dark[rng.int(dark.count)]
+                if b[sq] != 0 { continue }
+                let king = rng.int(10) < 3
+                if !king && (sq / 8 == (side == 1 ? 0 : 7)) { continue }
+                b[sq] = king ? 2 * side : side; return
+            }
+        }
+        for _ in 0..<(n + 1) { place(1) }
+        for _ in 0..<n { place(-1) }
+        if b.contains(2) || b.contains(-2) || true {
+            let s1 = CheckersRules.successors(b, side: 1)
+            if s1.isEmpty { continue }
+            // skip positions where white captures at once (too easy) or black can capture next (often just even)
+            if s1.contains(where: { $0.filter { $0 < 0 }.count < n }) { continue }
+            return b
+        }
+    }
+}
+
 func makeCkA(trap: Bool = true, contempt: Int? = nil, tie: Bool = true, count: Bool = true) -> CkPlayer {
     let e = CheckersEngine()
     e.trapMode = trap; e.humanTieBreak = tie
-    if !count { e.countLeft = -1 }
-    _ = contempt
+    if !count { e.countInSearch = false }
+    if let c = contempt { e.contempt = c }
     if let d = try? Data(contentsOf: URL(fileURLWithPath: "hos-tb.bin")) { e.loadTB(d) }
     return { b, side in
         let r = e.search(b, side: side, maxMs: ms)
@@ -146,7 +174,7 @@ case _ where game.hasPrefix("checkers"):
     for part in game.split(separator: "-") where part.hasPrefix("c") && Int(part.dropFirst()) != nil { ct = Int(part.dropFirst()) }
     result = runPairs(pairs) { i in
         var rng = Rng(s: 0x9E3779B97F4A7C15 &+ UInt64(i) &* 0x632BE59BD9B4E019)
-        let open = ckOpening(&rng, plies: 2 + rng.int(4))
+        let open = game.contains("-end") ? ckEnding(&rng) : ckOpening(&rng, plies: 2 + rng.int(4))
         let selfOld = game.contains("selfold"), selfNew = game.contains("selfnew")
         let a = selfOld ? makeCkB() : makeCkA(trap: trap, contempt: ct, tie: tie, count: count)
         let b = selfNew ? makeCkA(trap: trap, contempt: ct, tie: tie, count: count) : makeCkB()
