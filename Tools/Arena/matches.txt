@@ -1,2 +1,2 @@
-checkers 800 100
-checkers-notrap 800 100
+checkers-strict 400 100
+checkers-strict-c0 400 100

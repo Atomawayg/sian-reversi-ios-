@@ -325,6 +325,10 @@ final class CheckersEngine {
     /// Our moves still allowed under the count at the root (set by the app; 0 = the count is not running,
     /// −1 = ignore the count, for tests).
     var countLeft = 0
+    /// How much a draw is worth less than nothing to the side we play (3.43 — Atom: "no draws, only wins; it always draws
+    /// once it's down to three pieces"). A drawn ending (tablebase or the count) scores −contempt for us and +contempt
+    /// for the opponent, so the search keeps winning chances alive when it can do so without risking a loss.
+    var contempt = 60
 
     private func negamax(_ side: Int, _ depth: Int, _ alphaIn: Int, _ betaIn: Int, _ ply: Int) -> Int {
         nodes += 1
@@ -334,13 +338,14 @@ final class CheckersEngine {
         if !TB.isEmpty && ply > 0 && pieces() <= 4 {
             let v = tbProbe(side)
             if v >= 0 {
-                if v == 0 { return 0 }
+                let drawn = side == curSide ? -contempt : contempt
+                if v == 0 { return drawn }
                 // entering the counted ending: a win that needs more than 8 of the winner's moves is a draw
                 let cs = countSide()
                 if cs != 0 {
                     let winner = v < 128 ? side : -side
                     let movesNeeded = v < 128 ? (v + 1) / 2 : (v - 128) / 2
-                    if winner == cs && movesNeeded > CheckersEngine.countMoves { return 0 }
+                    if winner == cs && movesNeeded > CheckersEngine.countMoves { return drawn }
                 }
                 if v < 128 { return MATE - ply - v }; return -(MATE - ply - (v - 128))
             }

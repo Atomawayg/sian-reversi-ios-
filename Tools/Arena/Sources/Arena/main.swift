@@ -42,6 +42,7 @@ func ckStart() -> [Int] {
     return b
 }
 
+var strict = false
 func ckGame(_ white: CkPlayer, _ black: CkPlayer, opening: [Int]) -> Int {   // +1 white(bottom) wins, -1 black, 0 draw
     var b = opening, side = 1, plies = 0, quiet = 0
     while plies < 200 {
@@ -55,6 +56,8 @@ func ckGame(_ white: CkPlayer, _ black: CkPlayer, opening: [Int]) -> Int {   // 
         if theirs == 0 { return 1 }
         if quiet >= 60 { break }
     }
+    // strict (3.43): a game nobody finished is a draw — what Atom sees in WePlay
+    if strict { return 0 }
     // adjudicate by material (man 1, king 3) — a clear edge counts as a win
     var m = 0
     for v in b { m += v > 0 ? (v == 2 ? 3 : 1) : (v < 0 ? (v == -2 ? -3 : -1) : 0) }
@@ -73,9 +76,10 @@ func ckOpening(_ rng: inout Rng, plies: Int) -> [Int] {
     return b
 }
 
-func makeCkA(trap: Bool = true) -> CkPlayer {
+func makeCkA(trap: Bool = true, contempt: Int? = nil) -> CkPlayer {
     let e = CheckersEngine()
     e.trapMode = trap
+    if let c = contempt { e.contempt = c }
     if let d = try? Data(contentsOf: URL(fileURLWithPath: "hos-tb.bin")) { e.loadTB(d) }
     return { b, side in
         let r = e.search(b, side: side, maxMs: ms)
@@ -127,12 +131,14 @@ let pairs = max(1, games / 2)
 var result: (a: Int, b: Int, d: Int) = (0, 0, 0)
 let t0 = Date()
 switch game {
-case "checkers", "checkers-notrap":
-    let trap = game == "checkers"
+case "checkers", "checkers-notrap", "checkers-strict", "checkers-strict-c0":
+    let trap = game != "checkers-notrap"
+    strict = game.hasPrefix("checkers-strict")
+    let ct: Int? = game == "checkers-strict-c0" ? 0 : nil
     result = runPairs(pairs) { i in
         var rng = Rng(s: 0x9E3779B97F4A7C15 &+ UInt64(i) &* 0x632BE59BD9B4E019)
         let open = ckOpening(&rng, plies: 2 + rng.int(4))
-        let a = makeCkA(trap: trap), b = makeCkB()
+        let a = makeCkA(trap: trap, contempt: ct), b = makeCkB()
         let g1 = ckGame(a, b, opening: open), g2 = ckGame(b, a, opening: open)
         return (g1 == 1 ? .a : (g1 == -1 ? .b : .draw), g2 == -1 ? .a : (g2 == 1 ? .b : .draw))
     }
