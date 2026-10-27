@@ -22,7 +22,9 @@ extension BoardReader {
         if (s >= 0.25 || (s >= 0.12 && v > 0.8)) && h >= 235 && h <= 305 { return 3 }
         if s >= 0.45 && h >= 35 && h <= 60 { return 4 }
         if s >= 0.58 && h >= 17 && h < 35 { return 5 }
-        if s >= 0.3 && h >= 62 && h <= 170 { return 7 }
+        // greens split (3.42): the melon is green (hue ~130), the watermelon frog and the leaves yellow-green (~82)
+        if s >= 0.3 && h >= 100 && h <= 170 { return 7 }
+        if s >= 0.3 && h >= 62 && h < 100 { return 8 }
         if v > 0.78 && s <= 0.55 && (h >= 330 || h < 12) { return 6 }
         if v > 0.9 && s < 0.12 { return 6 }
         return 0
@@ -37,10 +39,10 @@ extension BoardReader {
         1 << 5,                  // persimmon
         1 << 1 | 1 << 2,         // apple
         1 << 4,                  // pear
-        1 << 6 | 1 << 2 | 1 << 1 | 1 << 7, // peach (with its leaves, or its middle is read too high: 3.40)
+        1 << 6 | 1 << 2 | 1 << 1 | 1 << 7 | 1 << 8, // peach (with its leaves, or its middle is read too high: 3.40)
         1 << 4,                  // pineapple
         1 << 7,                  // melon
-        1 << 7,                  // watermelon
+        1 << 8 | 1 << 1 | 1 << 2 | 1 << 6, // watermelon: yellow-green with its red mouth (3.42: the mouth alone read as an apple)
     ]
 
     /// The fruit game screen: blue sky on both sides of a white-walled jar and the wooden sign at the top.
@@ -120,12 +122,17 @@ extension BoardReader {
         /// share of the disc's sample points in the fruit's colour, and share of the outer ring alone
         /// (a big disc over a smaller fruit of the same colour fills its middle but not its rim)
         func score(_ ci: Double, _ cj: Double, _ rr: Double, _ m: UInt16) -> (all: Double, rim: Double) {
-            var hit = 0, rim = 0
-            for (k, (ux, uy)) in unit.enumerated() where on(Int((ci + ux * rr).rounded()), Int((cj + uy * rr).rounded()), m) {
-                hit += 1
-                if k >= 21 { rim += 1 }
+            // leaves and stems are drawn over the fruits beside them: for a fruit that isn't green, a green point says
+            // nothing (3.42 — Atom: small fruits hidden under a big one's leaf weren't seen)
+            var hit = 0, rim = 0, tot = 0, trim = 0
+            let leafBlind = m & (1 << 7 | 1 << 8) == 0
+            for (k, (ux, uy)) in unit.enumerated() {
+                let x = Int((ci + ux * rr).rounded()), y = Int((cj + uy * rr).rounded())
+                if leafBlind && x >= 0 && x < gw && y >= 0 && y < gh && (grid[y * gw + x] == 7 || grid[y * gw + x] == 8) { continue }
+                tot += 1; if k >= 21 { trim += 1 }
+                if on(x, y, m) { hit += 1; if k >= 21 { rim += 1 } }
             }
-            return (Double(hit) / Double(unit.count), Double(rim) / Double(unit.count - 21))
+            return (Double(hit) / Double(max(1, tot)), Double(rim) / Double(max(1, trim)))
         }
         /// hits on a ring just inside the edge: highest when the centre is right
         func edge(_ ci: Double, _ cj: Double, _ rr: Double, _ m: UInt16) -> Int {
@@ -139,20 +146,22 @@ extension BoardReader {
         /// Tests measured on recordings: the disc's edge lies on the fruit, and the big look-alikes are told apart
         /// (a pear beside a dekopon is not a pineapple, an apple is not a peach, melon vs watermelon).
         func lookAlikeOK(_ t: Int, _ ci: Double, _ cj: Double, _ rr: Double, _ m: UInt16) -> Bool {
-            var h = 0
+            var h = 0, tot = 0
             for a in 0..<32 {
                 let th = 2 * Double.pi * Double(a) / 32
-                if on(Int((ci + 0.93 * rr * cos(th)).rounded()), Int((cj + 0.93 * rr * sin(th)).rounded()), m) { h += 1 }
+                let x = Int((ci + 0.93 * rr * cos(th)).rounded()), y = Int((cj + 0.93 * rr * sin(th)).rounded())
+                if x < 0 || x >= gw || y < 0 || y >= gh { continue }   // past the wall: says nothing (3.42)
+                tot += 1; if on(x, y, m) { h += 1 }
             }
-            if Double(h) / 32 < (t == 10 ? 0.6 : 0.35) { return false }   // (3.40: a melon with an apple beside it read as a watermelon)
+            if tot == 0 || Double(h) / Double(tot) < (t == 10 ? 0.6 : 0.35) { return false }   // (3.40: a melon with an apple beside it read as a watermelon)
             if t < 7 { return true }
-            var n = 0, pale = 0, red = 0, band = 0, bandOwn = 0
+            var n = 0, pale = 0, red = 0, band = 0, bandOwn = 0, yg = 0
             let R = Int(rr) + 1
             for y in max(0, Int(cj) - R)...min(gh - 1, Int(cj) + R) {
                 for x in max(0, Int(ci) - R)...min(gw - 1, Int(ci) + R) {
                     let d = ((Double(x) - ci) * (Double(x) - ci) + (Double(y) - cj) * (Double(y) - cj)).squareRoot()
                     let g = grid[y * gw + x]
-                    if d <= 0.85 * rr { n += 1; if g == 6 { pale += 1 }; if g == 1 || g == 2 { red += 1 } }
+                    if d <= 0.85 * rr { n += 1; if g == 6 { pale += 1 }; if g == 1 || g == 2 { red += 1 }; if g == 8 { yg += 1 } }
                     if d > 0.6 * rr && d < 0.95 * rr { band += 1; if on(x, y, m) { bandOwn += 1 } }
                 }
             }
@@ -161,7 +170,7 @@ extension BoardReader {
             case 7: return Double(pale) / f >= 0.2                       // a peach is mostly pale pink
             case 8: return Double(bandOwn) / Double(max(1, band)) >= 0.8 // a pineapple is a solid yellow ring
             case 9: return Double(red) / f < 0.06                        // a melon has no red
-            case 10: return Double(red) / f >= 0.06                      // a watermelon shows its red mouth
+            case 10: return Double(red) / f >= 0.06 && Double(yg) / f >= 0.3   // its red mouth, and mostly yellow-green
             default: return true
             }
         }
@@ -274,7 +283,7 @@ extension BoardReader {
     /// Next fruit: the icon in the middle of the wheel at the top right. Only the five small kinds come next.
     private static func readNext(_ s: Sampler) -> Int {
         let sx = Double(s.w) / 1179, sy = Double(s.h) / 2556
-        var votes = [Int](repeating: 0, count: 8)
+        var votes = [Int](repeating: 0, count: 9)
         var total = 0, redV = 0.0, redN = 0.0
         var y = 485.0
         while y <= 545 {

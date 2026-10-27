@@ -8,9 +8,10 @@ from PIL import Image, ImageDraw
 LEFT, RIGHT, FLOOR, DEAD, TOP = 108.0, 1070.0, 2323.0, 1002.0, 800.0
 RADIUS = [35, 48, 63, 75, 92, 121, 138, 168, 200, 235, 280]
 NAMES = ['cherry', 'straw', 'grape', 'dekopon', 'persim', 'apple', 'pear', 'peach', 'pine', 'melon', 'wmelon']
-MASK = [1 << 1 | 1 << 2, 1 << 2 | 1 << 1, 1 << 3, 1 << 4, 1 << 5, 1 << 1 | 1 << 2, 1 << 4, 1 << 6 | 1 << 2 | 1 << 1 | 1 << 7, 1 << 4, 1 << 7, 1 << 7]
+MASK = [1 << 1 | 1 << 2, 1 << 2 | 1 << 1, 1 << 3, 1 << 4, 1 << 5, 1 << 1 | 1 << 2, 1 << 4, 1 << 6 | 1 << 2 | 1 << 1 | 1 << 7 | 1 << 8, 1 << 4, 1 << 7, 1 << 8 | 1 << 1 | 1 << 2 | 1 << 6]
 CORNER = 52.0
 CLAIM = 0.95
+LEAVES = True
 
 
 def groups(img):
@@ -32,7 +33,8 @@ def groups(img):
     put(((s >= 0.25) | ((s >= 0.12) & (v > 0.8))) & (h >= 235) & (h <= 305), 3)
     put((s >= 0.45) & (h >= 35) & (h <= 60), 4)
     put((s >= 0.58) & (h >= 17) & (h < 35), 5)
-    put((s >= 0.3) & (h >= 62) & (h <= 170), 7)
+    put((s >= 0.3) & (h >= 100) & (h <= 170), 7)   # melon green
+    put((s >= 0.3) & (h >= 62) & (h < 100), 8)     # yellow-green: the watermelon frog, leaves
     put((v > 0.78) & (s <= 0.55) & ((h >= 330) | (h < 12)), 6)
     put((v > 0.9) & (s < 0.12), 6)
     return out
@@ -67,32 +69,41 @@ def read(img, classify=None):
         g = grid[y, x]
         return (not claimed[y, x]) and g != 0 and (m >> int(g)) & 1
     def score(ci, cj, rr, m):
-        hit = rim = 0
+        # leaves and stems are drawn over the fruits next to them: for a fruit that isn't green, a green point says nothing
+        hit = rim = tot = trim = 0
+        green_ok = not (m >> 7) & 1 and not (m >> 8) & 1
         for k, (ux, uy) in enumerate(unit):
-            if on(int(round(ci + ux * rr)), int(round(cj + uy * rr)), m):
+            x, y = int(round(ci + ux * rr)), int(round(cj + uy * rr))
+            if green_ok and LEAVES and 0 <= x < gw and 0 <= y < gh and grid[y, x] in (7, 8): continue
+            tot += 1; trim += k >= 21
+            if on(x, y, m):
                 hit += 1
                 if k >= 21: rim += 1
-        return hit / len(unit), rim / (len(unit) - 21)
+        return hit / max(1, tot), rim / max(1, trim)
     def edge(ci, cj, rr, m):
         return sum(1 for a in range(36) if on(int(round(ci + 0.88 * rr * math.cos(2 * math.pi * a / 36))), int(round(cj + 0.88 * rr * math.sin(2 * math.pi * a / 36))), m))
     def lookalike(t, ci, cj, rr, m):
-        h = sum(1 for a in range(32) if on(int(round(ci + 0.93 * rr * math.cos(2 * math.pi * a / 32))), int(round(cj + 0.93 * rr * math.sin(2 * math.pi * a / 32))), m))
-        if h / 32 < (0.6 if t == 10 else 0.35): return False
+        h = tot = 0
+        for a in range(32):
+            x = int(round(ci + 0.93 * rr * math.cos(2 * math.pi * a / 32))); y = int(round(cj + 0.93 * rr * math.sin(2 * math.pi * a / 32)))
+            if x < 0 or x >= gw or y < 0 or y >= gh: continue   # past the wall: says nothing
+            tot += 1; h += on(x, y, m)
+        if tot == 0 or h / tot < (0.6 if t == 10 else 0.35): return False
         if t < 7: return True
-        n = pale = red = band = bown = 0
+        n = pale = red = band = bown = yg = 0
         R = int(rr) + 1
         for y in range(max(0, int(cj) - R), min(gh - 1, int(cj) + R) + 1):
             for x in range(max(0, int(ci) - R), min(gw - 1, int(ci) + R) + 1):
                 d = math.hypot(x - ci, y - cj); g = grid[y, x]
                 if d <= 0.85 * rr:
-                    n += 1; pale += g == 6; red += g in (1, 2)
+                    n += 1; pale += g == 6; red += g in (1, 2); yg += g == 8
                 if 0.6 * rr < d < 0.95 * rr:
                     band += 1; bown += on(x, y, m)
         f = max(1, n)
         if t == 7: return pale / f >= 0.2
         if t == 8: return bown / max(1, band) >= 0.8
         if t == 9: return red / f < 0.06
-        if t == 10: return red / f >= 0.06
+        if t == 10: return red / f >= 0.06 and yg / f >= 0.3   # the frog is mostly yellow-green
         return True
     def near_corner(ci, cj):
         px, py = LEFT + ci * S, TOP + cj * S
