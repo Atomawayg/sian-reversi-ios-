@@ -43,8 +43,9 @@ final class SuikaEngine {
 
     /// strategy weights (tuned offline by Tools/SuikaSim, which plays whole games in this physics)
     struct Knobs {
-        var pair = 0.6, bury = 1.5, small = 0.6, count = 0.4, wall = 0.25, combo = 0.6
-        var fill = 240.0, fill0 = 0.5, ahead = 0.9, chain = 0.0, roll = 1.5
+        // 3.43 SuikaSim (24 games each): count 0.4→1.5, fill 240@0.5→120@0.6, wall 0.25→0.6 — mean +11 %, watermelons 5→13
+        var pair = 0.6, bury = 1.5, small = 0.6, count = 1.5, wall = 0.6, combo = 0.6
+        var fill = 120.0, fill0 = 0.6, ahead = 0.9, chain = 0.0, roll = 1.5
     }
     static var k = Knobs()
 
