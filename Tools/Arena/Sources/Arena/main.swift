@@ -44,13 +44,19 @@ func ckStart() -> [Int] {
 
 var strict = false
 func ckGame(_ white: CkPlayer, _ black: CkPlayer, opening: [Int]) -> Int {   // +1 white(bottom) wins, -1 black, 0 draw
-    var b = opening, side = 1, plies = 0, quiet = 0
+    var b = opening, side = 1, plies = 0, quiet = 0, counted = 0
     while plies < 200 {
         let p = side == 1 ? white : black
         guard let nb = p(b, side) else { return -side }
         let before = b.filter { $0 != 0 }.count, after = nb.filter { $0 != 0 }.count
         quiet = after < before ? 0 : quiet + 1
         b = nb; side = -side; plies += 1
+        // WePlay's count (strict): king + man against a lone king — the stronger side has 8 moves, then it's a draw
+        if strict {
+            let wm = b.filter { $0 == 1 }.count, wk = b.filter { $0 == 2 }.count, bm = b.filter { $0 == -1 }.count, bk = b.filter { $0 == -2 }.count
+            let cs = (wm == 1 && wk == 1 && bm == 0 && bk == 1) ? 1 : ((bm == 1 && bk == 1 && wm == 0 && wk == 1) ? -1 : 0)
+            if cs == 0 { counted = 0 } else if -side == cs { counted += 1; if counted > 8 { return 0 } }
+        }
         let mine = b.filter { $0 > 0 }.count, theirs = b.filter { $0 < 0 }.count
         if mine == 0 { return -1 }
         if theirs == 0 { return 1 }
@@ -131,10 +137,10 @@ let pairs = max(1, games / 2)
 var result: (a: Int, b: Int, d: Int) = (0, 0, 0)
 let t0 = Date()
 switch game {
-case "checkers", "checkers-notrap", "checkers-strict", "checkers-strict-c0":
-    let trap = game != "checkers-notrap"
+case "checkers", "checkers-notrap", "checkers-strict", "checkers-strict-c0", "checkers-strict-notrap", "checkers-strict-notrap-c0":
+    let trap = !game.contains("notrap")
     strict = game.hasPrefix("checkers-strict")
-    let ct: Int? = game == "checkers-strict-c0" ? 0 : nil
+    let ct: Int? = game.hasSuffix("-c0") ? 0 : nil
     result = runPairs(pairs) { i in
         var rng = Rng(s: 0x9E3779B97F4A7C15 &+ UInt64(i) &* 0x632BE59BD9B4E019)
         let open = ckOpening(&rng, plies: 2 + rng.int(4))
