@@ -1,0 +1,67 @@
+14:33:00.6  รอลูกหยุด | โต๊ะเปิด | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 1]
+14:33:03.6  ✓ เบรก |  | pick=- guides=0 found=0 tgt=100 spin=- zoom=- ring=- pots=true
+      [pic 2]
+14:33:06.9  เบรก |  | pick=- guides=0 found=0 tgt=100 spin=- zoom=- ring=606,1771 pots=false
+      [pic 3]
+14:33:07.2  รอลูกหยุด | โต๊ะเปิด | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:33:15.0  9 → มุมขวาล่าง |  | pick=9>5@70 guides=10 found=1 tgt=70 spin=- zoom=- ring=- pots=false
+      [pic 4]
+14:33:15.1  รอลูกหยุด | โต๊ะเปิด | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:33:16.0  9 → มุมขวาล่าง |  | pick=9>5@70 guides=10 found=1 tgt=70 spin=- zoom=- ring=- pots=false
+      [pic 5]
+14:33:16.7  9 → มุมขวาล่าง เสี่ยง |  | pick=9>5@70 guides=10 found=1 tgt=70 spin=- zoom=5 ring=- pots=false
+      [pic 6]
+14:33:18.4  ✓ 9 → มุมขวาล่าง |  | pick=9>5@70 guides=10 found=1 tgt=70 spin=- zoom=5 ring=- pots=true
+      [pic 7]
+14:33:18.4  9 → มุมขวาล่าง เสี่ยง |  | pick=9>5@70 guides=10 found=1 tgt=70 spin=- zoom=5 ring=- pots=false
+14:33:18.5  ✓ 9 → มุมขวาล่าง |  | pick=9>5@70 guides=10 found=1 tgt=70 spin=- zoom=5 ring=- pots=true
+14:33:18.5  9 → มุมขวาล่าง เสี่ยง |  | pick=9>5@70 guides=10 found=1 tgt=70 spin=- zoom=5 ring=- pots=false
+14:33:18.6  ✓ 9 → มุมขวาล่าง |  | pick=9>5@70 guides=10 found=1 tgt=70 spin=- zoom=5 ring=- pots=true
+14:33:22.4  รอลูกหยุด | โต๊ะเปิด | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 8]
+14:33:27.9  ไม่มีลูกชัวร์ |  | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 9]
+14:33:27.9  ไม่มีลูกชัวร์ |  | pick=- guides=11 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:33:28.3  รอลูกหยุด | โต๊ะเปิด | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:33:29.1  ไม่มีลูกชัวร์ |  | pick=- guides=11 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 10]
+14:33:31.4  ไม่มีลูกชัวร์ |  | pick=- guides=12 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 11]
+14:33:32.5  ไม่มีลูกชัวร์ |  | pick=- guides=11 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 12]
+14:33:32.5  ไม่มีลูกชัวร์ |  | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:33:32.6  ไม่มีลูกชัวร์ |  | pick=- guides=11 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:33:32.6  ไม่มีลูกชัวร์ |  | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:33:32.6  11 → มุมขวาล่าง? |  | pick=- guides=11 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:33:32.6  ไม่มีลูกชัวร์ |  | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:33:32.7  ไม่มีลูกชัวร์ |  | pick=- guides=11 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:33:35.7  11 → มุมขวาล่าง? |  | pick=- guides=11 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 13]
+14:33:35.7  ไม่มีลูกชัวร์ |  | pick=- guides=11 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:33:38.2  ไม่มีลูกชัวร์ |  | pick=- guides=12 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 14]
+14:33:40.4  11 → มุมขวาล่าง? |  | pick=- guides=11 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 15]
+14:33:45.7  ไม่มีลูกชัวร์ |  | pick=- guides=11 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 16]
+14:33:46.0  ไม่มีลูกชัวร์ |  | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:33:46.0  ไม่มีลูกชัวร์ |  | pick=- guides=11 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:33:46.1  ไม่มีลูกชัวร์ |  | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:33:46.1  11 → มุมขวาล่าง? |  | pick=- guides=12 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:33:46.1  ไม่มีลูกชัวร์ |  | pick=- guides=12 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:33:46.3  ไม่มีลูกชัวร์ |  | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 17]
+14:33:46.4  ไม่มีลูกชัวร์ |  | pick=- guides=12 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:33:47.8  ไม่มีลูกชัวร์ |  | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 18]
+14:33:53.5  ไม่มีลูกชัวร์ |  | pick=- guides=12 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 19]
+14:33:54.2  ไม่มีลูกชัวร์ |  | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+      [pic 20]
+14:33:54.5  รอลูกหยุด | โต๊ะเปิด | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:34:01.7  13 → กลางขวา | ลูกขาวชิ่ง 1 | pick=13>3@30 guides=12 found=4 tgt=30 spin=- zoom=- ring=- pots=false
+      [pic 21]
+14:34:02.1  รอลูกหยุด | โต๊ะเปิด | pick=- guides=0 found=0 tgt=- spin=- zoom=- ring=- pots=false
+14:34:02.7  13 → กลางขวา | ลูกขาวชิ่ง 1 | pick=13>3@30 guides=12 found=5 tgt=30 spin=- zoom=- ring=- pots=false
+      [pic 22]
