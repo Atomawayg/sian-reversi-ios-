@@ -24,6 +24,8 @@ if variant != "base" {
         case "ahead": SuikaEngine.k.ahead = v
         case "chain": SuikaEngine.k.chain = v
         case "roll": SuikaEngine.k.roll = v
+        case "under": SuikaEngine.k.under = v
+        case "order": SuikaEngine.k.order = v
         default: print("unknown knob \(p[0])")
         }
     }

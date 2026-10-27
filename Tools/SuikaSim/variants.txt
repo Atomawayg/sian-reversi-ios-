@@ -1,8 +1,9 @@
 base
-count=1.0
-count=1.0,fill=120,fill0=0.6
-count=1.0,fill=120,fill0=0.6,wall=0.6
-count=1.5,fill=120,fill0=0.6,wall=0.6
-count=1.0,fill=60,fill0=0.65,wall=0.6
-count=1.0,fill=120,fill0=0.6,wall=0.6,pair=0.3
-count=2.0,fill=120,fill0=0.6
+under=0.5
+under=1.0
+under=2.0
+order=1.0
+order=3.0
+under=1.0,order=1.0
+under=1.0,order=3.0
+under=2.0,order=3.0

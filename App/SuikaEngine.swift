@@ -46,6 +46,7 @@ final class SuikaEngine {
         // 3.43 SuikaSim (24 games each): count 0.4→1.5, fill 240@0.5→120@0.6, wall 0.25→0.6 — mean +11 %, watermelons 5→13
         var pair = 0.6, bury = 1.5, small = 0.6, count = 1.5, wall = 0.6, combo = 0.6
         var fill = 120.0, fill0 = 0.6, ahead = 0.9, chain = 0.0, roll = 1.5
+        var under = 0.0, order = 0.0   // 3.44: small fruit anywhere under a bigger one · big fruits graded from one wall
     }
     static var k = Knobs()
 
@@ -192,6 +193,12 @@ final class SuikaEngine {
             for j in (i + 1)..<b.count {
                 let dx = b[j].x - b[i].x, dy = b[j].y - b[i].y
                 let d = (dx * dx + dy * dy).squareRoot(), rs = b[i].r + b[j].r
+                // Atom (3.44): small fruits piling up on the floor push the big ones up — any small fruit in the
+                // column under a bigger one counts, touching or not
+                if k.under != 0 && b[i].t != b[j].t && abs(dx) < 0.8 * rs {
+                    let (sm, bg) = b[i].t < b[j].t ? (i, j) : (j, i)
+                    if b[sm].y > b[bg].y { v -= k.under * Double(b[bg].t - b[sm].t) }
+                }
                 if b[i].t == b[j].t {
                     // two of a kind close together: one more fruit could join them
                     if d < rs * 1.35 { v += k.pair * made(b[i].t + 1) * (1.35 - d / rs) / 0.35 }   // (0.6, 3.36: set up chains)
@@ -210,6 +217,16 @@ final class SuikaEngine {
         let f = b[bigI]
         let dWall = min(f.x - f.r - SK.left, SK.right - f.x - f.r)
         v += k.wall * made(bigT) * max(0, 1 - dWall / 300)
+        // big fruits graded from the biggest one's wall: the bigger, the nearer the wall (a merge then rolls into its twin)
+        if k.order != 0 {
+            let leftSide = f.x < (SK.left + SK.right) / 2
+            func dw(_ q: Body) -> Double { leftSide ? q.x - SK.left : SK.right - q.x }
+            for i in b.indices where b[i].t >= 4 {
+                for j in b.indices where b[j].t >= 4 && b[j].t < b[i].t && dw(b[i]) > dw(b[j]) + 30 {
+                    v -= k.order * Double(b[i].t - b[j].t)
+                }
+            }
+        }
         return (v, fill)
     }
 
