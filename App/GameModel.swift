@@ -17,7 +17,11 @@ final class GameModel: ObservableObject {
     let pip = PiPManager()
     private let keepAlive = KeepAlive()
     private let engine = Engine()
-    private let checkers = CheckersEngine()
+    private let checkers: CheckersEngine = {
+        let e = CheckersEngine()
+        e.kingPlan = (first: 150, home: 0, near: 0)   // 3.50: first king +150 (arena, WePlay-judged: 118–89–193 vs the 23 Oct engine)
+        return e
+    }()
     private lazy var c4 = Connect4Solver()
     private var tbLoaded = false
     private let ckTrack = BoardTracker(), rvTrack = BoardTracker(), cnTrack = BoardTracker()
@@ -281,7 +285,7 @@ final class GameModel: ObservableObject {
         if !counted { ckCount = 0; ckCountBoard = nil }
         else if ckCountBoard != board { ckCount += 1; ckCountBoard = board }
         let countLeft = counted ? max(1, CheckersEngine.countMoves - (ckCount - 1)) : 0
-        let g = gen, ms = thinkMs
+        let g = gen, ms = max(thinkMs, 3000)   // 3.50: checkers thinks 3 s or more (about 2 plies deeper than 1 s)
         show(Overlay(game: .checkers, cells: draw, title: "คิด…", line: "ตาคุณ · AI กำลังคิด", mine: true, meColor: meC))
         work.async { [weak self] in
             guard let self else { return }
