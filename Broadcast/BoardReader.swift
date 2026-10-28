@@ -81,6 +81,8 @@ enum BoardReader {
         if HosBaseReader.looksLikeHosBase(s), let m = HosBaseReader.read(s) { return m }
         // Plato chess / checkers: wooden frame on both sides of the board.
         if PlatoBoardReader.looksLikeBoard(s), let m = PlatoBoardReader.read(s) { return m }
+        // HosBase with its orange bar off screen: the board alone (after Plato, so a Plato board is never taken for it)
+        if let m = HosBaseReader.read(s) { return m }
         // Jackaroo has a green table under the board; the others differ in the top-left corner.
         let jg = s.avg(W * 590 / 1180, H * 1650 / 2556, W * 6 / 1180)
         if jg.1 > jg.0 + 60 && jg.1 > jg.2 + 20 { return readJackaroo(s) }

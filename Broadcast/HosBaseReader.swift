@@ -33,8 +33,10 @@ enum HosBaseReader {
 
     private static func rim(_ p: (Double, Double, Double)) -> Bool { p.0 - p.2 > 30 && p.0 > 110 }
 
+    /// With no orange bar on screen (Atom's screenshot 28 Oct 07:09: the site header didn't show) the board alone
+    /// has to prove it: full width, 28+ light wood squares. BoardReader tries that only after Plato's reader.
     static func read(_ s: BoardReader.Sampler) -> BoardMessage? {
-        guard let bar = barBottom(s) else { return nil }
+        let bar = barBottom(s) ?? 0
         let W = s.w, H = s.h
         // The board's left edge: its border, found across a row a little below the middle of the screen.
         // Top and bottom: up and down that border until it stops (no piece ever stands on it). The right edge
@@ -82,7 +84,25 @@ enum HosBaseReader {
                     let l = (q.0 + q.1 + q.2) / 3
                     lo = min(lo, l); hi = max(hi, l)
                 }
-                if hi - lo < 14 { v += 2 }
+                if v == 1 { if hi - lo < 14 { v += 2 } }
+                else {
+                    // a silver king is a smooth dish (dented in the middle, lit from one side), a man has a thin ring:
+                    // look for that ring's sharp edge along 16 spokes (Atom's screenshot 28 Oct 07:12: men 29+, king 0)
+                    var sharp: [Double] = []
+                    for k in 0..<16 {
+                        let a = Double(k) * Double.pi / 8, ca = cos(a), sa = sin(a)
+                        var prof: [Double] = []
+                        for j in 10..<28 {
+                            let q = s.get(Int(px + Double(j) * 0.01 * C * ca), Int(py + Double(j) * 0.01 * C * sa))
+                            prof.append((q.0 + q.1 + q.2) / 3)
+                        }
+                        var d2 = 0.0
+                        for i in 1..<(prof.count - 1) { d2 = max(d2, abs(prof[i - 1] - 2 * prof[i] + prof[i + 1])) }
+                        sharp.append(d2)
+                    }
+                    sharp.sort()
+                    if sharp[4] < 12 { v += 2 }
+                }
                 if v % 2 == 1 { reds += 1 } else { silvers += 1 }
                 rowSum[(v - 1) % 2 + 1] += Double(r)
             }
