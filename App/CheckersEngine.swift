@@ -306,11 +306,11 @@ final class CheckersEngine {
         var s = Double(nw - nb) * 100
         for i in 0..<14 { s += W[i] * F[i] }
         // 3.49 (Atom's plan): get the first king and keep theirs out.
-        if kingPlan.first != 0 || kingPlan.guard != 0 || kingPlan.near != 0 {
+        if kingPlan.first != 0 || kingPlan.home != 0 || kingPlan.near != 0 {
             if nwk > 0 && nbk == 0 { s += kingPlan.first } else if nbk > 0 && nwk == 0 { s -= kingPlan.first }
             // men left on the home row block the squares their men would crown on (worth most while they have many men)
             let gW = nb >= 4 ? min(pc(w & ROWM[7]), 2) : 0, gB = nw >= 4 ? min(pc(b & ROWM[0]), 2) : 0
-            s += kingPlan.guard * Double(gW - gB)
+            s += kingPlan.home * Double(gW - gB)
             // men one or two steps from crowning
             let nearW = pc(w & (ROWM[1] | ROWM[2])), nearB = pc(b & (ROWM[5] | ROWM[6]))
             s += kingPlan.near * Double(nearW - nearB)
@@ -339,7 +339,7 @@ final class CheckersEngine {
     var countInSearch = false    // WePlay count in the search: still being measured (arena), off until it wins
     var contempt = 0
     var drawAvoid = false
-    var kingPlan: (first: Double, guard: Double, near: Double) = (0, 0, 0)
+    var kingPlan: (first: Double, home: Double, near: Double) = (0, 0, 0)
 
     /// Tablebase result for the side to move (arena judge): -1 unknown, 0 draw, <128 wins in v plies, >=128 loses in v-128.
     func tbResult(_ b64: [Int], side: Int) -> Int {

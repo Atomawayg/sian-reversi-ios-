@@ -100,7 +100,7 @@ func ckOpening(_ rng: inout Rng, plies: Int) -> [Int] {
 
 func makeCkA(trap: Bool = true, drawAvoid: Bool = false, count: Bool = false, plan: (Double, Double, Double) = (0, 0, 0)) -> CkPlayer {
     let e = CheckersEngine()
-    e.kingPlan = (first: plan.0, guard: plan.1, near: plan.2)
+    e.kingPlan = (first: plan.0, home: plan.1, near: plan.2)
     e.trapMode = trap
     e.drawAvoid = drawAvoid
     e.countInSearch = count
