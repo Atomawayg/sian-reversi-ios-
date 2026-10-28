@@ -1,2 +1,3 @@
-checkers 800 100
-checkers-notrap 800 100
+checkers-strict 400 100
+checkers-da 800 100
+checkers-dac 800 100

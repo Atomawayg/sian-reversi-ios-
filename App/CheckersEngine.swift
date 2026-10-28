@@ -328,6 +328,22 @@ final class CheckersEngine {
     var humanTieBreak = false
     var countInSearch = false    // WePlay count in the search: still being measured (arena), off until it wins
     var contempt = 0
+    var drawAvoid = false
+
+    /// Tablebase result for the side to move (arena judge): -1 unknown, 0 draw, <128 wins in v plies, >=128 loses in v-128.
+    func tbResult(_ b64: [Int], side: Int) -> Int {
+        var b32 = [Int](repeating: 0, count: 32)
+        for s in 0..<32 { b32[s] = b64[S64[s]] }
+        setFrom32(b32, side)
+        return tbProbe(side)
+    }
+    /// Who must finish inside WePlay's count (king + man vs lone king), or 0.
+    func countingSide(_ b64: [Int]) -> Int {
+        var b32 = [Int](repeating: 0, count: 32)
+        for s in 0..<32 { b32[s] = b64[S64[s]] }
+        setFrom32(b32, 1)
+        return countSide()
+    }
     func moves(_ b64: [Int], side: Int) -> [CheckersMove] {
         var b32 = [Int](repeating: 0, count: 32)
         for s in 0..<32 { b32[s] = b64[S64[s]] }
@@ -443,6 +459,12 @@ final class CheckersEngine {
         for s in 0..<32 { b32[s] = b64[S64[s]] }
         setFrom32(b32, side); curSide = side
         stop = false; nodes = 0
+        // 3.49: when ahead, a draw is a bad result (Atom: WePlay games that end king + man vs king are drawn).
+        // The draw penalty grows with the lead, so the search keeps material instead of trading into a drawn ending.
+        if drawAvoid {
+            let ev = side * evaluate(side)
+            contempt = ev > 60 ? min(300, ev / 2) : 0
+        }
         for i in 0..<HIST.count { HIST[i] = 0 }
         for i in 0..<128 { K1[i] = 0; K2[i] = 0 }
         let n = gen(side, 0)

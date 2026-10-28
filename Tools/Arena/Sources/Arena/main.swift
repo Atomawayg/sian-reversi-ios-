@@ -42,9 +42,33 @@ func ckStart() -> [Int] {
     return b
 }
 
+/// WePlay's real result once 4 or fewer pieces are left (3.49): the tablebase decides, and king + man against a
+/// lone king must be won inside the count (8 moves) or it is a draw. Nil while the game is still open.
+let judge: CheckersEngine = {
+    let e = CheckersEngine()
+    if let d = try? Data(contentsOf: URL(fileURLWithPath: "hos-tb.bin")) { e.loadTB(d) }
+    return e
+}()
+let judgeLock = NSLock()
+func ckJudge(_ b: [Int], side: Int) -> Int? {
+    guard b.filter({ $0 != 0 }).count <= 4 else { return nil }
+    judgeLock.lock(); defer { judgeLock.unlock() }
+    let v = judge.tbResult(b, side: side)
+    if v < 0 { return nil }
+    if v == 0 { return 0 }
+    let winner = v < 128 ? side : -side
+    let movesNeeded = v < 128 ? (v + 1) / 2 : (v - 128) / 2
+    let cs = judge.countingSide(b)
+    if cs != 0 && cs == winner && movesNeeded > CheckersEngine.countMoves { return 0 }
+    return winner
+}
+/// strict: a game nobody wins is a draw (WePlay), not a material win
+var strict = false
+
 func ckGame(_ white: CkPlayer, _ black: CkPlayer, opening: [Int]) -> Int {   // +1 white(bottom) wins, -1 black, 0 draw
     var b = opening, side = 1, plies = 0, quiet = 0
     while plies < 200 {
+        if strict, let r = ckJudge(b, side: side) { return r }
         let p = side == 1 ? white : black
         guard let nb = p(b, side) else { return -side }
         let before = b.filter { $0 != 0 }.count, after = nb.filter { $0 != 0 }.count
@@ -55,6 +79,7 @@ func ckGame(_ white: CkPlayer, _ black: CkPlayer, opening: [Int]) -> Int {   // 
         if theirs == 0 { return 1 }
         if quiet >= 60 { break }
     }
+    if strict { return 0 }
     // adjudicate by material (man 1, king 3) — a clear edge counts as a win
     var m = 0
     for v in b { m += v > 0 ? (v == 2 ? 3 : 1) : (v < 0 ? (v == -2 ? -3 : -1) : 0) }
@@ -73,9 +98,11 @@ func ckOpening(_ rng: inout Rng, plies: Int) -> [Int] {
     return b
 }
 
-func makeCkA(trap: Bool = true) -> CkPlayer {
+func makeCkA(trap: Bool = true, drawAvoid: Bool = false, count: Bool = false) -> CkPlayer {
     let e = CheckersEngine()
     e.trapMode = trap
+    e.drawAvoid = drawAvoid
+    e.countInSearch = count
     if let d = try? Data(contentsOf: URL(fileURLWithPath: "hos-tb.bin")) { e.loadTB(d) }
     return { b, side in
         let r = e.search(b, side: side, maxMs: ms)
@@ -133,6 +160,17 @@ case "checkers", "checkers-notrap":
         var rng = Rng(s: 0x9E3779B97F4A7C15 &+ UInt64(i) &* 0x632BE59BD9B4E019)
         let open = ckOpening(&rng, plies: 2 + rng.int(4))
         let a = makeCkA(trap: trap), b = makeCkB()
+        let g1 = ckGame(a, b, opening: open), g2 = ckGame(b, a, opening: open)
+        return (g1 == 1 ? .a : (g1 == -1 ? .b : .draw), g2 == -1 ? .a : (g2 == 1 ? .b : .draw))
+    }
+case "checkers-strict", "checkers-da", "checkers-dac":
+    // WePlay's real results (tablebase + count, unfinished = draw). A: plain / draw-avoiding / + the count in the search
+    strict = true
+    let da = game != "checkers-strict", cnt = game == "checkers-dac"
+    result = runPairs(pairs) { i in
+        var rng = Rng(s: 0x9E3779B97F4A7C15 &+ UInt64(i) &* 0x632BE59BD9B4E019)
+        let open = ckOpening(&rng, plies: 2 + rng.int(4))
+        let a = makeCkA(trap: false, drawAvoid: da, count: cnt), b = makeCkB()
         let g1 = ckGame(a, b, opening: open), g2 = ckGame(b, a, opening: open)
         return (g1 == 1 ? .a : (g1 == -1 ? .b : .draw), g2 == -1 ? .a : (g2 == 1 ? .b : .draw))
     }
