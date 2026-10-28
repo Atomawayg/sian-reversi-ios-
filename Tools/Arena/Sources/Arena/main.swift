@@ -98,8 +98,9 @@ func ckOpening(_ rng: inout Rng, plies: Int) -> [Int] {
     return b
 }
 
-func makeCkA(trap: Bool = true, drawAvoid: Bool = false, count: Bool = false) -> CkPlayer {
+func makeCkA(trap: Bool = true, drawAvoid: Bool = false, count: Bool = false, plan: (Double, Double, Double) = (0, 0, 0)) -> CkPlayer {
     let e = CheckersEngine()
+    e.kingPlan = (first: plan.0, guard: plan.1, near: plan.2)
     e.trapMode = trap
     e.drawAvoid = drawAvoid
     e.countInSearch = count
@@ -171,6 +172,17 @@ case "checkers-strict", "checkers-da", "checkers-dac":
         var rng = Rng(s: 0x9E3779B97F4A7C15 &+ UInt64(i) &* 0x632BE59BD9B4E019)
         let open = ckOpening(&rng, plies: 2 + rng.int(4))
         let a = makeCkA(trap: false, drawAvoid: da, count: cnt), b = makeCkB()
+        let g1 = ckGame(a, b, opening: open), g2 = ckGame(b, a, opening: open)
+        return (g1 == 1 ? .a : (g1 == -1 ? .b : .draw), g2 == -1 ? .a : (g2 == 1 ? .b : .draw))
+    }
+case let g where g.hasPrefix("checkers-kp"):
+    // checkers-kp:<first>,<guard>,<near> — Atom's king plan, WePlay-judged
+    strict = true
+    let v = g.split(separator: ":").last!.split(separator: ",").map { Double($0)! }
+    result = runPairs(pairs) { i in
+        var rng = Rng(s: 0x9E3779B97F4A7C15 &+ UInt64(i) &* 0x632BE59BD9B4E019)
+        let open = ckOpening(&rng, plies: 2 + rng.int(4))
+        let a = makeCkA(trap: false, plan: (v[0], v[1], v[2])), b = makeCkB()
         let g1 = ckGame(a, b, opening: open), g2 = ckGame(b, a, opening: open)
         return (g1 == 1 ? .a : (g1 == -1 ? .b : .draw), g2 == -1 ? .a : (g2 == 1 ? .b : .draw))
     }
