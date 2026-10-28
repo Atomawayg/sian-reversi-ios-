@@ -236,14 +236,33 @@ final class GameModel: ObservableObject {
     private var ckLastLog = ""
     private var ckCount = 0                 // your moves so far in the counted ending
     private var ckCountBoard: [Int]? = nil
+    /// The camera loses a king's crown once it leaves the back row (Atom's log 27 Oct 23:06: a winning king
+    /// read as a man, so the advice fell apart). If one or two legal moves from the trusted board give this
+    /// reading apart from crowns, that board's crowns are the true ones.
+    private func ckFixCrowns(_ b: [Int]) -> [Int] {
+        guard let t = ckTrack.trusted, b != t else { return b }
+        let shape = b.map { $0.signum() }
+        var best: [Int]? = nil, bestAgree = -1
+        for side in [1, -1] {
+            for b1 in CheckersRules.successors(t, side: side) {
+                for c in [b1] + CheckersRules.successors(b1, side: -side) where c.map({ $0.signum() }) == shape {
+                    let agree = zip(c, b).filter { $0 == $1 }.count
+                    if agree > bestAgree { best = c; bestAgree = agree }
+                }
+            }
+        }
+        return best ?? b
+    }
+
     private func handleCheckers(_ m: BoardMessage) {
-        let (board, meC) = checkersBoard(m)
+        let (read, meC) = checkersBoard(m)
+        let board = ckFixCrowns(read)
         let draw = board.map { $0 == 1 ? 1 : ($0 == 2 ? 2 : ($0 == -1 ? 3 : ($0 == -2 ? 4 : 0))) }
         let verdict = ckTrack.check(board) { b, p in CheckersRules.successors(b, side: p == 0 ? 1 : -1) }
         // log (for checking games afterwards): each new board once — m/M yours, o/O theirs, top row first
         if logOn {
             let txt = board.map { $0 == 1 ? "m" : ($0 == 2 ? "M" : ($0 == -1 ? "o" : ($0 == -2 ? "O" : "."))) }.joined()
-            let line = "K turn=\(m.myTurn ? 1 : 0) me=\(meC)" + (verdict == .suspicious ? " odd" : "") + " board=" + stride(from: 0, to: 64, by: 8).map { i in String(Array(txt)[i..<i + 8]) }.joined(separator: "/")
+            let line = "K turn=\(m.myTurn ? 1 : 0) me=\(meC)" + (verdict == .suspicious ? " odd" : "") + (board != read ? " crown" : "") + " board=" + stride(from: 0, to: 64, by: 8).map { i in String(Array(txt)[i..<i + 8]) }.joined(separator: "/")
             if line != ckLastLog { ckLastLog = line; log(line) }
         }
         guard verdict != .suspicious else { boardInDoubt(.checkers, meColor: meC, shown: ckTrack.trusted.map { t in t.map { $0 == 1 ? 1 : ($0 == 2 ? 2 : ($0 == -1 ? 3 : ($0 == -2 ? 4 : 0))) } }); return }
