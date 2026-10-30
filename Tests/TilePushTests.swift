@@ -65,6 +65,17 @@ final class TilePushTests: XCTestCase {
         XCTAssertTrue(r.completes)
     }
 
+    /// a picture not known yet at the bottom: even odds to keep playing
+    func testUnknownBottom() {
+        let g = [0, 3, 4, 5,
+                 0, 0, 0, 0,
+                 0, 0, 0, 0,
+                 9, 1, 1, 1]
+        let r = e.think(mine: g, opp: noOpp, hand: 6)
+        XCTAssertEqual(r.col, 0)
+        XCTAssertEqual(r.keep, 0.5)
+    }
+
     /// thinking stays quick on an open board
     func testSpeed() {
         let t0 = Date()
@@ -74,11 +85,11 @@ final class TilePushTests: XCTestCase {
 
     /// what the floating window shows for Atom's frame (written to Tests/out to look at)
     func testRenderWindow() throws {
-        let cells: [Int] = [3, 2, 4, 5, 0, 0, 0, 0, 0, 4, 1, 0, 0, 4, 1, 0] + [0, 1, 6, 0, 0, 1, 6, 0, 0, 0, 0, 0, 0, 1, 1, 0] + [6]
+        let cells: [Int] = [9, 2, 4, 5, 0, 0, 0, 0, 0, 4, 1, 0, 0, 4, 1, 0] + [0, 1, 6, 0, 0, 1, 6, 0, 0, 0, 0, 0, 0, 1, 1, 0] + [6]
         let out = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("out")
         try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
         let shots: [(String, Overlay)] = [
-            ("tp-move", Overlay(game: .tilePush, cells: cells, rec: 1, title: "ช่อง 2", line: "ลุ้นเล่นต่อ 48%", mine: true)),
+            ("tp-move", Overlay(game: .tilePush, cells: cells, rec: 1, title: "ช่อง 2", line: "ได้เล่นต่อแน่\nกำลังจำไพ่", mine: true)),
             ("tp-wait", Overlay(game: .tilePush, cells: Array(cells.prefix(32)) + [1], title: "รอ…", line: "ตาคู่แข่ง")),
         ]
         for (name, o) in shots {

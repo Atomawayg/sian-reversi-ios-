@@ -1282,10 +1282,11 @@ final class GameModel: ObservableObject {
                 var line: String
                 if r.win { line = "ชนะเลย!" }
                 else if r.completes { line = "ครบคอลัมน์" }
-                else if r.popped == 1 { line = "ของกินหล่น · หมดตา" }
-                else if r.popped >= 2 { line = "ได้เล่นต่อแน่" }
+                else if r.popped == 1 { line = "ไพ่คู่แข่งหล่น · หมดตา" }
+                else if r.popped == 2 || TilePushEngine.isMine(r.popped) { line = "ได้เล่นต่อแน่" }
                 else { line = "ลุ้นเล่นต่อ \(Int((r.keep * 100).rounded()))%" }
-                if r.completes && !r.win { line += r.popped == 1 ? " · หมดตา" : (r.popped >= 2 ? " · เล่นต่อ" : "") }
+                if r.completes && !r.win { line += r.popped == 1 ? " · หมดตา" : (r.popped == 2 || TilePushEngine.isMine(r.popped) ? " · เล่นต่อ" : "") }
+                if m.cells.contains(where: TilePushEngine.isUnknown) { line += "\nกำลังจำไพ่" }
                 self.show(Overlay(game: .tilePush, cells: m.cells, rec: r.col, title: "ช่อง \(r.col + 1)", line: line, mine: true))
             }
         }
