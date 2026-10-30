@@ -250,13 +250,14 @@ extension BoardReader {
         if tpLib.count > 2 * tpKinds + 6 { tpDebug = "\(W)x\(H) too many pictures \(tpLib.count): reset"; tpReset(); return bad }     // something went wrong: start over
         // whose turn: the seconds countdown on an avatar (you bottom left, the opponent top right)
         let tm = tpTimer(s, 157, 1907), to = tpTimer(s, 1024, 525)
-        let turn = tm > 0.03 && tm > to + 0.02 ? 1 : (to > 0.03 && to > tm + 0.02 ? 2 : 0)
+        // (the floating window can cover the opponent's avatar, so no countdown on yours counts as their turn too)
+        let turn = tm > 0.03 && tm > to + 0.02 ? 1 : ((to > 0.03 && to > tm + 0.02) || tm < 0.01 ? 2 : 0)
         let hand = local[2 * N] >= 0 ? lib[local[2 * N]] : -1
         tpDebug = String(format: "%dx%d k%.2f turn %d (me %.3f opp %.3f) hand %d lib %d votes %@", W, H, L.k, turn, tm, to, hand, tpLib.count,
                          tpLib.map { "\($0.mine)/\($0.opp)" }.joined(separator: " "))
         if hand >= 0 && turn != 0 {
             tpObs = tpObs.turn == turn && tpObs.pic == hand ? (turn, hand, tpObs.n + 1) : (turn, hand, 1)
-            if tpObs.n >= 2 { if turn == 1 { tpLib[hand].mine += 1 } else { tpLib[hand].opp += 1 } }
+            if tpObs.n >= (turn == 1 ? 2 : 3) { if turn == 1 { tpLib[hand].mine += 1 } else { tpLib[hand].opp += 1 } }
         } else { tpObs = (0, -1, 0) }
         // codes: yours 3…8, not known yet 9…13, the opponent's 1
         let owner = (0..<tpLib.count).map(tpOwner)
@@ -267,7 +268,7 @@ extension BoardReader {
             if t.kind != 1 { codes.append(t.kind); continue }
             let i = lib[l]
             if let m = mineList.firstIndex(of: i), m < 6 { codes.append(3 + m) }
-            else if let u = unknown.firstIndex(of: i), u < 5 { codes.append(9 + u) }
+            else if let u = unknown.firstIndex(of: i) { codes.append(9 + min(u, 4)) }
             else { codes.append(1) }
         }
         // what popping each of your bottom tiles would hand the opponent: a picture of theirs that tops one of their
