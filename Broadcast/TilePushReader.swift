@@ -18,25 +18,28 @@ extension BoardReader {
     /// kind: 0 face down, 1 other picture, 2 joker, 3 one of your faces, -1 not a resting tile (moving / covered)
     static func tpTile(_ s: Sampler, _ x: Double, _ y: Double) -> (kind: Int, sig: [Double]) {
         let sx = Double(s.w) / 1180, sy = Double(s.h) / 2556
-        var n = 0.0, orange = 0.0, white = 0.0, blue = 0.0, emo = 0.0
-        var dy = -42.0
-        while dy <= 42 {
-            var dx = -42.0
-            while dx <= 42 {
+        var n = 0.0, orange = 0.0, white = 0.0, blue = 0.0, emo = 0.0, ne = 0.0
+        var dy = -54.0
+        while dy <= 54 {
+            var dx = -54.0
+            while dx <= 54 {
                 let p = s.get(Int((x + dx) * sx), Int((y + dy) * sy))
                 let r = p.0, g = p.1, b = p.2
                 n += 1
                 if r > 200 && r - g > 70 && b < 120 { orange += 1 }
                 if r > 225 && g > 225 && b > 220 { white += 1 }
                 if b > 180 && b - r > 80 { blue += 1 }
-                if r > 225 && g > 185 && g < 228 && b < 100 { emo += 1 }   // emoji yellow (cheese is darker: g ≈ 179)
+                if abs(dx) <= 42 && abs(dy) <= 42 {
+                    ne += 1
+                    if r > 225 && g > 185 && g < 228 && b < 100 { emo += 1 }   // emoji yellow (cheese is darker: g ≈ 179)
+                }
                 dx += 3
             }
             dy += 3
         }
-        orange /= n; white /= n; blue /= n; emo /= n
+        orange /= n; white /= n; blue /= n; emo /= max(1, ne)
         if orange > 0.6 { return (0, []) }
-        if white < 0.12 { return (-1, []) }
+        if white < 0.15 { return (-1, []) }
         if blue > 0.12 { return (2, []) }
         guard emo > 0.35 else { return (1, []) }
         var sig: [Double] = []
