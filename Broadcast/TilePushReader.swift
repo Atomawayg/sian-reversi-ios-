@@ -5,7 +5,8 @@ import Foundation
 /// by comparing them with each other and learnt as yours / theirs while you play. Cells: see TP.
 extension BoardReader {
     /// Where everything is. Your map's top-left corner and the opponent's bottom-right stay put; tiles are 152.6 px apart
-    /// across (125.3 on a 5×5 map, where everything is drawn smaller) and 1.1186 times that down.
+    /// across (125.3 on a 5×5 map, where everything is drawn smaller) and 1.1186 times that down. (Only these two spacings: with
+/// any spacing allowed, a 5×5 map fits a 6×6 one of smaller tiles just as well.)
     struct TPLayout { var cols: Int; var rows: Int; var k: Double; var mine: [(Double, Double)]; var opp: [(Double, Double)]; var hand: (Double, Double, Double) }
 
     static func tpIsTile(_ p: (Double, Double, Double)) -> Bool {
@@ -33,7 +34,7 @@ extension BoardReader {
         guard let m = tpBox(s, 200, 1100, 1400, 2400) else { return nil }
         let w = m.x1 - m.x0 + 1, h = m.y1 - m.y0 + 1
         var best: (e: Double, c: Int, r: Int, p: Double)? = nil
-        for p in [152.6, 125.3, 104.4] {
+        for p in [152.6, 125.3] {
             let k = p / 152.6, py = p * 1.1186, lip = 9 * k
             let c = w / p, r = (h - lip) / py
             let C = Int(c.rounded()), R = Int(r.rounded())
@@ -196,7 +197,8 @@ extension BoardReader {
         let sx = Double(s.w) / 1180, sy = Double(s.h) / 2556
         let sand = [(1100.0, 1250.0), (590, 1100), (100, 1000)].filter { tpSand(s.avg($0.0 * sx, $0.1 * sy, 3 * sx)) }.count
         guard sand >= 2 else { return false }
-        return tpLayout(s) != nil
+        // the banner or a tile animation can hide part of the map: still this game (the reading just waits)
+        return tpBanner(s) || tpBox(s, 200, 1100, 1400, 2400) != nil
     }
 
     static func readTilePush(_ s: Sampler) -> BoardMessage {
