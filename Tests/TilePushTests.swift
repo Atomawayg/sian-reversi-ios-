@@ -74,12 +74,12 @@ final class TilePushTests: XCTestCase {
 
     /// what the floating window shows for Atom's frame (written to Tests/out to look at)
     func testRenderWindow() throws {
-        let cells = [3, 2, 4, 5, 0, 0, 0, 0, 0, 4, 1, 0, 0, 4, 1, 0] + [0, 1, 6, 0, 0, 1, 6, 0, 0, 0, 0, 0, 0, 1, 1, 0] + [6]
+        let cells: [Int] = [3, 2, 4, 5, 0, 0, 0, 0, 0, 4, 1, 0, 0, 4, 1, 0] + [0, 1, 6, 0, 0, 1, 6, 0, 0, 0, 0, 0, 0, 1, 1, 0] + [6]
         let out = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("out")
         try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
         let shots: [(String, Overlay)] = [
             ("tp-move", Overlay(game: .tilePush, cells: cells, rec: 1, title: "ช่อง 2", line: "ลุ้นเล่นต่อ 48%", mine: true)),
-            ("tp-wait", Overlay(game: .tilePush, cells: Array(cells[0..<32]) + [1], title: "รอ…", line: "ตาคู่แข่ง")),
+            ("tp-wait", Overlay(game: .tilePush, cells: Array(cells.prefix(32)) + [1], title: "รอ…", line: "ตาคู่แข่ง")),
         ]
         for (name, o) in shots {
             let img = UIGraphicsImageRenderer(size: Renderer.size).image { _ in Renderer.draw(o, in: CGRect(origin: .zero, size: Renderer.size)) }
