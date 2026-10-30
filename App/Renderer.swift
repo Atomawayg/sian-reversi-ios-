@@ -209,14 +209,14 @@ enum Renderer {
         let (cs, cell, box) = grid(CGRect(x: r.minX, y: r.minY + top, width: r.width, height: r.height - top), cols: tp.w, rows: tp.h, inset: 4, gap: 3)
         panel.setFill(); UIBezierPath(roundedRect: box, cornerRadius: 8).fill()
         // which faces you have: number them 1…4 in the order the reader saw them
-        let codes = Array(Set((tp.mine + [tp.hand]).filter { $0 >= 3 && $0 <= 7 })).sorted()
+        let codes = Array(Set((tp.mine + [tp.hand]).filter { $0 >= 3 && $0 <= 8 })).sorted()
         func tile(_ v: Int, _ t: CGRect) {
             let p = UIBezierPath(roundedRect: t.insetBy(dx: 1, dy: 1), cornerRadius: 6)
             switch v {
             case 0: UIColor(red: 0.93, green: 0.48, blue: 0.22, alpha: 1).setFill(); p.fill()
             case 1: UIColor(white: 0.45, alpha: 1).setFill(); p.fill()
             case 2: UIColor(red: 0.25, green: 0.80, blue: 0.95, alpha: 1).setFill(); p.fill()
-            case 8...: // a picture not known yet to be yours or theirs
+            case 9...: // a picture not known yet to be yours or theirs
                 UIColor(white: 0.78, alpha: 1).setFill(); p.fill()
                 let a: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: t.height * 0.42, weight: .heavy), .foregroundColor: bg]
                 let txt = "?" as NSString, sz = txt.size(withAttributes: a)
@@ -239,7 +239,7 @@ enum Renderer {
         for rr in 0..<tp.h { for c in 0..<tp.w { tile(tp.mine[rr * tp.w + c], cell(rr, c)) } }
         // the tile in hand, above the column to push it into (centred when there is no answer)
         let hand = tp.hand
-        if hand == 2 || (hand >= 3 && hand <= 7) {
+        if hand == 2 || (hand >= 3 && hand <= 8) {
             let col = o.rec ?? -1
             let x = col >= 0 ? cell(0, col).midX : box.midX
             let ht = CGRect(x: x - cs * 0.4, y: r.minY + 2, width: cs * 0.8, height: cs * 0.8)
