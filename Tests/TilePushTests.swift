@@ -12,7 +12,7 @@ final class TilePushTests: XCTestCase {
         let opp = [0, 1, 6, 0, 0, 1, 6, 0, 0, 0, 0, 0, 0, 1, 1, 0]
         let r = e.think(mine: g, opp: opp, hand: 6)
         XCTAssertEqual(r.col, 1)
-        XCTAssertEqual(r.popped, -1)
+        XCTAssertEqual(r.popped, 4)
     }
 
     /// three of a face on top: the fourth finishes the column

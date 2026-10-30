@@ -62,7 +62,9 @@ final class TilePushReaderTests: XCTestCase {
     func testFrames() throws {
         let rt = ReaderTests()
         // your move, holding 😭: the faces 😂 joker 😇 😤 on top, two 😇 lower down beside cheese and a skewer
-        let a = BoardReader.read(try rt.sampler("tp-030.png"))
+        let s0 = try rt.sampler("tp-030.png")
+        print("TP size", s0.w, s0.h, [(1100.0, 1250.0), (590, 1100), (100, 1000), (367, 1558), (367, 1729)].map { s0.avg($0.0, $0.1, 3) })
+        let a = BoardReader.read(s0)
         print("TP 030", a.game, a.cells, a.myTurn)
         XCTAssertEqual(a.game, .tilePush)
         XCTAssertEqual(Array(a.cells[0..<16]), [3, 2, 4, 5, 0, 0, 0, 0, 0, 4, 1, 0, 0, 4, 1, 0])

@@ -113,7 +113,7 @@ final class TilePushEngine {
         let base = Self.eval(n)
         if base >= 10000 { return base + Double(depth) }      // won: sooner is better
         if out == 1 { return base }                            // turn over
-        if depth <= 1 || p < 0.02 || nodes > 60000 {
+        if depth <= 1 || p < 0.02 || nodes > 15000 {
             if out == 0 { return base + 4 * Self.mineChance(n, opp) }
             return base + 4                                    // still yours to place
         }
