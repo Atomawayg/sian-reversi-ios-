@@ -36,12 +36,27 @@ enum Link {
     static let port: UInt16 = 52741
 }
 
-/// Tile Push message layout: 16 cells of your map (row-major, top row first), 16 of the opponent's, then the tile in hand.
-/// 0 face down, 1 the opponent's picture, 2 the blue cat joker, 3…6 your pictures, 7…13 pictures not known yet to be
-/// yours or theirs (same number = same picture).
+/// Tile Push message layout: columns, rows, then your map (row-major, top row first, room for 6×6), the opponent's, the tile
+/// in hand. 0 face down, 1 the opponent's picture, 2 the blue cat joker, 3…7 your pictures, 8…13 pictures not known yet to
+/// be yours or theirs (same number = same picture).
 enum TP {
-    static let mine = 0, opp = 16, hand = 32, count = 33
-    static let n = 4
+    static let maxSide = 6
+    static let cols = 0, rows = 1, mine = 2, opp = 2 + 36, hand = 2 + 72, count = 75
+    static func pack(cols w: Int, rows h: Int, mine: [Int], opp: [Int], hand: Int) -> [Int] {
+        var c = [Int](repeating: 0, count: count)
+        c[cols] = w; c[rows] = h
+        for i in 0..<min(36, mine.count) { c[TP.mine + i] = mine[i] }
+        for i in 0..<min(36, opp.count) { c[TP.opp + i] = opp[i] }
+        c[TP.hand] = hand
+        return c
+    }
+    /// (columns, rows, your map, the opponent's map, hand) or nil when the sizes don't make sense
+    static func unpack(_ c: [Int]) -> (w: Int, h: Int, mine: [Int], opp: [Int], hand: Int)? {
+        guard c.count == count else { return nil }
+        let w = c[cols], h = c[rows]
+        guard w >= 3 && w <= maxSide && h >= 3 && h <= maxSide else { return nil }
+        return (w, h, Array(c[mine..<mine + w * h]), Array(c[opp..<opp + w * h]), c[hand])
+    }
 }
 
 /// Jackaroo message layout (cells): colours 0 none, 1 green, 2 red, 3 blue, 4 orange.

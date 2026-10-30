@@ -1,14 +1,31 @@
 import Foundation
 
-/// WePlay Tile Push (4×4): your map at the bottom, the opponent's at the top, the tile to place in the middle.
-/// Calibrated on Atom's 1180×2556 recording (30 Oct). Each player gets four random pictures per game, so pictures are
-/// grouped by comparing them with each other and learnt as yours / theirs while you play. Cells: see TP.
+/// WePlay Tile Push: your map at the bottom, the opponent's at the top, the tile to place in the middle.
+/// Maps are 3×3, 4×4 or 5 wide × 4 high. Calibrated on Atom's 1180×2556 recordings and screenshots (30 Oct): your map grows
+/// right and down from its top-left corner (340, 1533), the opponent's left and up from its bottom-right (841, 1037);
+/// tiles are 152.7 px apart across and 170.7 down. Each player gets random pictures each game, so pictures are grouped
+/// by comparing them with each other and learnt as yours / theirs while you play. Cells: see TP.
 extension BoardReader {
-    static let tpCols: [Double] = [417, 570, 722, 874]
-    static let tpRows: [Double] = [1608, 1779, 1950, 2120]
-    static let tpOppCols: [Double] = [306, 459, 612, 764]
-    static let tpOppRows: [Double] = [417, 588, 759, 930]
-    static let tpCentre = (x: 591.0, y: 1258.0)
+    static let tpPitchX = 152.7, tpPitchY = 170.7
+    static func tpMine(_ c: Int, _ r: Int) -> (Double, Double) { (416.5 + tpPitchX * Double(c), 1608 + tpPitchY * Double(r)) }
+    static func tpOpp(_ c: Int, _ r: Int, _ cols: Int, _ rows: Int) -> (Double, Double) {
+        (764.5 - tpPitchX * Double(cols - 1 - c), 930 - tpPitchY * Double(rows - 1 - r))
+    }
+    static let tpCentre = (x: 590.0, y: 1258.0)
+
+    /// a tile's top-left corner: orange back or white face
+    static func tpIsTile(_ s: Sampler, _ x: Double, _ y: Double) -> Bool {
+        let sx = Double(s.w) / 1180, sy = Double(s.h) / 2556
+        let p = s.avg((x - 50) * sx, (y - 50) * sy, 3 * sx)
+        return (p.0 > 200 && p.0 - p.1 > 70 && p.2 < 120) || (p.0 > 220 && p.1 > 220 && p.2 > 215)
+    }
+    /// how big your map is (columns along its second row, rows down its first column)
+    static func tpSize(_ s: Sampler) -> (cols: Int, rows: Int) {
+        var cols = 0, rows = 0
+        while cols < 6 && tpIsTile(s, tpMine(cols, 1).0, tpMine(cols, 1).1) { cols += 1 }
+        while rows < 6 && tpIsTile(s, tpMine(0, rows).0, tpMine(0, rows).1) { rows += 1 }
+        return (cols, rows)
+    }
 
     private static func tpSand(_ p: (Double, Double, Double)) -> Bool {
         p.0 > 230 && p.1 > 185 && p.1 < 228 && p.2 > 110 && p.2 < 175
@@ -127,6 +144,7 @@ extension BoardReader {
     static var tpPrevKey: [Int] = []
     static var tpObs = (turn: 0, pic: -1, n: 0)
     static var tpLastSeen = 0.0
+    static var tpKinds = 4               // pictures each player has: one per column
 
     static func tpReset() { tpLib = []; tpObs = (0, -1, 0); tpPrevKey = [] }
 
@@ -140,8 +158,8 @@ extension BoardReader {
         let v = voted(tpLib[i])
         if v != 0 { return v }
         let all = tpLib.map(voted)
-        if all.filter({ $0 == 1 }).count >= 4 { return 2 }          // your four are known: the rest is theirs
-        if all.filter({ $0 == 2 }).count >= 4 && tpLib.count == 8 { return 1 }
+        if all.filter({ $0 == 1 }).count >= tpKinds { return 2 }          // all yours are known: the rest is theirs
+        if all.filter({ $0 == 2 }).count >= tpKinds && tpLib.count == 2 * tpKinds { return 1 }
         return 0
     }
 
@@ -149,12 +167,8 @@ extension BoardReader {
         let sx = Double(s.w) / 1180, sy = Double(s.h) / 2556
         let sand = [(1100.0, 1250.0), (590, 1100), (100, 1000)].filter { tpSand(s.avg($0.0 * sx, $0.1 * sy, 3 * sx)) }.count
         guard sand >= 2 else { return false }
-        var tiles = 0
-        for y in tpRows { for x in tpCols {
-            let p = s.avg((x - 50) * sx, (y - 50) * sy, 3 * sx)   // the tile's top-left corner: orange back or white face
-            if (p.0 > 200 && p.0 - p.1 > 70 && p.2 < 120) || (p.0 > 220 && p.1 > 220 && p.2 > 215) { tiles += 1 }
-        } }
-        return tiles >= 13
+        let n = tpSize(s)
+        return n.cols >= 3 && n.rows >= 3
     }
 
     static func readTilePush(_ s: Sampler) -> BoardMessage {
@@ -163,18 +177,22 @@ extension BoardReader {
         if now - tpLastSeen > 60 { tpReset() }
         tpLastSeen = now
         if tpBanner(s) { return bad }
+        let (W, H) = tpSize(s)
+        guard W >= 3 && W <= TP.maxSide && H >= 3 && H <= TP.maxSide else { return bad }
+        if W != tpKinds { tpReset(); tpKinds = W }
         var pts: [(Double, Double)] = []
-        for y in tpRows { for x in tpCols { pts.append((x, y)) } }
-        for y in tpOppRows { for x in tpOppCols { pts.append((x, y)) } }
-        pts.append(tpCentre)
+        for r in 0..<H { for c in 0..<W { pts.append(tpMine(c, r)) } }
+        for r in 0..<H { for c in 0..<W { pts.append(tpOpp(c, r, W, H)) } }
+        pts.append((tpCentre.x, tpCentre.y))
+        let N = W * H
         var tiles: [(kind: Int, sig: [Float])] = []
         for (k, p) in pts.enumerated() {
             let t = tpTile(s, p.0, p.1)
-            if t.kind < 0 && k < 16 { return bad }   // your map mid-animation
+            if t.kind < 0 && k < N { return bad }   // your map mid-animation
             tiles.append(t)
         }
         // a new game starts face down
-        if tiles.prefix(32).filter({ $0.kind == 0 }).count >= 28 { tpReset() }
+        if tiles.prefix(2 * N).filter({ $0.kind == 0 }).count >= 2 * N - 4 { tpReset() }
         // same picture within this frame
         var reps: [[Float]] = [], local: [Int] = []
         for t in tiles {
@@ -194,28 +212,29 @@ extension BoardReader {
             if best >= 0 && bd < tpSame { tpLib[best].sig = r; lib.append(best) }
             else { tpLib.append(TPPicture(sig: r)); lib.append(tpLib.count - 1) }
         }
-        if tpLib.count > 12 { tpReset(); return bad }     // something went wrong: start over
+        if tpLib.count > 2 * tpKinds + 3 { tpReset(); return bad }     // something went wrong: start over
         // whose turn: the seconds countdown on an avatar (you bottom left, the opponent top right)
         let tm = tpTimer(s, 157, 1907), to = tpTimer(s, 1024, 525)
         let turn = tm > 0.03 && tm > to + 0.02 ? 1 : (to > 0.03 && to > tm + 0.02 ? 2 : 0)
-        let hand = local[32] >= 0 ? lib[local[32]] : -1
+        let hand = local[2 * N] >= 0 ? lib[local[2 * N]] : -1
         if hand >= 0 && turn != 0 {
             tpObs = tpObs.turn == turn && tpObs.pic == hand ? (turn, hand, tpObs.n + 1) : (turn, hand, 1)
             if tpObs.n >= 2 { if turn == 1 { tpLib[hand].mine += 1 } else { tpLib[hand].opp += 1 } }
         } else { tpObs = (0, -1, 0) }
-        // codes: yours 3…6, not known yet 7…13, the opponent's 1
+        // codes: yours 3…7, not known yet 8…13, the opponent's 1
         let owner = (0..<tpLib.count).map(tpOwner)
         let mineList = (0..<tpLib.count).filter { owner[$0] == 1 }, unknown = (0..<tpLib.count).filter { owner[$0] == 0 }
-        var cells: [Int] = []
+        var codes: [Int] = []
         for (t, l) in zip(tiles, local) {
-            if t.kind < 0 { cells.append(1); continue }
-            if t.kind != 1 { cells.append(t.kind); continue }
+            if t.kind < 0 { codes.append(1); continue }
+            if t.kind != 1 { codes.append(t.kind); continue }
             let i = lib[l]
-            if let m = mineList.firstIndex(of: i), m < 4 { cells.append(3 + m) }
-            else if let u = unknown.firstIndex(of: i), u < 7 { cells.append(7 + u) }
-            else { cells.append(1) }
+            if let m = mineList.firstIndex(of: i), m < 5 { codes.append(3 + m) }
+            else if let u = unknown.firstIndex(of: i), u < 6 { codes.append(8 + u) }
+            else { codes.append(1) }
         }
-        let h = cells[32]
-        return BoardMessage(valid: true, game: .tilePush, cells: cells, me: 1, myTurn: turn == 1 && (h == 2 || (h >= 3 && h <= 6)))
+        let cells = TP.pack(cols: W, rows: H, mine: Array(codes[0..<N]), opp: Array(codes[N..<2 * N]), hand: codes[2 * N])
+        let h = codes[2 * N]
+        return BoardMessage(valid: true, game: .tilePush, cells: cells, me: 1, myTurn: turn == 1 && (h == 2 || (h >= 3 && h <= 7)))
     }
 }

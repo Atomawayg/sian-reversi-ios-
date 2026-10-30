@@ -204,19 +204,19 @@ enum Renderer {
         UIColor(red: 0.55, green: 0.85, blue: 0.45, alpha: 1), UIColor(red: 0.90, green: 0.45, blue: 0.75, alpha: 1),
         UIColor(red: 0.98, green: 0.60, blue: 0.30, alpha: 1), UIColor(red: 0.70, green: 0.55, blue: 0.95, alpha: 1)]
     private static func drawTilePush(_ o: Overlay, _ cells: [Int], _ r: CGRect) {
-        guard cells.count == TP.count else { return }
+        guard let tp = TP.unpack(cells) else { return }
         let top: CGFloat = 70
-        let (cs, cell, box) = grid(CGRect(x: r.minX, y: r.minY + top, width: r.width, height: r.height - top), cols: 4, rows: 4, inset: 4, gap: 3)
+        let (cs, cell, box) = grid(CGRect(x: r.minX, y: r.minY + top, width: r.width, height: r.height - top), cols: tp.w, rows: tp.h, inset: 4, gap: 3)
         panel.setFill(); UIBezierPath(roundedRect: box, cornerRadius: 8).fill()
         // which faces you have: number them 1…4 in the order the reader saw them
-        let codes = Array(Set(cells.filter { $0 >= 3 && $0 <= 6 })).sorted()
+        let codes = Array(Set((tp.mine + [tp.hand]).filter { $0 >= 3 && $0 <= 7 })).sorted()
         func tile(_ v: Int, _ t: CGRect) {
             let p = UIBezierPath(roundedRect: t.insetBy(dx: 1, dy: 1), cornerRadius: 6)
             switch v {
             case 0: UIColor(red: 0.93, green: 0.48, blue: 0.22, alpha: 1).setFill(); p.fill()
             case 1: UIColor(white: 0.45, alpha: 1).setFill(); p.fill()
             case 2: UIColor(red: 0.25, green: 0.80, blue: 0.95, alpha: 1).setFill(); p.fill()
-            case 7...: // a picture not known yet to be yours or theirs
+            case 8...: // a picture not known yet to be yours or theirs
                 UIColor(white: 0.78, alpha: 1).setFill(); p.fill()
                 let a: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: t.height * 0.42, weight: .heavy), .foregroundColor: bg]
                 let txt = "?" as NSString, sz = txt.size(withAttributes: a)
@@ -236,10 +236,10 @@ enum Renderer {
                 txt.draw(at: CGPoint(x: t.midX - sz.width / 2, y: t.midY - sz.height / 2), withAttributes: a)
             }
         }
-        for rr in 0..<4 { for c in 0..<4 { tile(cells[TP.mine + rr * 4 + c], cell(rr, c)) } }
+        for rr in 0..<tp.h { for c in 0..<tp.w { tile(tp.mine[rr * tp.w + c], cell(rr, c)) } }
         // the tile in hand, above the column to push it into (centred when there is no answer)
-        let hand = cells[TP.hand]
-        if hand == 2 || (hand >= 3 && hand <= 6) {
+        let hand = tp.hand
+        if hand == 2 || (hand >= 3 && hand <= 7) {
             let col = o.rec ?? -1
             let x = col >= 0 ? cell(0, col).midX : box.midX
             let ht = CGRect(x: x - cs * 0.4, y: r.minY + 2, width: cs * 0.8, height: cs * 0.8)
@@ -250,7 +250,7 @@ enum Renderer {
                 a.move(to: CGPoint(x: x - 12, y: ht.maxY + 4)); a.addLine(to: CGPoint(x: x + 12, y: ht.maxY + 4))
                 a.addLine(to: CGPoint(x: x, y: box.minY - 2)); a.close(); a.fill()
                 gold.setStroke()
-                let hl = UIBezierPath(roundedRect: CGRect(x: cell(0, col).minX - 2, y: cell(0, col).minY - 2, width: cs + 4, height: cell(3, col).maxY - cell(0, col).minY + 4), cornerRadius: 7)
+                let hl = UIBezierPath(roundedRect: CGRect(x: cell(0, col).minX - 2, y: cell(0, col).minY - 2, width: cs + 4, height: cell(tp.h - 1, col).maxY - cell(0, col).minY + 4), cornerRadius: 7)
                 hl.lineWidth = 4; hl.stroke()
             }
         }
