@@ -59,27 +59,53 @@ final class ReaderTests: XCTestCase {
 
 /// Tile Push: frames from Atom's recording of 30 Oct (11:36)
 final class TilePushReaderTests: XCTestCase {
+    /// the reader learns from steady frames: read the same frame a few times, like the screen recording does
+    func steady(_ s: BoardReader.Sampler, _ n: Int = 5) -> BoardMessage {
+        var m = BoardReader.read(s)
+        for _ in 1..<n { m = BoardReader.read(s) }
+        return m
+    }
+
     func testFrames() throws {
         let rt = ReaderTests()
-        // your move, holding 😭: the faces 😂 joker 😇 😤 on top, two 😇 lower down beside cheese and a skewer
-        let s0 = try rt.sampler("tp-030.png")
-        print("TP size", s0.w, s0.h, [(1100.0, 1250.0), (590, 1100), (100, 1000), (367, 1558), (367, 1729)].map { s0.avg($0.0, $0.1, 3) })
-        let a = BoardReader.read(s0)
-        print("TP 030", a.game, a.cells, a.myTurn)
+        BoardReader.tpReset()
+        // your move (2 s left), holding 😭: 😂 joker 😇 😤 on top, two 😇 lower down beside cheese and a skewer
+        let a = steady(try rt.sampler("tp-030.png"))
+        print("TP 030", a.game, a.valid, a.cells, a.myTurn)
         XCTAssertEqual(a.game, .tilePush)
-        XCTAssertEqual(Array(a.cells[0..<16]), [3, 2, 4, 5, 0, 0, 0, 0, 0, 4, 1, 0, 0, 4, 1, 0])
-        XCTAssertEqual(Array(a.cells[16..<32]), [0, 1, 6, 0, 0, 1, 6, 0, 0, 0, 0, 0, 0, 1, 1, 0])
-        XCTAssertEqual(a.cells[32], 6)
+        XCTAssertTrue(a.valid)
+        let c = a.cells
+        XCTAssertEqual(c[32], 3, "😭 in hand on your turn is yours")
         XCTAssertTrue(a.myTurn)
-        let b = BoardReader.read(try rt.sampler("tp-060.png"))
-        print("TP 060", b.game, b.cells, b.myTurn)
-        XCTAssertEqual(b.game, .tilePush)
-        XCTAssertEqual(Array(b.cells[0..<16]), [3, 4, 5, 6, 0, 2, 5, 0, 0, 0, 0, 0, 0, 5, 1, 0])
+        XCTAssertEqual(c[1], 2, "joker")
+        for i in [4, 5, 6, 7, 8, 11, 12, 15] { XCTAssertEqual(c[i], 0, "face down \(i)") }
+        XCTAssertEqual(c[9], c[13], "two 😇")
+        XCTAssertEqual(c[2], c[9], "😇 on top too")
+        XCTAssertNotEqual(c[10], c[9], "cheese is not 😇")
+        XCTAssertEqual(c[16 + 2], 3, "😭 in the opponent's map")
+        XCTAssertEqual(c[16 + 6], 3)
+        XCTAssertEqual(c[10], c[16 + 1], "cheese in both maps")
+        XCTAssertEqual(Set([c[0], c[2], c[3], c[10], c[14]]).count, 5, "five different pictures")
+
+        // the opponent's move: not yours
+        let b = steady(try rt.sampler("tp-060.png"))
+        print("TP 060", b.game, b.valid, b.cells, b.myTurn)
+        XCTAssertTrue(b.valid)
         XCTAssertFalse(b.myTurn)
-        let c = BoardReader.read(try rt.sampler("tp-176.png"))
-        print("TP 176", c.game, c.cells, c.myTurn)
-        XCTAssertEqual(Array(c.cells[0..<16]), [3, 4, 5, 6, 3, 4, 5, 6, 3, 4, 5, 2, 3, 4, 5, 6])
+        XCTAssertEqual(b.cells[1], 3, "😭 pushed into the joker's column")
+        XCTAssertEqual(b.cells[5], 2, "joker one down")
+
+        let e = steady(try rt.sampler("tp-176.png"))
+        print("TP 176", e.game, e.valid, e.cells, e.myTurn)
+        XCTAssertTrue(e.valid)
+        for c4 in 0..<4 { XCTAssertEqual(Set((0..<4).map { e.cells[$0 * 4 + c4] }.filter { $0 != 2 }).count, 1, "column \(c4) one picture") }
+
+        // Atom's screenshot 12:59 (other pictures: food for him, animals for the opponent): the YOUR TURN banner is up
+        let f = try rt.sampler("tp-banner.png")
+        XCTAssertTrue(BoardReader.looksLikeTilePush(f))
+        XCTAssertTrue(BoardReader.tpBanner(f))
+        XCTAssertFalse(BoardReader.tpBanner(try rt.sampler("tp-030.png")))
         // other games' screenshots are not Tile Push
-        for f in ["suika-1952.png"] { XCTAssertFalse(BoardReader.looksLikeTilePush(try rt.sampler(f)), f) }
+        XCTAssertFalse(BoardReader.looksLikeTilePush(try rt.sampler("suika-1952.png")))
     }
 }

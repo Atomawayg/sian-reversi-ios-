@@ -19,6 +19,8 @@ final class TilePushEngine {
     private static let N = 4
 
     static func top(_ g: Grid, _ c: Int) -> Int { g[c] }
+    static func isMine(_ v: Int) -> Bool { v >= 3 && v <= 6 }
+    static func isUnknown(_ v: Int) -> Bool { v >= 7 }
     static func colCells(_ g: Grid, _ c: Int) -> [Int] { (0..<N).map { g[$0 * N + c] } }
 
     /// the face a column is built of and how many tiles from the top already fit it
@@ -26,7 +28,7 @@ final class TilePushEngine {
         var face = -1, len = 0
         for v in col {
             if v == 2 { len += 1; continue }
-            if v >= 3 && (face < 0 || face == v) { face = v; len += 1; continue }
+            if isMine(v) && (face < 0 || face == v) { face = v; len += 1; continue }
             break
         }
         return (face, len)
@@ -59,7 +61,7 @@ final class TilePushEngine {
             let p = prefix(col)
             if p.len == N { doneN += 1 }
             // a tile of yours lower down pops out to you later (a free extra move): small bonus
-            for r in p.len..<N where col[r] >= 2 { total += r == N - 1 ? 1.5 : 0.5 }
+            for r in p.len..<N where col[r] == 2 || isMine(col[r]) { total += r == N - 1 ? 1.5 : 0.5 }
             if p.face < 0 { total += runValue[p.len] }
             else { byFace[p.face, default: []].append(runValue[p.len]) }
         }
@@ -76,7 +78,7 @@ final class TilePushEngine {
         var seen: [Int: Int] = [:]
         var hidden = 0, jokerSeen = false
         for v in g + opp + (hand == 0 ? [] : [hand]) {
-            if v == 0 { hidden += 1 } else if v == 2 { jokerSeen = true } else if v >= 3 { seen[v, default: 0] += 1 }
+            if v == 0 { hidden += 1 } else if v == 2 { jokerSeen = true } else if isMine(v) { seen[v, default: 0] += 1 }
         }
         guard hidden > 0 else { return [(1, 1)] }
         var out: [(Int, Double)] = []
@@ -85,7 +87,7 @@ final class TilePushEngine {
         // faces not seen yet: a new code each (only "different from the others" matters)
         let unseen = max(0, N - seen.count)
         var nextCode = (seen.keys.max() ?? 2) + 1
-        for _ in 0..<unseen where nextCode <= 13 { out.append((nextCode, 4)); mineLeft += 4; nextCode += 1 }
+        for _ in 0..<unseen where nextCode <= 6 { out.append((nextCode, 4)); mineLeft += 4; nextCode += 1 }
         if !jokerSeen { out.append((2, 1)); mineLeft += 1 }
         let H = Double(hidden)
         let scale = mineLeft > H ? H / mineLeft : 1
@@ -113,6 +115,9 @@ final class TilePushEngine {
         let base = Self.eval(n)
         if base >= 10000 { return base + Double(depth) }      // won: sooner is better
         if out == 1 { return base }                            // turn over
+        if Self.isUnknown(out) {                               // a picture not known yet: yours or theirs, even odds
+            return 0.5 * base + 0.5 * (depth <= 1 ? base + 4 : hold(n, out, opp, depth - 1, p * 0.5))
+        }
         if depth <= 1 || p < 0.02 || nodes > 15000 {
             if out == 0 { return base + 4 * Self.mineChance(n, opp) }
             return base + 4                                    // still yours to place
@@ -133,7 +138,7 @@ final class TilePushEngine {
 
     func think(mine g: Grid, opp: Grid, hand t: Int, depth: Int = 5) -> TPResult {
         var r = TPResult()
-        guard t == 2 || t >= 3 else { return r }
+        guard t == 2 || Self.isMine(t) else { return r }
         var best = -Double.infinity
         for c in 0..<Self.N where Self.allowed(g, c, t) {
             nodes = 0
@@ -142,7 +147,7 @@ final class TilePushEngine {
                 best = v; r.col = c; r.value = v
                 let (n, out) = Self.push(g, c, t)
                 r.popped = out == 0 ? -1 : out
-                r.keep = out == 0 ? Self.mineChance(n, opp) : (out == 1 ? 0 : 1)
+                r.keep = out == 0 ? Self.mineChance(n, opp) : (out == 1 ? 0 : (Self.isUnknown(out) ? 0.5 : 1))
                 r.completes = Self.done(n, c)
                 r.win = (0..<Self.N).allSatisfy { Self.done(n, $0) }
             }
