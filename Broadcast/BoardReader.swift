@@ -77,6 +77,8 @@ enum BoardReader {
         if looksLikeSuika(s) { return readSuika(s) }
         // WePlay Pool: felt in the middle, dark pockets, wooden rail
         if PoolReader.looksLikePool(s) { return PoolReader.read(s) }
+        // WePlay Tile Push: sand background, a 4×4 map of orange / white tiles at the bottom
+        if looksLikeTilePush(s) { return readTilePush(s) }
         // Plato chess / checkers: wooden frame on both sides of the board.
         if PlatoBoardReader.looksLikeBoard(s), let m = PlatoBoardReader.read(s) { return m }
         // Jackaroo has a green table under the board; the others differ in the top-left corner.

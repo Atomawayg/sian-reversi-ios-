@@ -102,6 +102,7 @@ enum Renderer {
             case .chess: drawChess(o, cells, CGRect(x: pad, y: pad, width: side, height: side))
             case .connect4, .connect5: drawConnect(o, cells, CGRect(x: pad, y: pad, width: side, height: side))
             case .suika: drawSuika(o, cells, CGRect(x: pad, y: pad, width: side, height: side))
+            case .tilePush: drawTilePush(o, cells, CGRect(x: pad, y: pad, width: side, height: side))
             case .jackaroo, .pool: break
             }
             textX = pad + side + 24
@@ -194,6 +195,59 @@ enum Renderer {
             let last = pts[pts.count - 1]
             arrow.setFill(); UIBezierPath(ovalIn: CGRect(x: last.x - cs * 0.22, y: last.y - cs * 0.22, width: cs * 0.44, height: cs * 0.44)).fill()
             ring(cell(o.path[0] / 8, o.path[0] % 8), cs)
+        }
+    }
+
+    /// Tile Push: your map (faces as coloured numbered tiles), the tile in hand above it, an arrow over the column to tap.
+    private static let tpFace: [UIColor] = [
+        UIColor(red: 0.95, green: 0.78, blue: 0.22, alpha: 1), UIColor(red: 0.36, green: 0.62, blue: 0.95, alpha: 1),
+        UIColor(red: 0.55, green: 0.85, blue: 0.45, alpha: 1), UIColor(red: 0.90, green: 0.45, blue: 0.75, alpha: 1),
+        UIColor(red: 0.98, green: 0.60, blue: 0.30, alpha: 1), UIColor(red: 0.70, green: 0.55, blue: 0.95, alpha: 1)]
+    private static func drawTilePush(_ o: Overlay, _ cells: [Int], _ r: CGRect) {
+        guard cells.count == TP.count else { return }
+        let top: CGFloat = 70
+        let (cs, cell, box) = grid(CGRect(x: r.minX, y: r.minY + top, width: r.width, height: r.height - top), cols: 4, rows: 4, inset: 4, gap: 3)
+        panel.setFill(); UIBezierPath(roundedRect: box, cornerRadius: 8).fill()
+        // which faces you have: number them 1…4 in the order the reader saw them
+        let codes = Array(Set(cells.filter { $0 >= 3 })).sorted()
+        func tile(_ v: Int, _ t: CGRect) {
+            let p = UIBezierPath(roundedRect: t.insetBy(dx: 1, dy: 1), cornerRadius: 6)
+            switch v {
+            case 0: UIColor(red: 0.93, green: 0.48, blue: 0.22, alpha: 1).setFill(); p.fill()
+            case 1: UIColor(white: 0.45, alpha: 1).setFill(); p.fill()
+            case 2: UIColor(red: 0.25, green: 0.80, blue: 0.95, alpha: 1).setFill(); p.fill()
+            default:
+                UIColor.white.setFill(); p.fill()
+                let i = codes.firstIndex(of: v) ?? 0
+                tpFace[i % tpFace.count].setFill()
+                UIBezierPath(ovalIn: t.insetBy(dx: t.width * 0.16, dy: t.height * 0.16)).fill()
+                let a: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: t.height * 0.42, weight: .heavy), .foregroundColor: bg]
+                let txt = "\(i + 1)" as NSString, sz = txt.size(withAttributes: a)
+                txt.draw(at: CGPoint(x: t.midX - sz.width / 2, y: t.midY - sz.height / 2), withAttributes: a)
+            }
+            if v == 2 {
+                let a: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: t.height * 0.42, weight: .heavy), .foregroundColor: bg]
+                let txt = "★" as NSString, sz = txt.size(withAttributes: a)
+                txt.draw(at: CGPoint(x: t.midX - sz.width / 2, y: t.midY - sz.height / 2), withAttributes: a)
+            }
+        }
+        for rr in 0..<4 { for c in 0..<4 { tile(cells[TP.mine + rr * 4 + c], cell(rr, c)) } }
+        // the tile in hand, above the column to push it into (centred when there is no answer)
+        let hand = cells[TP.hand]
+        if hand == 2 || hand >= 3 {
+            let col = o.rec ?? -1
+            let x = col >= 0 ? cell(0, col).midX : box.midX
+            let ht = CGRect(x: x - cs * 0.4, y: r.minY + 2, width: cs * 0.8, height: cs * 0.8)
+            tile(hand, ht)
+            if col >= 0 {
+                gold.setFill()
+                let a = UIBezierPath()
+                a.move(to: CGPoint(x: x - 12, y: ht.maxY + 4)); a.addLine(to: CGPoint(x: x + 12, y: ht.maxY + 4))
+                a.addLine(to: CGPoint(x: x, y: box.minY - 2)); a.close(); a.fill()
+                gold.setStroke()
+                let hl = UIBezierPath(roundedRect: CGRect(x: cell(0, col).minX - 2, y: cell(0, col).minY - 2, width: cs + 4, height: cell(3, col).maxY - cell(0, col).minY + 4), cornerRadius: 7)
+                hl.lineWidth = 4; hl.stroke()
+            }
         }
     }
 

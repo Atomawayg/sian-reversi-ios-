@@ -73,7 +73,7 @@ class SampleHandler: RPBroadcastSampleHandler {
         if msg.cells != glowCells { glowCells = msg.cells; lastGlow = 0 }
         if msg.myTurn { lastGlow = t }
         // Plato shows a steady "Your Turn" pill: use it as is (holding it on would think on the opponent's turn)
-        if msg.game != .chess && msg.game != .draughts { msg.myTurn = msg.valid && t - lastGlow < 1.2 }
+        if msg.game != .chess && msg.game != .draughts && msg.game != .tilePush { msg.myTurn = msg.valid && t - lastGlow < 1.2 }
         prev = msg
         if !stable { return }
         if msg != sent || t - lastSent > 1.0 {

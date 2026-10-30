@@ -1,0 +1,29 @@
+name: Tile Push tests
+on:
+  push:
+    branches: ['tp/**']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  test:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install xcodegen && xcodegen generate
+      - name: Test
+        run: |
+          set -o pipefail
+          UDID=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(next(x['udid'] for k,v in d.items() if 'iOS' in k for x in v if x['name'].startswith('iPhone')))")
+          xcodebuild test -project SianReversi.xcodeproj -scheme SianReversi -destination "id=$UDID" -derivedDataPath build CODE_SIGNING_ALLOWED=NO \
+            -only-testing:SianTests/TilePushTests -only-testing:ReaderTests/TilePushReaderTests 2>&1 | tee test.log | grep -E "error:|Test Case|TP |XCTAssert|passed|failed|TEST" || true
+          grep -q "TEST SUCCEEDED" test.log
+      - name: Push results to a branch
+        if: always()
+        run: |
+          git config user.name "tp-bot"; git config user.email "tp-bot@users.noreply.github.com"
+          B="tp-out/${GITHUB_RUN_ID}"
+          mkdir -p Tests/out; cp test.log Tests/out/ 2>/dev/null || true
+          git checkout --orphan "$B"; git rm -rq --cached . >/dev/null
+          git add -f Tests/out; git commit -qm "tp results"; git push -q origin "$B"

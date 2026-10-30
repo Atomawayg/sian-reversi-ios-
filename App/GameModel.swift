@@ -151,6 +151,7 @@ final class GameModel: ObservableObject {
         case .draughts: handleDraughts(m); return
         case .suika: handleSuika(m); return
         case .pool: handlePool(m); return
+        case .tilePush: handleTilePush(m); return
         case .reversi: break
         }
         let rv = rvTrack.check(m.cells) { b, p in ReversiRules.successors(b, colour: p + 1) }
@@ -1252,6 +1253,40 @@ final class GameModel: ObservableObject {
                 self.skLastSuggest = r.x
                 if self.logOn { self.log(String(format: "A x=%.0f land=%@ fill=%.2f merges=%@", r.x, r.land.map { String(format: "%.0f,%.0f", $0.x, $0.y) } ?? "-", r.fill, r.merges.map(String.init).joined(separator: ","))) }
                 self.show(self.skOverlay(self.skComputed))
+            }
+        }
+    }
+
+    // MARK: Tile Push
+    private let tilePush = TilePushEngine()
+    private func handleTilePush(_ m: BoardMessage) {
+        let mine = Array(m.cells[TP.mine..<TP.mine + 16]), opp = Array(m.cells[TP.opp..<TP.opp + 16]), hand = m.cells[TP.hand]
+        guard m.myTurn else {
+            computedFor = []; gen += 1
+            show(Overlay(game: .tilePush, cells: m.cells, title: "รอ…", line: "ตาคู่แข่ง"))
+            return
+        }
+        let key = [300] + m.cells
+        if key == computedFor { return }
+        computedFor = key; gen += 1
+        let g = gen
+        work.async { [weak self] in
+            guard let self else { return }
+            let r = self.tilePush.think(mine: mine, opp: opp, hand: hand)
+            DispatchQueue.main.async {
+                guard g == self.gen else { return }
+                guard r.col >= 0 else {
+                    self.show(Overlay(game: .tilePush, cells: m.cells, title: "?", line: "ไม่มีคอลัมน์ที่วางได้", mine: true))
+                    return
+                }
+                var line: String
+                if r.win { line = "ชนะเลย!" }
+                else if r.completes { line = "ครบคอลัมน์" }
+                else if r.popped == 1 { line = "ของกินหล่น · หมดตา" }
+                else if r.popped >= 2 { line = "ได้เล่นต่อแน่" }
+                else { line = "ลุ้นเล่นต่อ \(Int((r.keep * 100).rounded()))%" }
+                if r.completes && !r.win { line += r.popped == 1 ? " · หมดตา" : (r.popped >= 2 ? " · เล่นต่อ" : "") }
+                self.show(Overlay(game: .tilePush, cells: m.cells, rec: r.col, title: "ช่อง \(r.col + 1)", line: line, mine: true))
             }
         }
     }
