@@ -7,7 +7,7 @@ extension BoardReader {
     static let tpCols: [Double] = [417, 570, 722, 874]
     static let tpRows: [Double] = [1608, 1779, 1950, 2120]
     static let tpOppCols: [Double] = [306, 459, 612, 764]
-    static let tpOppRows: [Double] = [410, 582, 752, 922]
+    static let tpOppRows: [Double] = [417, 588, 759, 930]
     static let tpCentre = (x: 591.0, y: 1258.0)
 
     private static func tpSand(_ p: (Double, Double, Double)) -> Bool {
@@ -18,7 +18,7 @@ extension BoardReader {
     /// kind: 0 face down, 1 other picture, 2 joker, 3 one of your faces, -1 not a resting tile (moving / covered)
     static func tpTile(_ s: Sampler, _ x: Double, _ y: Double) -> (kind: Int, sig: [Double]) {
         let sx = Double(s.w) / 1180, sy = Double(s.h) / 2556
-        var n = 0.0, orange = 0.0, white = 0.0, blue = 0.0, emo = 0.0, ne = 0.0
+        var n = 0.0, orange = 0.0, white = 0.0, blue = 0.0, emo = 0.0, ne = 0.0, ex = 0.0, ey = 0.0
         var dy = -54.0
         while dy <= 54 {
             var dx = -54.0
@@ -31,22 +31,25 @@ extension BoardReader {
                 if b > 180 && b - r > 80 { blue += 1 }
                 if abs(dx) <= 42 && abs(dy) <= 42 {
                     ne += 1
-                    if r > 225 && g > 185 && g < 228 && b < 100 { emo += 1 }   // emoji yellow (cheese is darker: g ≈ 179)
+                    if r > 225 && g > 185 && g < 228 && b < 100 { emo += 1; ex += dx; ey += dy }   // emoji yellow (cheese is darker: g ≈ 179)
                 }
                 dx += 3
             }
             dy += 3
         }
-        orange /= n; white /= n; blue /= n; emo /= max(1, ne)
+        orange /= n; white /= n; blue /= n
+        let emoN = emo; emo /= max(1, ne)
         if orange > 0.6 { return (0, []) }
         if white < 0.15 { return (-1, []) }
         if blue > 0.12 { return (2, []) }
         guard emo > 0.35 else { return (1, []) }
+        // the picture is taken around the yellow face's middle, so a few px off in the tile position don't matter
+        let fx = x + ex / emoN, fy = y + ey / emoN
         var sig: [Double] = []
         for j in 0..<6 { for i in 0..<6 {
             var r = 0.0, g = 0.0, b = 0.0
             for v in 0..<4 { for u in 0..<4 {
-                let p = s.get(Int((x - 48 + Double(i * 16 + u * 4 + 2)) * sx), Int((y - 48 + Double(j * 16 + v * 4 + 2)) * sy))
+                let p = s.get(Int((fx - 48 + Double(i * 16 + u * 4 + 2)) * sx), Int((fy - 48 + Double(j * 16 + v * 4 + 2)) * sy))
                 r += p.0; g += p.1; b += p.2
             } }
             sig += [r / 16, g / 16, b / 16]
@@ -86,7 +89,7 @@ extension BoardReader {
             for (i, f) in faces.enumerated() {
                 var d = 0.0
                 for q in 0..<f.count { d += abs(f[q] - t.sig[q]) }
-                if d / Double(f.count) < 7 { id = i; break }
+                if d / Double(f.count) < 8 { id = i; break }
             }
             if id < 0 { faces.append(t.sig); id = faces.count - 1 }
             cells.append(min(13, 3 + id))
