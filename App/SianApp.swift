@@ -48,6 +48,7 @@ struct ContentView: View {
         GameInfo(kind: .draughts, name: "Checkers", place: "Plato", icon: "circle.grid.2x2.fill"),
         GameInfo(kind: .suika, name: "รวมผลไม้", place: "WePlay", icon: "leaf.fill"),
         GameInfo(kind: .pool, name: "พูล", place: "WePlay", icon: "circle.circle.fill"),
+        GameInfo(kind: .tilePush, name: "Tile Push", place: "WePlay", icon: "square.grid.3x3.fill"),
     ]
 
     var body: some View {

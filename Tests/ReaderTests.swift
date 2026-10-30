@@ -56,3 +56,28 @@ final class ReaderTests: XCTestCase {
         XCTAssertLessThanOrEqual(total, 5, "fruits misread across the saved screenshots (5 of ~350: cherries almost hidden behind a big fruit)")
     }
 }
+
+/// Tile Push: frames from Atom's recording of 30 Oct (11:36)
+final class TilePushReaderTests: XCTestCase {
+    func testFrames() throws {
+        let rt = ReaderTests()
+        // your move, holding 😭: the faces 😂 joker 😇 😤 on top, two 😇 lower down beside cheese and a skewer
+        let a = BoardReader.read(try rt.sampler("tp-030.png"))
+        print("TP 030", a.game, a.cells, a.myTurn)
+        XCTAssertEqual(a.game, .tilePush)
+        XCTAssertEqual(Array(a.cells[0..<16]), [3, 2, 4, 5, 0, 0, 0, 0, 0, 4, 1, 0, 0, 4, 1, 0])
+        XCTAssertEqual(Array(a.cells[16..<32]), [0, 1, 6, 0, 0, 1, 6, 0, 0, 0, 0, 0, 0, 1, 1, 0])
+        XCTAssertEqual(a.cells[32], 6)
+        XCTAssertTrue(a.myTurn)
+        let b = BoardReader.read(try rt.sampler("tp-060.png"))
+        print("TP 060", b.game, b.cells, b.myTurn)
+        XCTAssertEqual(b.game, .tilePush)
+        XCTAssertEqual(Array(b.cells[0..<16]), [3, 4, 5, 6, 0, 2, 5, 0, 0, 0, 0, 0, 0, 5, 1, 0])
+        XCTAssertFalse(b.myTurn)
+        let c = BoardReader.read(try rt.sampler("tp-176.png"))
+        print("TP 176", c.game, c.cells, c.myTurn)
+        XCTAssertEqual(Array(c.cells[0..<16]), [3, 4, 5, 6, 3, 4, 5, 6, 3, 4, 5, 2, 3, 4, 5, 6])
+        // other games' screenshots are not Tile Push
+        for f in ["suika-1952.png"] { XCTAssertFalse(BoardReader.looksLikeTilePush(try rt.sampler(f)), f) }
+    }
+}

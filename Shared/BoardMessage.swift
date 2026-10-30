@@ -11,9 +11,10 @@ enum GameKind: Int, Codable {
     case draughts = 6     // Plato checkers (English rules): 64 cells, 0 empty, 1 red, 2 white, 3 red king, 4 white king
     case suika = 7        // WePlay Frog Watermelon (fruit merge): see SK layout
     case pool = 8         // WePlay Pool / 8-ball: see PoolCodec layout
+    case tilePush = 9     // WePlay Tile Push (4×4): see TP layout
 
     var size: (w: Int, h: Int) {
-        switch self { case .reversi, .checkers, .chess, .draughts: return (8, 8); case .connect4: return (7, 6); case .connect5: return (9, 7); case .jackaroo: return (JK.count, 1); case .suika: return (SK.count, 1); case .pool: return (PoolCodec.count, 1) }
+        switch self { case .reversi, .checkers, .chess, .draughts: return (8, 8); case .connect4: return (7, 6); case .connect5: return (9, 7); case .jackaroo: return (JK.count, 1); case .suika: return (SK.count, 1); case .pool: return (PoolCodec.count, 1); case .tilePush: return (TP.count, 1) }
     }
 }
 
@@ -33,6 +34,13 @@ struct BoardMessage: Codable, Equatable {
 
 enum Link {
     static let port: UInt16 = 52741
+}
+
+/// Tile Push message layout: 16 cells of your map (row-major, top row first), 16 of the opponent's, then the tile in hand.
+/// 0 face down, 1 not yours (food…), 2 the blue cat joker, 3…13 your faces (same number = same face).
+enum TP {
+    static let mine = 0, opp = 16, hand = 32, count = 33
+    static let n = 4
 }
 
 /// Jackaroo message layout (cells): colours 0 none, 1 green, 2 red, 3 blue, 4 orange.
