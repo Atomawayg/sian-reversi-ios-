@@ -98,7 +98,7 @@ extension BoardReader {
         }
         if m < 30 { return (-1, []) }
         let cx = x + (x0 + x1) / 2 * k, cy = y + (y0 + y1) / 2 * k
-        // 8×8 blocks of average colour over the picture (block averages don't mind small shifts, scale or a low-res frame)
+        // 12×12 blocks of average colour over the picture (block averages don't mind small shifts, scale or a low-res frame)
         var sig = [Float](repeating: 0, count: tpSide * tpSide * 3)
         let half = 46.0, step = 2 * half / Double(tpSide)
         for j in 0..<tpSide { for i in 0..<tpSide {
@@ -113,15 +113,15 @@ extension BoardReader {
         return (1, sig)
     }
 
-    static let tpSide = 8
+    static let tpSide = 12
     /// how different two pictures are: mean colour difference, letting one slide a sample (4 px) each way
     static func tpDist(_ a: [Float], _ b: [Float]) -> Float {
         var t: Float = 0
         for i in 0..<min(a.count, b.count) { t += abs(a[i] - b[i]) }
         return t / Float(max(1, a.count))
     }
-    /// same picture below this (Atom's 6×5 clip at 442 px wide: same ≲ 16, different ≳ 30)
-    static let tpSame: Float = 24
+    /// same picture below this (Atom's 6×5 clip at 442 px wide: same ≲ 16, different ≳ 24; emoji alike: same ≲ 16, different ≳ 24)
+    static let tpSame: Float = 18
 
     /// "YOUR TURN!" banner across the screen (it covers your top row)
     static func tpBanner(_ s: Sampler) -> Bool {
@@ -242,7 +242,7 @@ extension BoardReader {
         while tpLib.count > 2 * tpKinds {
             var bi = 0, bj = 1, bd: Float = .infinity
             for i in 0..<tpLib.count { for j in (i + 1)..<tpLib.count { let d = tpDist(tpLib[i].sig, tpLib[j].sig); if d < bd { bd = d; bi = i; bj = j } } }
-            if bd > 2 * tpSame { break }
+            if bd > 24 { break }
             tpLib[bi].mine += tpLib[bj].mine; tpLib[bi].opp += tpLib[bj].opp
             tpLib.remove(at: bj)
             lib = lib.map { $0 == bj ? bi : ($0 > bj ? $0 - 1 : $0) }
