@@ -38,14 +38,14 @@ final class TilePushTests: XCTestCase {
         XCTAssertEqual(r.keep, 1)
     }
 
-    /// never push onto a different face; a finished column is closed
+    /// never push onto a different face
     func testRules() {
         TilePushEngine.W = 4; TilePushEngine.H = 4
         let g = [3, 4, 0, 0,
                  3, 0, 0, 0,
                  3, 0, 0, 0,
                  3, 0, 0, 0]
-        XCTAssertFalse(TilePushEngine.allowed(g, 0, 3))
+        XCTAssertTrue(TilePushEngine.allowed(g, 0, 3), "a finished column still takes its own face")
         XCTAssertFalse(TilePushEngine.allowed(g, 1, 3))
         XCTAssertTrue(TilePushEngine.allowed(g, 1, 4))
         XCTAssertTrue(TilePushEngine.allowed(g, 1, 2))
@@ -97,6 +97,19 @@ final class TilePushTests: XCTestCase {
                  0, 0, 0]
         let r = e.think(mine: g, opp: [Int](repeating: 0, count: 9), hand: 3, cols: 3, rows: 3)
         XCTAssertEqual(r.col, 0)
+        XCTAssertTrue(r.completes)
+    }
+
+    /// Atom's 14:20: holding coffee, coffee ×3 + joker in the first column, nothing else takes coffee.
+    /// Pushing it there keeps the column whole and gives the joker back (play on).
+    func testPushIntoFinishedColumn() {
+        let g = [3, 4, 5, 9, 6,
+                 3, 4, 5, 0, 6,
+                 3, 4, 0, 0, 6,
+                 2, 4, 0, 1, 0]
+        let r = e.think(mine: g, opp: [Int](repeating: 0, count: 20), hand: 3, cols: 5, rows: 4)
+        XCTAssertEqual(r.col, 0)
+        XCTAssertEqual(r.popped, 2)
         XCTAssertTrue(r.completes)
     }
 

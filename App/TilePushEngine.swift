@@ -3,7 +3,8 @@ import Foundation
 /// Tile Push: which column to push the tile in hand into.
 /// Rules (Atom, 30 Oct): the tile goes in at the top of a column, the column slides down one and its bottom tile pops out
 /// into the middle. Yours (a face or the joker): you place it next. Not yours: it goes to the opponent and your turn ends.
-/// A tile may only go on a face-down tile, the same face or the joker. A column all of one face (joker = any) is done;
+/// A tile may only go on a face-down tile, the same face or the joker (the joker goes anywhere). A column all of one face
+/// (joker = any) is done;
 /// all columns done wins. The map is 3×3, 4×4 or 5 wide × 4 high: each player has one picture per column, as many of each
 /// as there are rows; one joker in the game.
 struct TPResult {
@@ -37,8 +38,9 @@ final class TilePushEngine {
     }
     static func done(_ g: Grid, _ c: Int) -> Bool { prefix(colCells(g, c)).len == H }
 
+    /// A finished column can still be pushed into (Atom, 30 Oct 14:20): 3 coffees + joker, push a coffee → 4 coffees and
+    /// the joker pops back to you (you keep playing and can use it on another column).
     static func allowed(_ g: Grid, _ c: Int, _ t: Int) -> Bool {
-        if done(g, c) { return false }
         let tp = g[c]
         return tp == 0 || tp == 2 || t == 2 || tp == t
     }
@@ -115,7 +117,9 @@ final class TilePushEngine {
 
     private func after(_ g: Grid, _ c: Int, _ t: Int, _ opp: Grid, _ depth: Int, _ p: Double) -> Double {
         let (n, out) = Self.push(g, c, t)
-        let base = Self.eval(n)
+        var base = Self.eval(n)
+        // pushing a finished column round and round gets nowhere (only worth it to win the joker back)
+        if Self.done(g, c) && out != 2 { base -= 6 }
         if base >= 10000 { return base + Double(depth) }      // won: sooner is better
         if out == 1 { return base }                            // turn over
         if Self.isUnknown(out) {                               // a picture not known yet: yours or theirs, even odds
