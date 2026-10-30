@@ -1,0 +1,5 @@
+4 4 400 greedy random
+4 4 400 engine greedy
+5 4 400 engine greedy
+5 5 200 engine greedy
+3 3 400 engine greedy

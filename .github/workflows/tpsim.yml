@@ -1,0 +1,26 @@
+name: Tile Push sim
+# Self-play on Linux: lines of Tools/TPSim/matches.txt ("cols rows games A B"); each result is a notice on the run.
+on:
+  push:
+    branches: ['tpsim/**']
+permissions:
+  contents: read
+jobs:
+  sim:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          cp App/TilePushEngine.swift Tools/TPSim/Sources/TPSim/
+          swift build -c release --package-path Tools/TPSim 2>&1 | grep -vE "^\[[0-9]+/[0-9]+\]" | tail -40
+      - name: Play
+        run: |
+          B=$(swift build -c release --package-path Tools/TPSim --show-bin-path)/TPSim
+          nproc
+          while read -r w h n x y; do
+            [ -z "$w" ] && continue
+            $B $w $h $n $x $y | tee -a results.txt
+            echo "::notice title=tpsim::$(tail -1 results.txt)"
+          done < Tools/TPSim/matches.txt
