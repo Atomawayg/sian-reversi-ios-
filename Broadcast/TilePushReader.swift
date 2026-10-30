@@ -161,7 +161,7 @@ extension BoardReader {
 
     /// The pictures seen this game and who they belong to (votes: in hand on your turn / on the opponent's).
     /// Each player gets four pictures at random each game, so they are learnt while you play.
-    struct TPPicture { var sig: [Float]; var mine = 0; var opp = 0 }
+    struct TPPicture { var sig: [Float]; var mine = 0; var opp = 0; var hits = 0 }
     static var tpLib: [TPPicture] = []
     static var tpPrevKey: [Int] = []
     static var tpObs = (turn: 0, pic: -1, n: 0)
@@ -235,6 +235,7 @@ extension BoardReader {
             for (i, p) in tpLib.enumerated() { let d = tpDist(r, p.sig); if d < bd { bd = d; best = i } }
             if best >= 0 && bd < tpSame {
                 for q in 0..<r.count { tpLib[best].sig[q] = 0.8 * tpLib[best].sig[q] + 0.2 * r[q] }   // slow drift, no jumps
+                tpLib[best].hits += 1
                 lib.append(best)
             } else { tpLib.append(TPPicture(sig: r)); lib.append(tpLib.count - 1) }
         }
@@ -247,7 +248,14 @@ extension BoardReader {
             tpLib.remove(at: bj)
             lib = lib.map { $0 == bj ? bi : ($0 > bj ? $0 - 1 : $0) }
         }
-        if tpLib.count > 2 * tpKinds + 6 { tpDebug = "\(W)x\(H) too many pictures \(tpLib.count): reset"; tpReset(); return bad }     // something went wrong: start over
+        // still too many: drop the least-seen entries nobody voted on (misreadings while tiles moved), never the learnt ones
+        while tpLib.count > 2 * tpKinds + 2 {
+            let used = Set(lib)
+            guard let j = (0..<tpLib.count).filter({ tpLib[$0].mine + tpLib[$0].opp == 0 && !used.contains($0) }).min(by: { tpLib[$0].hits < tpLib[$1].hits }) else { break }
+            tpLib.remove(at: j)
+            lib = lib.map { $0 > j ? $0 - 1 : $0 }
+        }
+        if tpLib.count > 2 * tpKinds + 8 { tpDebug = "\(W)x\(H) too many pictures \(tpLib.count): reset"; tpReset(); return bad }     // something went wrong: start over
         // whose turn: the seconds countdown on an avatar (you bottom left, the opponent top right)
         let tm = tpTimer(s, 157, 1907), to = tpTimer(s, 1024, 525)
         // (the floating window can cover the opponent's avatar, so no countdown on yours counts as their turn too)
