@@ -173,6 +173,8 @@ extension BoardReader {
     static var tpPrevKey: [Int] = []
     static var tpObs = (turn: 0, pic: -1, n: 0)
     static var tpLastSeen = 0.0
+    /// what the last reading did (printed by the clip replay test)
+    static var tpDebug = ""
     static var tpKinds = 4               // pictures each player has: one per column
     static var tpShape = 44              // columns × 10 + rows of the map being learnt
 
@@ -206,8 +208,8 @@ extension BoardReader {
         let now = Date().timeIntervalSince1970
         if now - tpLastSeen > 60 { tpReset() }
         tpLastSeen = now
-        if tpBanner(s) { return bad }
-        guard let L = tpLayout(s) else { return bad }
+        if tpBanner(s) { tpDebug = "banner"; return bad }
+        guard let L = tpLayout(s) else { tpDebug = "no layout"; return bad }
         let W = L.cols, H = L.rows
         if W * 10 + H != tpShape { tpReset(); tpShape = W * 10 + H }
         tpKinds = W
@@ -217,7 +219,7 @@ extension BoardReader {
         var tiles: [(kind: Int, sig: [Float])] = []
         for (k, p) in pts.enumerated() {
             let t = tpTile(s, p.0, p.1, p.2)
-            if t.kind < 0 && k < N { return bad }   // your map mid-animation
+            if t.kind < 0 && k < N { tpDebug = "\(W)x\(H) unreadable cell \(k)"; return bad }   // your map mid-animation
             tiles.append(t)
         }
         // a new game starts face down
@@ -233,7 +235,7 @@ extension BoardReader {
         // only learn from a frame that matches the one before (nothing moving)
         let key = zip(tiles, local).map { $0.0.kind * 100 + $0.1 }
         defer { tpPrevKey = key }
-        guard key == tpPrevKey else { return bad }
+        guard key == tpPrevKey else { tpDebug = "\(W)x\(H) moving"; return bad }
         var lib: [Int] = []
         for r in reps {
             var best = -1, bd: Float = .infinity
@@ -241,11 +243,13 @@ extension BoardReader {
             if best >= 0 && bd < tpSame { tpLib[best].sig = r; lib.append(best) }
             else { tpLib.append(TPPicture(sig: r)); lib.append(tpLib.count - 1) }
         }
-        if tpLib.count > 2 * tpKinds + 3 { tpReset(); return bad }     // something went wrong: start over
+        if tpLib.count > 2 * tpKinds + 3 { tpDebug = "\(W)x\(H) too many pictures \(tpLib.count): reset"; tpReset(); return bad }     // something went wrong: start over
         // whose turn: the seconds countdown on an avatar (you bottom left, the opponent top right)
         let tm = tpTimer(s, 157, 1907), to = tpTimer(s, 1024, 525)
         let turn = tm > 0.03 && tm > to + 0.02 ? 1 : (to > 0.03 && to > tm + 0.02 ? 2 : 0)
         let hand = local[2 * N] >= 0 ? lib[local[2 * N]] : -1
+        tpDebug = String(format: "%dx%d k%.2f turn %d (me %.3f opp %.3f) hand %d lib %d votes %@", W, H, L.k, turn, tm, to, hand, tpLib.count,
+                         tpLib.map { "\($0.mine)/\($0.opp)" }.joined(separator: " "))
         if hand >= 0 && turn != 0 {
             tpObs = tpObs.turn == turn && tpObs.pic == hand ? (turn, hand, tpObs.n + 1) : (turn, hand, 1)
             if tpObs.n >= 2 { if turn == 1 { tpLib[hand].mine += 1 } else { tpLib[hand].opp += 1 } }
