@@ -141,11 +141,31 @@ final class TilePushReaderTests: XCTestCase {
         BoardReader.tpReset()
         let s = try rt.sampler("tp3-005.png")
         XCTAssertTrue(BoardReader.looksLikeTilePush(s))
-        XCTAssertEqual(BoardReader.tpSize(s).cols, 3); XCTAssertEqual(BoardReader.tpSize(s).rows, 3)
+        XCTAssertEqual(BoardReader.tpLayout(s)?.cols, 3); XCTAssertEqual(BoardReader.tpLayout(s)?.rows, 3)
         let a = steady(s)
         print("TP3", a.valid, a.cells, a.myTurn)
         let t = try XCTUnwrap(TP.unpack(a.cells))
         XCTAssertEqual(t.w, 3); XCTAssertEqual(t.h, 3)
         for k in 0..<3 { XCTAssertEqual(t.mine[k], t.mine[3 + k], "column \(k)") }
+    }
+
+    /// Atom's screenshot 13:49: a 5×5 map, everything drawn smaller; the opponent's move
+    func testFiveByFive() throws {
+        let rt = ReaderTests()
+        BoardReader.tpReset()
+        let s = try rt.sampler("tp55.png")
+        XCTAssertTrue(BoardReader.looksLikeTilePush(s))
+        let L = try XCTUnwrap(BoardReader.tpLayout(s))
+        XCTAssertEqual(L.cols, 5); XCTAssertEqual(L.rows, 5)
+        let a = steady(s)
+        print("TP55", a.valid, a.cells, a.myTurn)
+        let t = try XCTUnwrap(TP.unpack(a.cells))
+        XCTAssertEqual(t.w, 5); XCTAssertEqual(t.h, 5)
+        let c = t.mine
+        XCTAssertFalse(a.myTurn)
+        for i in [0, 4, 5, 6, 8, 9, 10, 11, 13, 14, 15, 16, 18, 19, 20, 21, 23, 24] { XCTAssertEqual(c[i], 0, "face down \(i)") }
+        XCTAssertEqual(c[2], c[17], "😈"); XCTAssertEqual(c[3], c[22], "coffee")
+        XCTAssertEqual(Set([c[1], c[2], c[3], c[7], c[12]]).count, 5)
+        XCTAssertNotEqual(t.hand, 0)
     }
 }
