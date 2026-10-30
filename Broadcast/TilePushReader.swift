@@ -98,37 +98,30 @@ extension BoardReader {
         }
         if m < 30 { return (-1, []) }
         let cx = x + (x0 + x1) / 2 * k, cy = y + (y0 + y1) / 2 * k
+        // 12×12 blocks of average colour over the picture (block averages don't mind small shifts, scale or a low-res frame)
         var sig = [Float](repeating: 0, count: tpSide * tpSide * 3)
+        let half = 46.0, step = 2 * half / Double(tpSide)
         for j in 0..<tpSide { for i in 0..<tpSide {
-            let p = px(cx + (-52 + Double(i * 4)) * k, cy + (-52 + Double(j * 4)) * k)
-            let k = (j * tpSide + i) * 3
-            sig[k] = Float(p.0); sig[k + 1] = Float(p.1); sig[k + 2] = Float(p.2)
+            var r = 0.0, g = 0.0, b = 0.0
+            for v in 0..<3 { for u in 0..<3 {
+                let p = px(cx + (-half + step * (Double(i) + (Double(u) + 0.5) / 3)) * k, cy + (-half + step * (Double(j) + (Double(v) + 0.5) / 3)) * k)
+                r += p.0; g += p.1; b += p.2
+            } }
+            let q = (j * tpSide + i) * 3
+            sig[q] = Float(r / 9); sig[q + 1] = Float(g / 9); sig[q + 2] = Float(b / 9)
         } }
         return (1, sig)
     }
 
-    static let tpSide = 26
+    static let tpSide = 12
     /// how different two pictures are: mean colour difference, letting one slide a sample (4 px) each way
     static func tpDist(_ a: [Float], _ b: [Float]) -> Float {
-        let S = tpSide
-        func d(_ ox: Int, _ oy: Int) -> Float {
-            var t: Float = 0, n = 0
-            for j in max(0, oy)..<(S + min(0, oy)) {
-                for i in max(0, ox)..<(S + min(0, ox)) {
-                    let ka = (j * S + i) * 3, kb = ((j - oy) * S + (i - ox)) * 3
-                    t += abs(a[ka] - b[kb]) + abs(a[ka + 1] - b[kb + 1]) + abs(a[ka + 2] - b[kb + 2])
-                    n += 3
-                }
-            }
-            return t / Float(max(1, n))
-        }
-        var best = d(0, 0)
-        if best > 40 { return best }
-        for oy in -1...1 { for ox in -1...1 where ox != 0 || oy != 0 { best = min(best, d(ox, oy)) } }
-        return best
+        var t: Float = 0
+        for i in 0..<min(a.count, b.count) { t += abs(a[i] - b[i]) }
+        return t / Float(max(1, a.count))
     }
-    /// same picture below this (measured on Atom's recording: same ≤ 14, different ≥ 29)
-    static let tpSame: Float = 20
+    /// same picture below this (Atom's 6×5 clip at 442 px wide: same ≲ 16, different ≳ 24; emoji alike: same ≲ 16, different ≳ 24)
+    static let tpSame: Float = 18
 
     /// "YOUR TURN!" banner across the screen (it covers your top row)
     static func tpBanner(_ s: Sampler) -> Bool {
@@ -168,11 +161,13 @@ extension BoardReader {
 
     /// The pictures seen this game and who they belong to (votes: in hand on your turn / on the opponent's).
     /// Each player gets four pictures at random each game, so they are learnt while you play.
-    struct TPPicture { var sig: [Float]; var mine = 0; var opp = 0 }
+    struct TPPicture { var sig: [Float]; var mine = 0; var opp = 0; var hits = 0 }
     static var tpLib: [TPPicture] = []
     static var tpPrevKey: [Int] = []
     static var tpObs = (turn: 0, pic: -1, n: 0)
     static var tpLastSeen = 0.0
+    /// what the last reading did (printed by the clip replay test)
+    static var tpDebug = ""
     static var tpKinds = 4               // pictures each player has: one per column
     static var tpShape = 44              // columns × 10 + rows of the map being learnt
 
@@ -206,8 +201,8 @@ extension BoardReader {
         let now = Date().timeIntervalSince1970
         if now - tpLastSeen > 60 { tpReset() }
         tpLastSeen = now
-        if tpBanner(s) { return bad }
-        guard let L = tpLayout(s) else { return bad }
+        if tpBanner(s) { tpDebug = "banner"; return bad }
+        guard let L = tpLayout(s) else { tpDebug = "no layout"; return bad }
         let W = L.cols, H = L.rows
         if W * 10 + H != tpShape { tpReset(); tpShape = W * 10 + H }
         tpKinds = W
@@ -217,7 +212,7 @@ extension BoardReader {
         var tiles: [(kind: Int, sig: [Float])] = []
         for (k, p) in pts.enumerated() {
             let t = tpTile(s, p.0, p.1, p.2)
-            if t.kind < 0 && k < N { return bad }   // your map mid-animation
+            if t.kind < 0 && k < N { tpDebug = "\(W)x\(H) unreadable cell \(k)"; return bad }   // your map mid-animation
             tiles.append(t)
         }
         // a new game starts face down
@@ -233,24 +228,46 @@ extension BoardReader {
         // only learn from a frame that matches the one before (nothing moving)
         let key = zip(tiles, local).map { $0.0.kind * 100 + $0.1 }
         defer { tpPrevKey = key }
-        guard key == tpPrevKey else { return bad }
+        guard key == tpPrevKey else { tpDebug = "\(W)x\(H) moving"; return bad }
         var lib: [Int] = []
         for r in reps {
             var best = -1, bd: Float = .infinity
             for (i, p) in tpLib.enumerated() { let d = tpDist(r, p.sig); if d < bd { bd = d; best = i } }
-            if best >= 0 && bd < tpSame { tpLib[best].sig = r; lib.append(best) }
-            else { tpLib.append(TPPicture(sig: r)); lib.append(tpLib.count - 1) }
+            if best >= 0 && bd < tpSame {
+                for q in 0..<r.count { tpLib[best].sig[q] = 0.8 * tpLib[best].sig[q] + 0.2 * r[q] }   // slow drift, no jumps
+                tpLib[best].hits += 1
+                lib.append(best)
+            } else { tpLib.append(TPPicture(sig: r)); lib.append(tpLib.count - 1) }
         }
-        if tpLib.count > 2 * tpKinds + 3 { tpReset(); return bad }     // something went wrong: start over
+        // more pictures than the game has: two entries are the same picture read differently — merge the closest pair
+        while tpLib.count > 2 * tpKinds {
+            var bi = 0, bj = 1, bd: Float = .infinity
+            for i in 0..<tpLib.count { for j in (i + 1)..<tpLib.count { let d = tpDist(tpLib[i].sig, tpLib[j].sig); if d < bd { bd = d; bi = i; bj = j } } }
+            if bd > 24 { break }
+            tpLib[bi].mine += tpLib[bj].mine; tpLib[bi].opp += tpLib[bj].opp
+            tpLib.remove(at: bj)
+            lib = lib.map { $0 == bj ? bi : ($0 > bj ? $0 - 1 : $0) }
+        }
+        // still too many: drop the least-seen entries nobody voted on (misreadings while tiles moved), never the learnt ones
+        while tpLib.count > 2 * tpKinds + 2 {
+            let used = Set(lib)
+            guard let j = (0..<tpLib.count).filter({ tpLib[$0].mine + tpLib[$0].opp == 0 && !used.contains($0) }).min(by: { tpLib[$0].hits < tpLib[$1].hits }) else { break }
+            tpLib.remove(at: j)
+            lib = lib.map { $0 > j ? $0 - 1 : $0 }
+        }
+        if tpLib.count > 2 * tpKinds + 8 { tpDebug = "\(W)x\(H) too many pictures \(tpLib.count): reset"; tpReset(); return bad }     // something went wrong: start over
         // whose turn: the seconds countdown on an avatar (you bottom left, the opponent top right)
         let tm = tpTimer(s, 157, 1907), to = tpTimer(s, 1024, 525)
-        let turn = tm > 0.03 && tm > to + 0.02 ? 1 : (to > 0.03 && to > tm + 0.02 ? 2 : 0)
+        // (the floating window can cover the opponent's avatar, so no countdown on yours counts as their turn too)
+        let turn = tm > 0.03 && tm > to + 0.02 ? 1 : ((to > 0.03 && to > tm + 0.02) || tm < 0.01 ? 2 : 0)
         let hand = local[2 * N] >= 0 ? lib[local[2 * N]] : -1
+        tpDebug = String(format: "%dx%d k%.2f turn %d (me %.3f opp %.3f) hand %d lib %d votes %@", W, H, L.k, turn, tm, to, hand, tpLib.count,
+                         tpLib.map { "\($0.mine)/\($0.opp)" }.joined(separator: " "))
         if hand >= 0 && turn != 0 {
             tpObs = tpObs.turn == turn && tpObs.pic == hand ? (turn, hand, tpObs.n + 1) : (turn, hand, 1)
-            if tpObs.n >= 2 { if turn == 1 { tpLib[hand].mine += 1 } else { tpLib[hand].opp += 1 } }
+            if tpObs.n >= (turn == 1 ? 2 : 3) { if turn == 1 { tpLib[hand].mine += 1 } else { tpLib[hand].opp += 1 } }
         } else { tpObs = (0, -1, 0) }
-        // codes: yours 3…7, not known yet 8…13, the opponent's 1
+        // codes: yours 3…8, not known yet 9…13, the opponent's 1
         let owner = (0..<tpLib.count).map(tpOwner)
         let mineList = (0..<tpLib.count).filter { owner[$0] == 1 }, unknown = (0..<tpLib.count).filter { owner[$0] == 0 }
         var codes: [Int] = []
@@ -258,8 +275,8 @@ extension BoardReader {
             if t.kind < 0 { codes.append(1); continue }
             if t.kind != 1 { codes.append(t.kind); continue }
             let i = lib[l]
-            if let m = mineList.firstIndex(of: i), m < 5 { codes.append(3 + m) }
-            else if let u = unknown.firstIndex(of: i), u < 6 { codes.append(8 + u) }
+            if let m = mineList.firstIndex(of: i), m < 6 { codes.append(3 + m) }
+            else if let u = unknown.firstIndex(of: i) { codes.append(9 + min(u, 4)) }
             else { codes.append(1) }
         }
         // what popping each of your bottom tiles would hand the opponent: a picture of theirs that tops one of their
@@ -280,6 +297,6 @@ extension BoardReader {
         }
         let cells = TP.pack(cols: W, rows: H, mine: Array(codes[0..<N]), opp: Array(codes[N..<2 * N]), hand: codes[2 * N], gift: gift)
         let h = codes[2 * N]
-        return BoardMessage(valid: true, game: .tilePush, cells: cells, me: 1, myTurn: turn == 1 && (h == 2 || (h >= 3 && h <= 7)))
+        return BoardMessage(valid: true, game: .tilePush, cells: cells, me: 1, myTurn: turn == 1 && (h == 2 || (h >= 3 && h <= 8)))
     }
 }

@@ -168,4 +168,20 @@ final class TilePushReaderTests: XCTestCase {
         XCTAssertEqual(Set([c[1], c[2], c[3], c[7], c[12]]).count, 5)
         XCTAssertNotEqual(t.hand, 0)
     }
+
+    /// Atom's clip 30 Oct 15:56 (the app's own recording, 6×5): every frame through the reader, one line each
+    func testClip1600() throws {
+        let rt = ReaderTests()
+        let dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("clips/tp1600")
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: dir.path).filter({ $0.hasSuffix(".jpg") }).sorted() else { throw XCTSkip("no clip") }
+        BoardReader.tpReset()
+        for n in names {
+            let s = try rt.sampler("../clips/tp1600/" + n)
+            let tp = BoardReader.looksLikeTilePush(s)
+            var m = BoardReader.read(s); m = BoardReader.read(s)
+            var cells = ""
+            if let t = TP.unpack(m.cells) { cells = t.mine.map { String($0, radix: 16) }.joined() + " h" + String(t.hand, radix: 16) + " g" + t.gift.map(String.init).joined() }
+            print("CLIP \(n) tp=\(tp) valid=\(m.valid) my=\(m.myTurn) \(BoardReader.tpDebug) | \(cells)")
+        }
+    }
 }

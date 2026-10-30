@@ -39,8 +39,8 @@ final class TilePushEngine {
     static var W = 4, H = 4
 
     static func top(_ g: Grid, _ c: Int) -> Int { g[c] }
-    static func isMine(_ v: Int) -> Bool { v >= 3 && v <= 7 }
-    static func isUnknown(_ v: Int) -> Bool { v >= 8 }
+    static func isMine(_ v: Int) -> Bool { v >= 3 && v <= 8 }
+    static func isUnknown(_ v: Int) -> Bool { v >= 9 }
     static func colCells(_ g: Grid, _ c: Int) -> [Int] { (0..<H).map { g[$0 * W + c] } }
 
     /// the face a column is built of and how many tiles from the top already fit it
@@ -110,7 +110,7 @@ final class TilePushEngine {
         // faces not seen yet: a new code each (only "different from the others" matters)
         let unseen = max(0, W - seen.count)
         var nextCode = (seen.keys.max() ?? 2) + 1
-        for _ in 0..<unseen where nextCode <= 7 { out.append((nextCode, Double(H))); mineLeft += Double(H); nextCode += 1 }
+        for _ in 0..<unseen where nextCode <= 8 { out.append((nextCode, Double(H))); mineLeft += Double(H); nextCode += 1 }
         if !jokerSeen { out.append((2, 1)); mineLeft += 1 }
         let hid = Double(hidden)
         let scale = mineLeft > hid ? hid / mineLeft : 1
