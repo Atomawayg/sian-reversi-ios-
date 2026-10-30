@@ -1,0 +1,16 @@
+4 4 4000 engine engine
+4 4 4000 engine greedy
+4 4 4000 engine:depth=3 engine
+4 4 4000 engine:depth=7,nodeCap=60000 engine
+4 4 4000 engine:holdBonus=2 engine
+4 4 4000 engine:holdBonus=8 engine
+4 4 4000 engine:bottomBonus=0,lowBonus=0 engine
+4 4 4000 engine:bottomBonus=4,lowBonus=1.5 engine
+4 4 4000 engine:dupShare=0 engine
+4 4 4000 engine:dupShare=1 engine
+4 4 4000 engine:run=0/5/15/40/100 engine
+4 4 4000 engine:run=0/2/5/12/100 engine
+4 4 4000 engine:nowhere=30 engine
+5 4 4000 engine greedy
+5 5 2000 engine greedy
+3 3 4000 engine greedy

@@ -41,21 +41,23 @@ enum Link {
 /// be yours or theirs (same number = same picture).
 enum TP {
     static let maxSide = 6
-    static let cols = 0, rows = 1, mine = 2, opp = 2 + 36, hand = 2 + 72, count = 75
-    static func pack(cols w: Int, rows h: Int, mine: [Int], opp: [Int], hand: Int) -> [Int] {
+    /// gift: per column of yours, what its bottom tile would give the opponent if it popped (their run on that picture + 1)
+    static let cols = 0, rows = 1, mine = 2, opp = 2 + 36, hand = 2 + 72, gift = 75, count = 81
+    static func pack(cols w: Int, rows h: Int, mine: [Int], opp: [Int], hand: Int, gift: [Int] = []) -> [Int] {
         var c = [Int](repeating: 0, count: count)
         c[cols] = w; c[rows] = h
         for i in 0..<min(36, mine.count) { c[TP.mine + i] = mine[i] }
         for i in 0..<min(36, opp.count) { c[TP.opp + i] = opp[i] }
         c[TP.hand] = hand
+        for i in 0..<min(6, gift.count) { c[TP.gift + i] = gift[i] }
         return c
     }
     /// (columns, rows, your map, the opponent's map, hand) or nil when the sizes don't make sense
-    static func unpack(_ c: [Int]) -> (w: Int, h: Int, mine: [Int], opp: [Int], hand: Int)? {
+    static func unpack(_ c: [Int]) -> (w: Int, h: Int, mine: [Int], opp: [Int], hand: Int, gift: [Int])? {
         guard c.count == count else { return nil }
         let w = c[cols], h = c[rows]
         guard w >= 3 && w <= maxSide && h >= 3 && h <= maxSide else { return nil }
-        return (w, h, Array(c[mine..<mine + w * h]), Array(c[opp..<opp + w * h]), c[hand])
+        return (w, h, Array(c[mine..<mine + w * h]), Array(c[opp..<opp + w * h]), c[hand], Array(c[gift..<gift + w]))
     }
 }
 

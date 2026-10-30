@@ -113,6 +113,18 @@ final class TilePushTests: XCTestCase {
         XCTAssertTrue(r.completes)
     }
 
+    /// two face-down columns for a new picture; one would pop a tile that finishes the opponent's column: take the other
+    func testDontFeedTheOpponent() {
+        let g = [0, 0, 3, 4,
+                 0, 0, 3, 4,
+                 0, 0, 3, 4,
+                 1, 1, 0, 0]
+        let r = e.think(mine: g, opp: noOpp, hand: 5, gift: [4, 0, 0, 0])
+        XCTAssertEqual(r.col, 1)
+        let r2 = e.think(mine: g, opp: noOpp, hand: 5, gift: [0, 4, 0, 0])
+        XCTAssertEqual(r2.col, 0)
+    }
+
     /// thinking stays quick on an open board
     func testSpeed() {
         let t0 = Date()

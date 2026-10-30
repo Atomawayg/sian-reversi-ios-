@@ -262,7 +262,23 @@ extension BoardReader {
             else if let u = unknown.firstIndex(of: i), u < 6 { codes.append(8 + u) }
             else { codes.append(1) }
         }
-        let cells = TP.pack(cols: W, rows: H, mine: Array(codes[0..<N]), opp: Array(codes[N..<2 * N]), hand: codes[2 * N])
+        // what popping each of your bottom tiles would hand the opponent: a picture of theirs that tops one of their
+        // columns → that column's run of it + 1 (0 = nothing useful / not theirs / not known)
+        func pic(_ k: Int) -> Int { tiles[k].kind == 1 && local[k] >= 0 ? lib[local[k]] : (tiles[k].kind == 2 ? -2 : -1) }
+        var gift = [Int](repeating: 0, count: W)
+        for c in 0..<W {
+            let b = pic((H - 1) * W + c)
+            guard b >= 0, owner[b] == 2 else { continue }
+            for oc in 0..<W {
+                var run = 0
+                for r in 0..<H {
+                    let v = pic(N + r * W + oc)
+                    if v == b || v == -2 { run += 1 } else { break }
+                }
+                if run > 0 { gift[c] = max(gift[c], min(run + 1, 13)) }
+            }
+        }
+        let cells = TP.pack(cols: W, rows: H, mine: Array(codes[0..<N]), opp: Array(codes[N..<2 * N]), hand: codes[2 * N], gift: gift)
         let h = codes[2 * N]
         return BoardMessage(valid: true, game: .tilePush, cells: cells, me: 1, myTurn: turn == 1 && (h == 2 || (h >= 3 && h <= 7)))
     }
