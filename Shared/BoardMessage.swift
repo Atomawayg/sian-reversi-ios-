@@ -37,7 +37,7 @@ enum Link {
 }
 
 /// Tile Push message layout: 16 cells of your map (row-major, top row first), 16 of the opponent's, then the tile in hand.
-/// 0 face down, 1 the opponent's picture, 2 the blue cat joker, 3…8 your pictures, 9…12 pictures not known yet to be
+/// 0 face down, 1 the opponent's picture, 2 the blue cat joker, 3…6 your pictures, 7…13 pictures not known yet to be
 /// yours or theirs (same number = same picture).
 enum TP {
     static let mine = 0, opp = 16, hand = 32, count = 33

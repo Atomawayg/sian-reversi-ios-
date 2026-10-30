@@ -203,7 +203,7 @@ extension BoardReader {
             tpObs = tpObs.turn == turn && tpObs.pic == hand ? (turn, hand, tpObs.n + 1) : (turn, hand, 1)
             if tpObs.n >= 2 { if turn == 1 { tpLib[hand].mine += 1 } else { tpLib[hand].opp += 1 } }
         } else { tpObs = (0, -1, 0) }
-        // codes: yours 3…8, not known yet 9…12, the opponent's 1
+        // codes: yours 3…6, not known yet 7…13, the opponent's 1
         let owner = (0..<tpLib.count).map(tpOwner)
         let mineList = (0..<tpLib.count).filter { owner[$0] == 1 }, unknown = (0..<tpLib.count).filter { owner[$0] == 0 }
         var cells: [Int] = []
@@ -211,11 +211,11 @@ extension BoardReader {
             if t.kind < 0 { cells.append(1); continue }
             if t.kind != 1 { cells.append(t.kind); continue }
             let i = lib[l]
-            if let m = mineList.firstIndex(of: i), m < 6 { cells.append(3 + m) }
-            else if let u = unknown.firstIndex(of: i), u < 4 { cells.append(9 + u) }
+            if let m = mineList.firstIndex(of: i), m < 4 { cells.append(3 + m) }
+            else if let u = unknown.firstIndex(of: i), u < 7 { cells.append(7 + u) }
             else { cells.append(1) }
         }
         let h = cells[32]
-        return BoardMessage(valid: true, game: .tilePush, cells: cells, me: 1, myTurn: turn == 1 && (h == 2 || (h >= 3 && h <= 8)))
+        return BoardMessage(valid: true, game: .tilePush, cells: cells, me: 1, myTurn: turn == 1 && (h == 2 || (h >= 3 && h <= 6)))
     }
 }
