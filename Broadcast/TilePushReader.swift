@@ -84,12 +84,12 @@ extension BoardReader {
                 cells.append(1); continue   // the tile in flight: nothing to place yet
             }
             if t.kind < 3 { cells.append(t.kind); continue }
-            // same face = same picture (measured: same kind ≤ 4 apart, different kinds ≥ 10)
+            // same face = same picture (measured: same kind ≤ 12 apart — the top map is drawn a little differently — different kinds ≥ 20)
             var id = -1
             for (i, f) in faces.enumerated() {
                 var d = 0.0
                 for q in 0..<f.count { d += abs(f[q] - t.sig[q]) }
-                if d / Double(f.count) < 8 { id = i; break }
+                if d / Double(f.count) < 16 { id = i; break }
             }
             if id < 0 { faces.append(t.sig); id = faces.count - 1 }
             cells.append(min(13, 3 + id))
