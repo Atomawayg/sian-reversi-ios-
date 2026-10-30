@@ -16,7 +16,24 @@ struct TPResult {
     var win = false
 }
 
+/// Knobs of the search, so the simulator (Tools/TPSim) can try variants against each other.
+struct TPTune {
+    var run3: [Double] = [0, 4, 15, 100]              // value of a column's top run, 3 rows
+    var run4: [Double] = [0, 3, 9, 20, 100]           // 4 rows
+    var run5: [Double] = [0, 2, 5, 11, 22, 100]       // 5 rows
+    var lowBonus = 0.5, bottomBonus = 1.5             // a tile of yours below the run (pops back to you later)
+    var dupShare = 0.3                                 // a second column building the same picture
+    var holdBonus = 4.0                                // still holding a tile of yours when the search stops
+    var nowhere = 5.0                                  // holding a tile with nowhere to put it
+    var spin = 6.0                                     // pushing a finished column round for nothing
+    var depth = 5
+    var nodeCap = 15000
+    var giftWeight = 4.0                               // per tile of the opponent's run a popped tile of theirs extends
+    var giftFinish = 40.0                              // … or when it finishes one of their columns
+}
+
 final class TilePushEngine {
+    var tune = TPTune()
     typealias Grid = [Int]       // W×H cells, row-major, top row first
     /// map size (set by think; the search runs on one queue)
     static var W = 4, H = 4
@@ -56,23 +73,24 @@ final class TilePushEngine {
 
     /// How good your map is. Finished columns count most; a column's top run of one face counts more the longer it is.
     /// Two columns building the same face can't both finish (four of each), so only the better one counts in full.
-    static func eval(_ g: Grid) -> Double {
+    func eval(_ g: Grid) -> Double {
+        let W = Self.W, H = Self.H
         // run length → value; the full column is worth most whatever the height
-        let runValue: [Double] = H == 3 ? [0, 4, 15, 100] : (H == 4 ? [0, 3, 9, 20, 100] : [0, 2, 5, 11, 22, 100])
+        let runValue: [Double] = H == 3 ? tune.run3 : (H == 4 ? tune.run4 : tune.run5)
         var byFace: [Int: [Double]] = [:]
         var total = 0.0, doneN = 0
         for c in 0..<W {
-            let col = colCells(g, c)
-            let p = prefix(col)
+            let col = Self.colCells(g, c)
+            let p = Self.prefix(col)
             if p.len == H { doneN += 1 }
             // a tile of yours lower down pops out to you later (a free extra move): small bonus
-            for r in p.len..<H where col[r] == 2 || isMine(col[r]) { total += r == H - 1 ? 1.5 : 0.5 }
+            for r in p.len..<H where col[r] == 2 || Self.isMine(col[r]) { total += r == H - 1 ? tune.bottomBonus : tune.lowBonus }
             if p.face < 0 { total += runValue[p.len] }
             else { byFace[p.face, default: []].append(runValue[p.len]) }
         }
         for (_, vs) in byFace {
             let s = vs.sorted(by: >)
-            total += s[0] + s.dropFirst().reduce(0) { $0 + $1 * 0.3 }
+            total += s[0] + s.dropFirst().reduce(0) { $0 + $1 * tune.dupShare }
         }
         if doneN == W { total += 10000 }
         return total
@@ -111,23 +129,23 @@ final class TilePushEngine {
         for c in 0..<Self.W where Self.allowed(g, c, t) {
             best = max(best, after(g, c, t, opp, depth, p))
         }
-        if best == -.infinity { return Self.eval(g) - 5 }   // nowhere to put it
+        if best == -.infinity { return eval(g) - tune.nowhere }   // nowhere to put it
         return best
     }
 
     private func after(_ g: Grid, _ c: Int, _ t: Int, _ opp: Grid, _ depth: Int, _ p: Double) -> Double {
         let (n, out) = Self.push(g, c, t)
-        var base = Self.eval(n)
+        var base = eval(n)
         // pushing a finished column round and round gets nowhere (only worth it to win the joker back)
-        if Self.done(g, c) && out != 2 { base -= 6 }
+        if Self.done(g, c) && out != 2 { base -= tune.spin }
         if base >= 10000 { return base + Double(depth) }      // won: sooner is better
         if out == 1 { return base }                            // turn over
         if Self.isUnknown(out) {                               // a picture not known yet: yours or theirs, even odds
-            return 0.5 * base + 0.5 * (depth <= 1 ? base + 4 : hold(n, out, opp, depth - 1, p * 0.5))
+            return 0.5 * base + 0.5 * (depth <= 1 ? base + tune.holdBonus : hold(n, out, opp, depth - 1, p * 0.5))
         }
-        if depth <= 1 || p < 0.02 || nodes > 15000 {
-            if out == 0 { return base + 4 * Self.mineChance(n, opp) }
-            return base + 4                                    // still yours to place
+        if depth <= 1 || p < 0.02 || nodes > tune.nodeCap {
+            if out == 0 { return base + tune.holdBonus * Self.mineChance(n, opp) }
+            return base + tune.holdBonus                       // still yours to place
         }
         if out == 0 {
             var e = 0.0
@@ -143,7 +161,9 @@ final class TilePushEngine {
         odds(g, opp: opp, hand: 0).filter { $0.0 != 1 }.reduce(0) { $0 + $1.1 }
     }
 
-    func think(mine g: Grid, opp: Grid, hand t: Int, cols: Int = 4, rows: Int = 4, depth: Int = 5) -> TPResult {
+    /// gift: per column, what its bottom tile would hand the opponent if it popped (their run on it + 1, 0 nothing; TP.gift)
+    func think(mine g: Grid, opp: Grid, hand t: Int, cols: Int = 4, rows: Int = 4, depth: Int? = nil, gift: [Int] = []) -> TPResult {
+        let depth = depth ?? tune.depth
         Self.W = cols; Self.H = rows
         var r = TPResult()
         guard g.count == cols * rows else { return r }
@@ -151,7 +171,12 @@ final class TilePushEngine {
         var best = -Double.infinity
         for c in 0..<Self.W where Self.allowed(g, c, t) {
             nodes = 0
-            let v = after(g, c, t, opp, depth, 1)
+            var v = after(g, c, t, opp, depth, 1)
+            // handing the opponent a picture that tops one of their columns helps them
+            if c < gift.count, gift[c] > 0, g[(rows - 1) * cols + c] == 1 {
+                let run = gift[c] - 1
+                v -= run >= rows - 1 ? tune.giftFinish : tune.giftWeight * Double(run)
+            }
             if v > best + 1e-9 {
                 best = v; r.col = c; r.value = v
                 let (n, out) = Self.push(g, c, t)

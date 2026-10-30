@@ -1273,7 +1273,7 @@ final class GameModel: ObservableObject {
         let g = gen
         work.async { [weak self] in
             guard let self else { return }
-            let r = self.tilePush.think(mine: mine, opp: opp, hand: hand, cols: tp.w, rows: tp.h)
+            let r = self.tilePush.think(mine: mine, opp: opp, hand: hand, cols: tp.w, rows: tp.h, gift: tp.gift)
             DispatchQueue.main.async {
                 guard g == self.gen else { return }
                 guard r.col >= 0 else {
