@@ -1260,7 +1260,8 @@ final class GameModel: ObservableObject {
     // MARK: Tile Push
     private let tilePush = TilePushEngine()
     private func handleTilePush(_ m: BoardMessage) {
-        let mine = Array(m.cells[TP.mine..<TP.mine + 16]), opp = Array(m.cells[TP.opp..<TP.opp + 16]), hand = m.cells[TP.hand]
+        guard let tp = TP.unpack(m.cells) else { return }
+        let mine = tp.mine, opp = tp.opp, hand = tp.hand
         guard m.myTurn else {
             computedFor = []; gen += 1
             show(Overlay(game: .tilePush, cells: m.cells, title: "รอ…", line: "ตาคู่แข่ง"))
@@ -1272,7 +1273,7 @@ final class GameModel: ObservableObject {
         let g = gen
         work.async { [weak self] in
             guard let self else { return }
-            let r = self.tilePush.think(mine: mine, opp: opp, hand: hand)
+            let r = self.tilePush.think(mine: mine, opp: opp, hand: hand, cols: tp.w, rows: tp.h)
             DispatchQueue.main.async {
                 guard g == self.gen else { return }
                 guard r.col >= 0 else {
@@ -1286,7 +1287,7 @@ final class GameModel: ObservableObject {
                 else if r.popped == 2 || TilePushEngine.isMine(r.popped) { line = "ได้เล่นต่อแน่" }
                 else { line = "ลุ้นเล่นต่อ \(Int((r.keep * 100).rounded()))%" }
                 if r.completes && !r.win { line += r.popped == 1 ? " · หมดตา" : (r.popped == 2 || TilePushEngine.isMine(r.popped) ? " · เล่นต่อ" : "") }
-                if m.cells.contains(where: TilePushEngine.isUnknown) { line += "\nกำลังจำไพ่" }
+                if (mine + opp + [hand]).contains(where: TilePushEngine.isUnknown) { line += "\nกำลังจำไพ่" }
                 self.show(Overlay(game: .tilePush, cells: m.cells, rec: r.col, title: "ช่อง \(r.col + 1)", line: line, mine: true))
             }
         }
