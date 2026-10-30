@@ -1,30 +1,59 @@
 import Foundation
 
 /// WePlay Tile Push: your map at the bottom, the opponent's at the top, the tile to place in the middle.
-/// Maps are 3×3, 4×4 or 5 wide × 4 high. Calibrated on Atom's 1180×2556 recordings and screenshots (30 Oct): your map grows
-/// right and down from its top-left corner (340, 1533), the opponent's left and up from its bottom-right (841, 1037);
-/// tiles are 152.7 px apart across and 170.7 down. Each player gets random pictures each game, so pictures are grouped
+/// Maps seen: 3×3, 4×4, 5 wide × 4 high, 5×5. Calibrated on Atom's 1180×2556 recordings and screenshots (30 Oct). Each player gets random pictures each game, so pictures are grouped
 /// by comparing them with each other and learnt as yours / theirs while you play. Cells: see TP.
 extension BoardReader {
-    static let tpPitchX = 152.7, tpPitchY = 170.7
-    static func tpMine(_ c: Int, _ r: Int) -> (Double, Double) { (416.5 + tpPitchX * Double(c), 1608 + tpPitchY * Double(r)) }
-    static func tpOpp(_ c: Int, _ r: Int, _ cols: Int, _ rows: Int) -> (Double, Double) {
-        (764.5 - tpPitchX * Double(cols - 1 - c), 930 - tpPitchY * Double(rows - 1 - r))
-    }
-    static let tpCentre = (x: 590.0, y: 1258.0)
+    /// Where everything is. Your map's top-left corner and the opponent's bottom-right stay put; tiles are 152.6 px apart
+    /// across (125.3 on a 5×5 map, where everything is drawn smaller) and 1.1186 times that down. (Only these two spacings: with
+/// any spacing allowed, a 5×5 map fits a 6×6 one of smaller tiles just as well.)
+    struct TPLayout { var cols: Int; var rows: Int; var k: Double; var mine: [(Double, Double)]; var opp: [(Double, Double)]; var hand: (Double, Double, Double) }
 
-    /// a tile's top-left corner: orange back or white face
-    static func tpIsTile(_ s: Sampler, _ x: Double, _ y: Double) -> Bool {
-        let sx = Double(s.w) / 1180, sy = Double(s.h) / 2556
-        let p = s.avg((x - 50) * sx, (y - 50) * sy, 3 * sx)
-        return (p.0 > 200 && p.0 - p.1 > 70 && p.2 < 120) || (p.0 > 220 && p.1 > 220 && p.2 > 215)
+    static func tpIsTile(_ p: (Double, Double, Double)) -> Bool {
+        (p.0 > 200 && p.0 - p.1 > 70 && p.2 < 120) || (p.0 > 225 && p.1 > 225 && p.2 > 220)
     }
-    /// how big your map is (columns along its second row, rows down its first column)
-    static func tpSize(_ s: Sampler) -> (cols: Int, rows: Int) {
-        var cols = 0, rows = 0
-        while cols < 6 && tpIsTile(s, tpMine(cols, 1).0, tpMine(cols, 1).1) { cols += 1 }
-        while rows < 6 && tpIsTile(s, tpMine(0, rows).0, tpMine(0, rows).1) { rows += 1 }
-        return (cols, rows)
+    /// bounding box of the tiles in an area: columns / rows where at least 30 % of the samples are tile
+    static func tpBox(_ s: Sampler, _ X0: Double, _ X1: Double, _ Y0: Double, _ Y1: Double, white: Bool = false) -> (x0: Double, x1: Double, y0: Double, y1: Double)? {
+        let sx = Double(s.w) / 1180, sy = Double(s.h) / 2556
+        let nx = Int((X1 - X0) / 3), ny = Int((Y1 - Y0) / 3)
+        var colHits = [Int](repeating: 0, count: nx), rowHits = [Int](repeating: 0, count: ny)
+        for j in stride(from: 0, to: ny, by: 2) {
+            for i in 0..<nx {
+                let p = s.get(min(s.w - 1, Int((X0 + Double(i) * 3) * sx)), min(s.h - 1, Int((Y0 + Double(j) * 3) * sy)))
+                let hit = white ? (p.0 > 225 && p.1 > 225 && p.2 > 220) : tpIsTile(p)
+                if hit { colHits[i] += 1; rowHits[j] += 1 }
+            }
+        }
+        let cx = (0..<nx).filter { Double(colHits[$0]) > 0.3 * Double((ny + 1) / 2) }
+        let ry = stride(from: 0, to: ny, by: 2).filter { Double(rowHits[$0]) > 0.3 * Double(nx) }
+        guard let a = cx.first, let b = cx.last, let c = ry.first, let d = ry.last else { return nil }
+        return (X0 + Double(a) * 3, X0 + Double(b) * 3, Y0 + Double(c) * 3, Y0 + Double(d) * 3)
+    }
+
+    static func tpLayout(_ s: Sampler) -> TPLayout? {
+        guard let m = tpBox(s, 200, 1100, 1400, 2400) else { return nil }
+        let w = m.x1 - m.x0 + 1, h = m.y1 - m.y0 + 1
+        var best: (e: Double, c: Int, r: Int, p: Double)? = nil
+        for p in [152.6, 125.3] {
+            let k = p / 152.6, py = p * 1.1186, lip = 9 * k
+            let c = w / p, r = (h - lip) / py
+            let C = Int(c.rounded()), R = Int(r.rounded())
+            guard C >= 3 && C <= TP.maxSide && R >= 3 && R <= TP.maxSide else { continue }
+            let e = abs(c - Double(C)) + abs(r - Double(R))
+            if best == nil || e < best!.e { best = (e, C, R, p) }
+        }
+        guard let b = best, b.e < 0.3 else { return nil }
+        let k = b.p / 152.6, py = b.p * 1.1186, lip = 9 * k
+        var mine: [(Double, Double)] = [], opp: [(Double, Double)] = []
+        for r in 0..<b.r { for c in 0..<b.c { mine.append((m.x0 + b.p * (Double(c) + 0.5), m.y0 + 0.44 * py + py * Double(r))) } }
+        guard let o = tpBox(s, 0, 860, 200, 1160) else { return nil }
+        for r in 0..<b.r { for c in 0..<b.c {
+            opp.append((o.x1 - b.p * (Double(b.c - c) - 0.5), o.y1 - lip - py * Double(b.r - r) + 0.44 * py))
+        } }
+        // the tile in hand: the white face in the middle (drawn at the map's scale)
+        var hand = (590.0, 1258.0, k)
+        if let t = tpBox(s, 450, 730, 1120, 1420, white: true) { hand = ((t.x0 + t.x1) / 2, (t.y0 + t.y1) / 2, k) }
+        return TPLayout(cols: b.c, rows: b.r, k: k, mine: mine, opp: opp, hand: hand)
     }
 
     private static func tpSand(_ p: (Double, Double, Double)) -> Bool {
@@ -33,7 +62,7 @@ extension BoardReader {
 
     /// One tile: 0 face down, 1 a picture (with its 26×26 colour sample, centred on the picture), 2 the joker,
     /// -1 not a resting tile (moving, covered, flashing).
-    static func tpTile(_ s: Sampler, _ x: Double, _ y: Double) -> (kind: Int, sig: [Float]) {
+    static func tpTile(_ s: Sampler, _ x: Double, _ y: Double, _ k: Double = 1) -> (kind: Int, sig: [Float]) {
         let sx = Double(s.w) / 1180, sy = Double(s.h) / 2556
         func px(_ X: Double, _ Y: Double) -> (Double, Double, Double) {
             s.get(min(s.w - 1, max(0, Int(X * sx))), min(s.h - 1, max(0, Int(Y * sy))))
@@ -43,7 +72,7 @@ extension BoardReader {
         while dy <= 54 {
             var dx = -54.0
             while dx <= 54 {
-                let p = px(x + dx, y + dy)
+                let p = px(x + dx * k, y + dy * k)
                 n += 1
                 if p.0 > 200 && p.0 - p.1 > 70 && p.2 < 120 { orange += 1 }
                 if p.0 > 225 && p.1 > 225 && p.2 > 220 { white += 1 }
@@ -61,17 +90,17 @@ extension BoardReader {
         while dy <= 50 {
             var dx = -50.0
             while dx <= 50 {
-                let p = px(x + dx, y + dy)
+                let p = px(x + dx * k, y + dy * k)
                 if !(p.0 > 215 && p.1 > 210 && p.2 > 200) { m += 1; x0 = min(x0, dx); x1 = max(x1, dx); y0 = min(y0, dy); y1 = max(y1, dy) }
                 dx += 2
             }
             dy += 2
         }
         if m < 30 { return (-1, []) }
-        let cx = x + (x0 + x1) / 2, cy = y + (y0 + y1) / 2
+        let cx = x + (x0 + x1) / 2 * k, cy = y + (y0 + y1) / 2 * k
         var sig = [Float](repeating: 0, count: tpSide * tpSide * 3)
         for j in 0..<tpSide { for i in 0..<tpSide {
-            let p = px(cx - 52 + Double(i * 4), cy - 52 + Double(j * 4))
+            let p = px(cx + (-52 + Double(i * 4)) * k, cy + (-52 + Double(j * 4)) * k)
             let k = (j * tpSide + i) * 3
             sig[k] = Float(p.0); sig[k + 1] = Float(p.1); sig[k + 2] = Float(p.2)
         } }
@@ -145,6 +174,7 @@ extension BoardReader {
     static var tpObs = (turn: 0, pic: -1, n: 0)
     static var tpLastSeen = 0.0
     static var tpKinds = 4               // pictures each player has: one per column
+    static var tpShape = 44              // columns × 10 + rows of the map being learnt
 
     static func tpReset() { tpLib = []; tpObs = (0, -1, 0); tpPrevKey = [] }
 
@@ -167,8 +197,8 @@ extension BoardReader {
         let sx = Double(s.w) / 1180, sy = Double(s.h) / 2556
         let sand = [(1100.0, 1250.0), (590, 1100), (100, 1000)].filter { tpSand(s.avg($0.0 * sx, $0.1 * sy, 3 * sx)) }.count
         guard sand >= 2 else { return false }
-        let n = tpSize(s)
-        return n.cols >= 3 && n.rows >= 3
+        // the banner or a tile animation can hide part of the map: still this game (the reading just waits)
+        return tpBanner(s) || tpBox(s, 200, 1100, 1400, 2400) != nil
     }
 
     static func readTilePush(_ s: Sampler) -> BoardMessage {
@@ -177,17 +207,16 @@ extension BoardReader {
         if now - tpLastSeen > 60 { tpReset() }
         tpLastSeen = now
         if tpBanner(s) { return bad }
-        let (W, H) = tpSize(s)
-        guard W >= 3 && W <= TP.maxSide && H >= 3 && H <= TP.maxSide else { return bad }
-        if W != tpKinds { tpReset(); tpKinds = W }
-        var pts: [(Double, Double)] = []
-        for r in 0..<H { for c in 0..<W { pts.append(tpMine(c, r)) } }
-        for r in 0..<H { for c in 0..<W { pts.append(tpOpp(c, r, W, H)) } }
-        pts.append((tpCentre.x, tpCentre.y))
+        guard let L = tpLayout(s) else { return bad }
+        let W = L.cols, H = L.rows
+        if W * 10 + H != tpShape { tpReset(); tpShape = W * 10 + H }
+        tpKinds = W
+        var pts: [(Double, Double, Double)] = L.mine.map { ($0.0, $0.1, L.k) } + L.opp.map { ($0.0, $0.1, L.k) }
+        pts.append(L.hand)
         let N = W * H
         var tiles: [(kind: Int, sig: [Float])] = []
         for (k, p) in pts.enumerated() {
-            let t = tpTile(s, p.0, p.1)
+            let t = tpTile(s, p.0, p.1, p.2)
             if t.kind < 0 && k < N { return bad }   // your map mid-animation
             tiles.append(t)
         }
